@@ -1,18 +1,19 @@
-FROM node:20-alpine
+FROM node:18-alpine
 
+# Set working directory
 WORKDIR /app
 
-# Copy dependency manifests
+# Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install runtime production dependencies
-RUN npm install --omit=dev
+# Install dependencies
+RUN npm install --production
 
-# Copy application source and prebuilt bundle
+# Copy the rest of your app's source code
 COPY . .
 
-# Production environment
+# Set environment
 ENV NODE_ENV=production
 
-# Run bot directly with node
-CMD ["node", "dist/bot.js"]
+# Run your bot script
+CMD ["node", "index.js"]
