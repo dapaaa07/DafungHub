@@ -7,6 +7,16 @@ console.log('🤖 Starting DaFung Hub Telegram Bot Service...');
 // HTTP Server for Webhook & Healthcheck
 const port = process.env.PORT || 3000;
 const server = http.createServer((req, res) => {
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Cache-Control, Pragma, x-callback-signature, x-callback-event',
+    });
+    res.end();
+    return;
+  }
+
   if (req.method === 'POST') {
     let body = '';
     req.on('data', (chunk) => {
@@ -70,8 +80,42 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // GET Request (Health check)
-  res.writeHead(200, { 'Content-Type': 'application/json' });
+  // GET /api/bot-status route
+  if (req.url?.includes('bot-status')) {
+    (async () => {
+      try {
+        const { getBotStatus } = await import('../lib/settings');
+        const status = await getBotStatus();
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Cache-Control, Pragma',
+        });
+        res.end(
+          JSON.stringify({
+            status,
+            timestamp: new Date().toISOString(),
+          })
+        );
+      } catch (err) {
+        console.error('[HTTP Server] bot-status error:', err);
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        });
+        res.end(JSON.stringify({ status: 'online', fallback: true }));
+      }
+    })();
+    return;
+  }
+
+  // Default GET Request (Health check)
+  res.writeHead(200, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+  });
   res.end(
     JSON.stringify({
       status: 'ok',

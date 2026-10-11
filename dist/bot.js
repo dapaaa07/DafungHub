@@ -38681,6 +38681,15 @@ init_fulfillment();
 console.log("\u{1F916} Starting DaFung Hub Telegram Bot Service...");
 var port = process.env.PORT || 3e3;
 var server = import_http.default.createServer((req, res) => {
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Cache-Control, Pragma, x-callback-signature, x-callback-event"
+    });
+    res.end();
+    return;
+  }
   if (req.method === "POST") {
     let body = "";
     req.on("data", (chunk) => {
@@ -38734,7 +38743,39 @@ var server = import_http.default.createServer((req, res) => {
     });
     return;
   }
-  res.writeHead(200, { "Content-Type": "application/json" });
+  if (req.url?.includes("bot-status")) {
+    (async () => {
+      try {
+        const { getBotStatus: getBotStatus2 } = await Promise.resolve().then(() => (init_settings(), settings_exports));
+        const status = await getBotStatus2();
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Cache-Control, Pragma"
+        });
+        res.end(
+          JSON.stringify({
+            status,
+            timestamp: (/* @__PURE__ */ new Date()).toISOString()
+          })
+        );
+      } catch (err) {
+        console.error("[HTTP Server] bot-status error:", err);
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*"
+        });
+        res.end(JSON.stringify({ status: "online", fallback: true }));
+      }
+    })();
+    return;
+  }
+  res.writeHead(200, {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*"
+  });
   res.end(
     JSON.stringify({
       status: "ok",
