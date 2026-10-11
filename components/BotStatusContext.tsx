@@ -1,7 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { BotStatus } from '@/lib/settings';
+
+export type BotStatus = 'online' | 'maintenance';
 
 interface BotStatusContextValue {
   botStatus: BotStatus;
@@ -12,6 +13,17 @@ const BotStatusContext = createContext<BotStatusContextValue>({
   botStatus: 'online',
   refreshStatus: async () => {},
 });
+
+function getStatusEndpoint(): string {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    // When running on shared hosting (e.g. store.dafung.web.id), point to Vercel API
+    if (host.includes('dafung.web.id')) {
+      return 'https://dafung-hub.vercel.app/api/bot-status';
+    }
+  }
+  return '/api/bot-status';
+}
 
 export function BotStatusProvider({
   initialStatus = 'online',
@@ -24,7 +36,8 @@ export function BotStatusProvider({
 
   const fetchLatestStatus = async () => {
     try {
-      const res = await fetch('/api/bot-status', {
+      const endpoint = getStatusEndpoint();
+      const res = await fetch(endpoint, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
@@ -36,16 +49,19 @@ export function BotStatusProvider({
           setBotStatus(data.status);
         }
       }
-    } catch {
+    } catch (err) {
       // Ignore background fetch error
     }
   };
 
   useEffect(() => {
-    // 1. Polling interval every 10 seconds
+    // 1. Fetch immediately on client mount
+    fetchLatestStatus();
+
+    // 2. Polling interval every 10 seconds
     const interval = setInterval(fetchLatestStatus, 10000);
 
-    // 2. Refresh immediately when window/tab is focused
+    // 3. Refresh immediately when window/tab is focused
     const handleFocus = () => {
       fetchLatestStatus();
     };
