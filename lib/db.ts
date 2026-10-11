@@ -51,12 +51,17 @@ declare global {
 
 function createPool(): Pool {
   const connectionString = process.env.DATABASE_URL;
+  const isRemote =
+    connectionString?.includes('supabase.co') ||
+    connectionString?.includes('pooler.supabase.com') ||
+    connectionString?.includes('sslmode=require');
 
   return new Pool({
     connectionString,
     max: 10,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: 10000,
+    ssl: isRemote ? { rejectUnauthorized: false } : undefined,
   });
 }
 

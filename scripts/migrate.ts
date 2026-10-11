@@ -17,7 +17,15 @@ export async function runMigrations(customConnectionString?: string): Promise<vo
     throw new Error('DATABASE_URL is not set in environment variables');
   }
 
-  const pool = new Pool({ connectionString });
+  const isRemote =
+    connectionString.includes('supabase.co') ||
+    connectionString.includes('pooler.supabase.com') ||
+    connectionString.includes('sslmode=require');
+
+  const pool = new Pool({
+    connectionString,
+    ssl: isRemote ? { rejectUnauthorized: false } : undefined,
+  });
   const client = await pool.connect();
 
   try {
