@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "tsx scripts/run-bot.ts",
+    "build:bot": "esbuild scripts/run-bot.ts --bundle --platform=node --target=node18 --outfile=dist/bot.js --external:pg-native --external:node-telegram-bot-api",
+    "start": "node dist/bot.js",
+    "start:dev": "tsx scripts/run-bot.ts",
     "start:web": "next start",
     "lint": "eslint",
     "db:migrate": "tsx scripts/migrate.ts",

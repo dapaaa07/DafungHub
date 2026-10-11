@@ -1,18 +1,18 @@
-FROM node:20-slim
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy dependency definitions
+# Copy dependency manifests
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install runtime production dependencies
+RUN npm install --omit=dev
 
-# Copy application code
+# Copy application source and prebuilt bundle
 COPY . .
 
-# Set environment
+# Production environment
 ENV NODE_ENV=production
 
-# Run the Telegram bot
-CMD ["npm", "start"]
+# Run bot directly with node
+CMD ["node", "dist/bot.js"]
