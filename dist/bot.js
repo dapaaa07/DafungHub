@@ -5476,14 +5476,27 @@ var init_settings = __esm({
 var pricing_exports = {};
 __export(pricing_exports, {
   ADMIN_TELEGRAM_ID: () => ADMIN_TELEGRAM_ID,
+  GATEWAY_CHANNELS: () => GATEWAY_CHANNELS,
+  calculateGatewayFee: () => calculateGatewayFee,
   calculateProfit: () => calculateProfit,
+  calculateProtectedSellingPrice: () => calculateProtectedSellingPrice,
   calculateSellingPrice: () => calculateSellingPrice,
   defaultMarginConfig: () => defaultMarginConfig,
-  isAdmin: () => isAdmin
+  isAdmin: () => isAdmin,
+  roundToMarketStandard: () => roundToMarketStandard
 });
 function isAdmin(telegramId) {
   if (!telegramId) return false;
   return String(telegramId) === ADMIN_TELEGRAM_ID;
+}
+function roundToMarketStandard(amount, interval = 500) {
+  if (amount <= 0) return 0;
+  return Math.ceil(amount / interval) * interval;
+}
+function calculateGatewayFee(amount, channelCode = "QRIS") {
+  if (amount <= 0) return 0;
+  const cfg = GATEWAY_CHANNELS[channelCode] || GATEWAY_CHANNELS.QRIS;
+  return amount * cfg.rate + cfg.flat;
 }
 function calculateSellingPrice(modalPrice, customMarkup) {
   if (modalPrice <= 0) return 0;
@@ -5493,21 +5506,47 @@ function calculateSellingPrice(modalPrice, customMarkup) {
       markup = 3e3;
     } else if (modalPrice < 5e4) {
       markup = 5e3;
-    } else {
+    } else if (modalPrice < 5e5) {
       markup = 1e4;
+    } else {
+      markup = Math.max(15e3, Math.round(modalPrice * 0.05));
     }
   }
   const rawSellingPrice = modalPrice + markup;
-  return Math.ceil(rawSellingPrice / 500) * 500;
+  return roundToMarketStandard(rawSellingPrice, 500);
 }
-function calculateProfit(sellingPrice, modalPrice) {
-  return Math.max(0, sellingPrice - modalPrice);
+function calculateProtectedSellingPrice(cogs, targetProfit = 5e3, channelCode = "QRIS", interval = 500) {
+  if (cogs <= 0) return 0;
+  const cfg = GATEWAY_CHANNELS[channelCode] || GATEWAY_CHANNELS.QRIS;
+  const rawPrice = (cogs + targetProfit + cfg.flat) / (1 - cfg.rate);
+  return roundToMarketStandard(rawPrice, interval);
 }
-var ADMIN_TELEGRAM_ID, defaultMarginConfig;
+function calculateProfit(sellingPrice, modalPrice, channelCode) {
+  if (sellingPrice <= modalPrice) return 0;
+  if (!channelCode) {
+    return Math.max(0, sellingPrice - modalPrice);
+  }
+  const fee = calculateGatewayFee(sellingPrice, channelCode);
+  const net = sellingPrice - fee - modalPrice;
+  return Math.max(0, Math.round(net));
+}
+var ADMIN_TELEGRAM_ID, GATEWAY_CHANNELS, defaultMarginConfig;
 var init_pricing = __esm({
   "lib/pricing.ts"() {
     "use strict";
     ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID || "7133868769";
+    GATEWAY_CHANNELS = {
+      QRIS: { rate: 7e-3, flat: 350, name: "QRIS Standard" },
+      QRISC: { rate: 7e-3, flat: 100, name: "QRISC" },
+      QRISMU: { rate: 8e-3, flat: 250, name: "QRISMU" },
+      QRIS2: { rate: 9e-3, flat: 0, name: "QRIS2" },
+      SHOPEEPAY: { rate: 0.03, flat: 0, name: "ShopeePay" },
+      GOPAY: { rate: 0.03, flat: 0, name: "GoPay" },
+      BCAVA: { rate: 0, flat: 4900, name: "BCA Virtual Account" },
+      BAGVA: { rate: 0, flat: 4200, name: "Artha Graha VA" },
+      VA_GENERAL: { rate: 0, flat: 3500, name: "General VA" },
+      RETAIL_OUTLET: { rate: 0, flat: 3e3, name: "Indomaret / Alfamart" }
+    };
     defaultMarginConfig = {
       defaultFlatMarkup: 5e3,
       minProfit: 2e3
@@ -37489,6 +37528,7 @@ __export(sakurupiah_exports, {
   createSakurupiahInvoice: () => createSakurupiahInvoice,
   generateSakurupiahSignature: () => generateSakurupiahSignature,
   getSakurupiahBaseUrl: () => getSakurupiahBaseUrl,
+  selectOptimalQrisChannel: () => selectOptimalQrisChannel,
   verifySakurupiahCallbackSignature: () => verifySakurupiahCallbackSignature
 });
 function getSakurupiahBaseUrl() {
@@ -37511,21 +37551,42 @@ function verifySakurupiahCallbackSignature(rawJsonBody, incomingSignature, apiKe
     return false;
   }
 }
-async function createSakurupiahInvoice(orderId, grossAmount, productName = "Akun Digital", customerName = "Pelanggan", customerEmail = "buyer@dafung-hub.com", customerPhone = "081234567890", method = "QRIS") {
+function selectOptimalQrisChannel(estimatedInvoice, availableChannels = ["QRIS", "QRIS2"]) {
+  if (estimatedInvoice <= 0) return "QRIS";
+  const costMap = {};
+  for (const channel of availableChannels) {
+    if (channel === "QRIS2") {
+      costMap[channel] = estimatedInvoice * 9e-3;
+    } else if (channel === "QRISC") {
+      costMap[channel] = estimatedInvoice * 7e-3 + 100;
+    } else if (channel === "QRIS") {
+      costMap[channel] = estimatedInvoice * 7e-3 + 350;
+    } else if (channel === "QRISMU") {
+      costMap[channel] = estimatedInvoice * 8e-3 + 250;
+    }
+  }
+  const entries = Object.entries(costMap);
+  if (entries.length === 0) return "QRIS";
+  entries.sort((a, b) => a[1] - b[1]);
+  return entries[0][0];
+}
+async function createSakurupiahInvoice(orderId, grossAmount, productName = "Akun Digital", customerName, customerEmail = "buyer@dafung-hub.com", customerPhone = "081234567890", method = "AUTO") {
   if (!orderId) {
     throw new Error("orderId is required to create a Sakurupiah transaction");
   }
   if (grossAmount <= 0) {
     throw new Error("grossAmount must be greater than 0");
   }
+  const effectiveMethod = method === "AUTO" || method === "AUTO_QRIS" ? selectOptimalQrisChannel(grossAmount) : method;
   const baseUrl = getSakurupiahBaseUrl();
   const apiId = SAKURUPIAH_API_ID;
   const apiKey = SAKURUPIAH_API_KEY;
   const roundedAmount = Math.round(grossAmount);
   const amountStr = String(roundedAmount);
+  const finalCustomerName = customerName && customerName.trim().length > 0 ? customerName.trim() : "Pelanggan";
   const signature = generateSakurupiahSignature(
     apiId,
-    method,
+    effectiveMethod,
     orderId,
     amountStr,
     apiKey
@@ -37534,8 +37595,8 @@ async function createSakurupiahInvoice(orderId, grossAmount, productName = "Akun
   const returnUrl = process.env.APP_URL || "https://dafung-hub.vercel.app";
   const params = new URLSearchParams();
   params.append("api_id", apiId);
-  params.append("method", method);
-  params.append("name", customerName);
+  params.append("method", effectiveMethod);
+  params.append("name", finalCustomerName);
   params.append("email", customerEmail);
   params.append("phone", customerPhone);
   params.append("amount", amountStr);
@@ -37771,13 +37832,12 @@ async function handleBuy(ctx, productId, botInstance) {
       qrisResult = await createQrisTransaction2(orderCode, product.price);
     } else {
       const { createSakurupiahInvoice: createSakurupiahInvoice2 } = await Promise.resolve().then(() => (init_sakurupiah(), sakurupiah_exports));
-      const buyerName = ctx.from?.first_name || "Pelanggan";
-      const buyerUsername = ctx.from?.username ? ` (@${ctx.from.username})` : "";
+      const telegramUsername = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || `User_${ctx.from?.id || "Buyer"}`;
       qrisResult = await createSakurupiahInvoice2(
         orderCode,
         product.price,
         product.name,
-        `${buyerName}${buyerUsername}`
+        telegramUsername
       );
     }
   } catch (error) {

@@ -109,16 +109,56 @@ export function verifySakurupiahCallbackSignature(
 }
 
 /**
+ * Select the optimal QRIS channel with the lowest processing cost:
+ *
+ * Inversion point:
+ * - QRIS (Standard): 0.007 * T + 350
+ * - QRIS2: 0.009 * T
+ *
+ * Mathematical Threshold:
+ * 0.009 * T = 0.007 * T + 350 => 0.002 * T = 350 => T = Rp 175.000
+ *
+ * For T <= Rp 175.000 => QRIS2 is cheaper.
+ * For T > Rp 175.000  => QRIS (Standard) is cheaper.
+ */
+export function selectOptimalQrisChannel(
+  estimatedInvoice: number,
+  availableChannels: string[] = ['QRIS', 'QRIS2']
+): string {
+  if (estimatedInvoice <= 0) return 'QRIS';
+
+  const costMap: Record<string, number> = {};
+
+  for (const channel of availableChannels) {
+    if (channel === 'QRIS2') {
+      costMap[channel] = estimatedInvoice * 0.009;
+    } else if (channel === 'QRISC') {
+      costMap[channel] = (estimatedInvoice * 0.007) + 100;
+    } else if (channel === 'QRIS') {
+      costMap[channel] = (estimatedInvoice * 0.007) + 350;
+    } else if (channel === 'QRISMU') {
+      costMap[channel] = (estimatedInvoice * 0.008) + 250;
+    }
+  }
+
+  const entries = Object.entries(costMap);
+  if (entries.length === 0) return 'QRIS';
+
+  entries.sort((a, b) => a[1] - b[1]);
+  return entries[0][0];
+}
+
+/**
  * Create a dynamic QRIS transaction via Sakurupiah API
  */
 export async function createSakurupiahInvoice(
   orderId: string,
   grossAmount: number,
   productName: string = 'Akun Digital',
-  customerName: string = 'Pelanggan',
+  customerName?: string,
   customerEmail: string = 'buyer@dafung-hub.com',
   customerPhone: string = '081234567890',
-  method: string = 'QRIS'
+  method: string = 'AUTO'
 ): Promise<SakurupiahTransactionResult> {
   if (!orderId) {
     throw new Error('orderId is required to create a Sakurupiah transaction');
@@ -128,15 +168,24 @@ export async function createSakurupiahInvoice(
     throw new Error('grossAmount must be greater than 0');
   }
 
+  // Resolve method dynamically if AUTO or default QRIS
+  const effectiveMethod =
+    method === 'AUTO' || method === 'AUTO_QRIS'
+      ? selectOptimalQrisChannel(grossAmount)
+      : method;
+
   const baseUrl = getSakurupiahBaseUrl();
   const apiId = SAKURUPIAH_API_ID;
   const apiKey = SAKURUPIAH_API_KEY;
   const roundedAmount = Math.round(grossAmount);
   const amountStr = String(roundedAmount);
+  const finalCustomerName = (customerName && customerName.trim().length > 0)
+    ? customerName.trim()
+    : 'Pelanggan';
 
   const signature = generateSakurupiahSignature(
     apiId,
-    method,
+    effectiveMethod,
     orderId,
     amountStr,
     apiKey
@@ -151,8 +200,8 @@ export async function createSakurupiahInvoice(
 
   const params = new URLSearchParams();
   params.append('api_id', apiId);
-  params.append('method', method);
-  params.append('name', customerName);
+  params.append('method', effectiveMethod);
+  params.append('name', finalCustomerName);
   params.append('email', customerEmail);
   params.append('phone', customerPhone);
   params.append('amount', amountStr);

@@ -4,6 +4,8 @@ import {
   isAdmin,
   calculateSellingPrice,
   calculateProfit,
+  calculateProtectedSellingPrice,
+  calculateGatewayFee,
   ADMIN_TELEGRAM_ID,
 } from '../lib/pricing';
 
@@ -50,4 +52,26 @@ test('Pricing & Admin: calculateProfit computes net profit margin', () => {
 
   const zeroProfit = calculateProfit(5000, 10000);
   assert.strictEqual(zeroProfit, 0);
+
+  // Profit with gateway deduction
+  const profitAfterFee = calculateProfit(80000, 69600, 'QRIS');
+  // Fee for 80.000 QRIS = 80.000 * 0.007 + 350 = 560 + 350 = 910
+  // Net profit = 80.000 - 910 - 69.600 = 9.490
+  assert.strictEqual(profitAfterFee, 9490);
+});
+
+test('Cost-Plus Protection Engine: calculateProtectedSellingPrice guarantees target profit', () => {
+  const cogs = 39500;
+  const targetProfit = 5000;
+  const channel = 'QRIS';
+
+  const protectedPrice = calculateProtectedSellingPrice(cogs, targetProfit, channel);
+  assert.strictEqual(protectedPrice, 45500);
+
+  const fee = calculateGatewayFee(protectedPrice, channel);
+  assert.strictEqual(fee, 45500 * 0.007 + 350);
+
+  const netPayout = protectedPrice - fee;
+  const actualProfit = netPayout - cogs;
+  assert.ok(actualProfit >= targetProfit, `Actual profit (${actualProfit}) must be >= target profit (${targetProfit})`);
 });

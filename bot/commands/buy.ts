@@ -188,13 +188,16 @@ export async function handleBuy(
       qrisResult = await createQrisTransaction(orderCode, product.price);
     } else {
       const { createSakurupiahInvoice } = await import('../../lib/sakurupiah');
-      const buyerName = ctx.from?.first_name || 'Pelanggan';
-      const buyerUsername = ctx.from?.username ? ` (@${ctx.from.username})` : '';
+      // Ambil username Telegram buyer untuk data customerName di Sakurupiah
+      const telegramUsername = ctx.from?.username
+        ? `@${ctx.from.username}`
+        : (ctx.from?.first_name || `User_${ctx.from?.id || 'Buyer'}`);
+
       qrisResult = await createSakurupiahInvoice(
         orderCode,
         product.price,
         product.name,
-        `${buyerName}${buyerUsername}`
+        telegramUsername
       );
     }
   } catch (error) {

@@ -7,6 +7,7 @@ import {
   verifySakurupiahCallbackSignature,
   getSakurupiahBaseUrl,
   createSakurupiahInvoice,
+  selectOptimalQrisChannel,
   SAKURUPIAH_API_KEY,
 } from '../lib/sakurupiah';
 import { POST as sakurupiahWebhookPOST } from '../app/api/webhooks/sakurupiah/route';
@@ -80,6 +81,21 @@ test('Sakurupiah Client: getSakurupiahBaseUrl correctly determines Sandbox vs Pr
   // Sandbox by default with SANBOX prefix
   const url = getSakurupiahBaseUrl();
   assert.ok(url.includes('sakurupiah.id'), 'URL must point to sakurupiah domain');
+});
+
+test('Dynamic Gateway Routing: selectOptimalQrisChannel routes correctly based on inversion threshold (Rp 175.000)', () => {
+  // 1. Below Rp 175.000: QRIS2 (0.9% without flat fee) is cheaper than QRIS (0.7% + 350)
+  // For 50.000: QRIS2 fee is 450, QRIS fee is 350 + 350 = 700
+  const smallInvoiceChannel = selectOptimalQrisChannel(50000, ['QRIS', 'QRIS2']);
+  assert.strictEqual(smallInvoiceChannel, 'QRIS2', 'Transactions under 175k must route to QRIS2 for maximum savings');
+
+  // 2. Above Rp 175.000: QRIS Standard (0.7% + 350) is cheaper than QRIS2 (0.9%)
+  // For 300.000: QRIS2 fee is 2.700, QRIS fee is 2.100 + 350 = 2.450
+  const largeInvoiceChannel = selectOptimalQrisChannel(300000, ['QRIS', 'QRIS2']);
+  assert.strictEqual(largeInvoiceChannel, 'QRIS', 'Transactions over 175k must route to QRIS standard');
+
+  // 3. Fallback / edge cases
+  assert.strictEqual(selectOptimalQrisChannel(0), 'QRIS');
 });
 
 test('Sakurupiah Client: createSakurupiahInvoice validates invalid input', async () => {
