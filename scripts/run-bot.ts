@@ -16,6 +16,31 @@ const server = http.createServer((req, res) => {
       try {
         const data = JSON.parse(body || '{}');
 
+        // Check if Sakurupiah webhook
+        if (req.url?.includes('sakurupiah')) {
+          const signature = (req.headers['x-callback-signature'] as string) || '';
+          const { verifySakurupiahCallbackSignature } = await import('../lib/sakurupiah');
+          if (signature && !verifySakurupiahCallbackSignature(body, signature)) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, message: 'Invalid signature' }));
+            return;
+          }
+
+          const orderId = data.merchant_ref;
+          const status = data.status;
+          const statusCode = Number(data.status_kode);
+          const isPaid = status === 'berhasil' && (statusCode === 1 || isNaN(statusCode));
+
+          if (isPaid && orderId) {
+            console.log(`[Sakurupiah Webhook] Payment confirmed for order: ${orderId}`);
+            await processOrderPayment(orderId, bot);
+          }
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, message: 'Payment status processed', order_id: orderId }));
+          return;
+        }
+
         // Check if Midtrans webhook
         if (req.url?.includes('midtrans')) {
           const orderId = data.order_id;

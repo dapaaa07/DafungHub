@@ -13,7 +13,7 @@
     "lint": "eslint",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
-    "test": "tsx --test tests/**/*.test.ts",
+    "test": "tsx --test --test-concurrency=1 tests/**/*.test.ts",
     "set-webhook": "tsx scripts/set-webhook.ts",
     "bot": "tsx scripts/run-bot.ts",
     "web:dev": "npm --prefix dafung-web run dev",

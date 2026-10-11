@@ -1,6 +1,5 @@
 import { Context } from 'node-telegram-bot-api';
 import { query, Product, User } from '../../lib/db';
-import { createQrisTransaction } from '../../lib/midtrans';
 import { ExtendedBot, sendSafeMessage, sendSafePhoto } from '../handler';
 
 function escapeHtml(str: string): string {
@@ -175,12 +174,31 @@ export async function handleBuy(
   // 4. Generate unique order_code
   const orderCode = generateOrderCode();
 
-  // 5. Create dynamic QRIS transaction via Midtrans Core API
-  let qrisResult;
+  // 5. Create dynamic QRIS transaction via Sakurupiah (with Midtrans fallback)
+  let qrisResult: {
+    qrCodeUrl: string;
+    qrString: string;
+    checkoutUrl?: string;
+    raw?: Record<string, unknown>;
+  };
+
   try {
-    qrisResult = await createQrisTransaction(orderCode, product.price);
+    if (process.env.PAYMENT_GATEWAY === 'midtrans') {
+      const { createQrisTransaction } = await import('../../lib/midtrans');
+      qrisResult = await createQrisTransaction(orderCode, product.price);
+    } else {
+      const { createSakurupiahInvoice } = await import('../../lib/sakurupiah');
+      const buyerName = ctx.from?.first_name || 'Pelanggan';
+      const buyerUsername = ctx.from?.username ? ` (@${ctx.from.username})` : '';
+      qrisResult = await createSakurupiahInvoice(
+        orderCode,
+        product.price,
+        product.name,
+        `${buyerName}${buyerUsername}`
+      );
+    }
   } catch (error) {
-    console.error('[Buy Command] Failed to create Midtrans QRIS transaction:', error);
+    console.error('[Buy Command] Failed to create QRIS transaction:', error);
     await sendSafeMessage(
       ctx,
       botInstance,
@@ -217,6 +235,7 @@ export async function handleBuy(
         ...(qrisResult.raw || {}),
         qr_code_url: qrisResult.qrCodeUrl,
         qr_string: qrisResult.qrString,
+        checkout_url: qrisResult.checkoutUrl,
       }),
     ]
   );
@@ -236,14 +255,23 @@ export async function handleBuy(
     '3. Setelah pembayaran berhasil, kredensial akun akan dikirimkan otomatis ke sini.\n' +
     '4. Cek status pembayaran kapan saja dengan menekan tombol <b>🔄 Cek Status Pembayaran</b> di bawah.';
 
+  const inlineKeyboardRows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
+    [{ text: '🔄 Cek Status Pembayaran', callback_data: `status_${orderCode}` }],
+  ];
+
+  if (qrisResult.checkoutUrl) {
+    inlineKeyboardRows.push([
+      { text: '🌐 Buka Link Pembayaran (Web)', url: qrisResult.checkoutUrl },
+    ]);
+  }
+
+  inlineKeyboardRows.push([
+    { text: '🛍️ Beli Produk Lain', callback_data: 'menu_products' },
+    { text: '🔙 Menu Utama', callback_data: 'menu_main' },
+  ]);
+
   const invoiceButtons = {
-    inline_keyboard: [
-      [{ text: '🔄 Cek Status Pembayaran', callback_data: `status_${orderCode}` }],
-      [
-        { text: '🛍️ Beli Produk Lain', callback_data: 'menu_products' },
-        { text: '🔙 Menu Utama', callback_data: 'menu_main' },
-      ],
-    ],
+    inline_keyboard: inlineKeyboardRows,
   };
 
   if (qrisResult.qrCodeUrl) {

@@ -706,6 +706,7 @@ export async function sendOrdersMenu(ctx: Context, botInstance: ExtendedBot): Pr
 export function extractQrisFromInvoiceData(rawInvoiceData: unknown): {
   qrCodeUrl: string;
   qrString: string;
+  checkoutUrl?: string;
 } {
   if (!rawInvoiceData) return { qrCodeUrl: '', qrString: '' };
   let data: Record<string, unknown> = {};
@@ -722,14 +723,23 @@ export function extractQrisFromInvoiceData(rawInvoiceData: unknown): {
   // 1. Actions array from Midtrans Core API response
   const actions = (data.actions as Array<{ name: string; url: string }>) || [];
   const qrAction = actions.find((a) => a.name === 'generate-qr-code');
-  const qrCodeUrl =
+  let qrCodeUrl =
     (qrAction?.url as string) ||
     (data.qr_code_url as string) ||
     (data.qrCodeUrl as string) ||
     '';
 
-  const qrString = (data.qr_string as string) || (data.qrString as string) || '';
-  return { qrCodeUrl, qrString };
+  const qrString = (data.qr_string as string) || (data.qrString as string) || (data.qr as string) || '';
+  const checkoutUrl = (data.checkout_url as string) || (data.checkoutUrl as string) || undefined;
+
+  // Fallback: If qrString is a web URL
+  if (!qrCodeUrl && qrString && (qrString.startsWith('http://') || qrString.startsWith('https://'))) {
+    qrCodeUrl = qrString;
+  } else if (!qrCodeUrl && qrString) {
+    qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrString)}`;
+  }
+
+  return { qrCodeUrl, qrString, checkoutUrl };
 }
 
 /**
@@ -740,7 +750,7 @@ export async function sendOrderInvoice(
   botInstance: ExtendedBot,
   order: Order & { product_name?: string; product_price?: number }
 ): Promise<void> {
-  const { qrCodeUrl, qrString } = extractQrisFromInvoiceData(order.invoice_data);
+  const { qrCodeUrl, qrString, checkoutUrl } = extractQrisFromInvoiceData(order.invoice_data);
   const prodName = order.product_name || 'Akun Digital';
   const priceStr = order.product_price
     ? `Rp ${order.product_price.toLocaleString('id-ID')}`
@@ -760,14 +770,23 @@ export async function sendOrderInvoice(
     '3. Setelah pembayaran berhasil, kredensial akun akan dikirimkan otomatis ke sini.\n' +
     '4. Sentuh <b>🔄 Refresh Status Pembayaran</b> di bawah setelah kamu menyelesaikan pembayaran.';
 
+  const invoiceButtonsRows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
+    [{ text: '🔄 Refresh Status Pembayaran', callback_data: `status_${order.order_code}` }],
+  ];
+
+  if (checkoutUrl) {
+    invoiceButtonsRows.push([
+      { text: '🌐 Buka Link Pembayaran (Web)', url: checkoutUrl },
+    ]);
+  }
+
+  invoiceButtonsRows.push([
+    { text: '🛍️ Beli Produk Lain', callback_data: 'menu_products' },
+    { text: '🔙 Menu Utama', callback_data: 'menu_main' },
+  ]);
+
   const invoiceButtons = {
-    inline_keyboard: [
-      [{ text: '🔄 Refresh Status Pembayaran', callback_data: `status_${order.order_code}` }],
-      [
-        { text: '🛍️ Beli Produk Lain', callback_data: 'menu_products' },
-        { text: '🔙 Menu Utama', callback_data: 'menu_main' },
-      ],
-    ],
+    inline_keyboard: invoiceButtonsRows,
   };
 
   if (qrCodeUrl) {
