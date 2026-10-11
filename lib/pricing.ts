@@ -130,3 +130,29 @@ export function calculateProfit(
   const net = sellingPrice - fee - modalPrice;
   return Math.max(0, Math.round(net));
 }
+
+export const CS_WHATSAPP_NUMBER = '081294950241';
+export const CS_WHATSAPP_INTL = '6281294950241';
+export const TELEGRAM_BOT_USERNAME = 'dafung_hub_bot';
+
+/**
+ * Format IDR currency format (e.g. Rp 35.000)
+ */
+export function formatRupiah(amount: number): string {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+/**
+ * Generate perceived retail / official price for comparison / discounts
+ */
+export function calculateOriginalPrice(sellingPrice: number): number {
+  const multiplier = 1.35; // ~35% higher standard retail price
+  const raw = Math.round((sellingPrice * multiplier) / 1000) * 1000;
+  return Math.max(sellingPrice + 10000, raw);
+}
+

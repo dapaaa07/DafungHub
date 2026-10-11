@@ -109,3 +109,377 @@ export async function createSupplierOrder(
     }),
   });
 }
+
+import { EnrichedProduct, PlatformConfig, ProductCategory } from './types';
+import { calculateSellingPrice, calculateOriginalPrice } from './pricing';
+
+export const PLATFORMS: PlatformConfig[] = [
+  {
+    id: 'netflix',
+    name: 'Netflix Premium',
+    icon: '🔴',
+    category: 'streaming',
+    keywords: ['netflix'],
+    logoFile: '/logos/netflix.png',
+    defaultFeatures: ['Kualitas Ultra HD 4K & HDR', 'Anti-on hold & bebas buffering', 'Bisa di HP, Laptop, & Smart TV', 'Garansi ganti akun full durasi'],
+    defaultWarranty: 'Garansi Full Durasi',
+  },
+  {
+    id: 'canva',
+    name: 'Canva Pro',
+    icon: '🎨',
+    category: 'creative',
+    keywords: ['canva'],
+    logoFile: '/logos/canva.png',
+    defaultFeatures: ['100+ Juta Foto & Elemen Premium', 'Background Remover 1-Klik', 'Resize Desain Bebas', 'Brand Kit & Cloud Storage Besar'],
+    defaultWarranty: 'Garansi Akun Aktif',
+  },
+  {
+    id: 'capcut',
+    name: 'CapCut Pro',
+    icon: '✂️',
+    category: 'creative',
+    keywords: ['capcut'],
+    logoFile: '/logos/capcut.png',
+    defaultFeatures: ['Semua Efek & Filter VIP Terbuka', 'Export 4K 60fps Tanpa Watermark', 'AI Auto-Captions & Voiceover', 'Support Android, iOS & PC Desktop'],
+    defaultWarranty: 'Garansi 30 Hari Penuh',
+  },
+  {
+    id: 'claude',
+    name: 'Claude AI Pro',
+    icon: '🤖',
+    category: 'ai',
+    keywords: ['claude'],
+    logoFile: '/logos/claude.png',
+    defaultFeatures: ['Akses Claude 3.5 Sonnet / Opus', 'Batas Pesan 5x Lebih Banyak', 'Coding & Analisis Dokumen Panjang', 'Akses Fitur Terbaru Lebih Awal'],
+    defaultWarranty: 'Garansi Full Durasi',
+  },
+  {
+    id: 'gemini',
+    name: 'Gemini AI Advanced',
+    icon: '✨',
+    category: 'ai',
+    keywords: ['gemini'],
+    logoFile: '/logos/gemini.png',
+    defaultFeatures: ['Akses Model Gemini 1.5 Pro Ultra', 'Context Window 1M Token', 'Integrasi Google Workspace', 'Pemrosesan Dokumen & Video Multimodal'],
+    defaultWarranty: 'Garansi Full Durasi',
+  },
+  {
+    id: 'codex',
+    name: 'ChatGPT / OpenAI',
+    icon: '💻',
+    category: 'ai',
+    keywords: ['codex', 'gpt', 'chatgpt', 'openai'],
+    logoFile: '/logos/codex.png',
+    defaultFeatures: ['Akses GPT-4o & Canvas Mode', 'DALL-E 3 Image Generator', 'Browsing Web & Code Interpreter', 'Akses Tanpa Batas Jam Sibuk'],
+    defaultWarranty: 'Garansi Akun Resmi',
+  },
+  {
+    id: 'office',
+    name: 'Microsoft 365 Office',
+    icon: '📊',
+    category: 'office',
+    keywords: ['office', 'microsoft', 'word', 'excel'],
+    logoFile: '/logos/office.png',
+    defaultFeatures: ['Word, Excel, PPT, Outlook Terbaru', '1TB OneDrive Cloud Storage Aman', 'Bisa untuk 5 Perangkat Sekaligus', 'Akun Resmi & Terjamin'],
+    defaultWarranty: 'Garansi 1 Tahun Penuh',
+  },
+  {
+    id: 'prime_video',
+    name: 'Prime Video',
+    icon: '📺',
+    category: 'streaming',
+    keywords: ['prime video', 'amazon'],
+    logoFile: '/logos/prime_video.png',
+    defaultFeatures: ['Streaming Kualitas Full HD / 4K', 'Film & Serial Eksklusif Amazon', 'Audio jernih & multi-subtitle Indo', 'Garansi lancar tanpa kendala'],
+    defaultWarranty: 'Garansi Full Durasi',
+  },
+  {
+    id: 'apple_tv',
+    name: 'Apple TV+',
+    icon: '🍏',
+    category: 'streaming',
+    keywords: ['apple tv', 'apple'],
+    logoFile: '/logos/apple_tv.png',
+    defaultFeatures: ['Apple Originals Kualitas 4K HDR', 'Spatial Audio & Dolby Atmos', 'Streaming di iPhone, iPad, Mac, TV', 'Garansi resmi terpercaya'],
+    defaultWarranty: 'Garansi Full Durasi',
+  },
+  {
+    id: 'hbo',
+    name: 'HBO Max',
+    icon: '🍿',
+    category: 'streaming',
+    keywords: ['hbo'],
+    logoFile: '/logos/hbo.png',
+    defaultFeatures: ['Warner Bros, HBO & DC Universe', 'Kualitas 4K UHD & Audio Surround', 'Profile pribadi bebas bentrok', 'Garansi penggantian instan'],
+    defaultWarranty: 'Garansi Full Durasi',
+  },
+  {
+    id: 'notion',
+    name: 'Notion AI & Plus',
+    icon: '📓',
+    category: 'ai',
+    keywords: ['notion'],
+    logoFile: '/logos/notion.png',
+    defaultFeatures: ['Unlimited Blocks & File Uploads', 'Notion AI Writer & Summary', 'Kolaborasi Tim & Workspace Terpadu', 'Integrasi API & Database'],
+    defaultWarranty: 'Garansi Penuh',
+  },
+  {
+    id: 'adobe',
+    name: 'Adobe Creative Cloud',
+    icon: '🖌️',
+    category: 'creative',
+    keywords: ['adobe'],
+    logoFile: '/logos/adobe.png',
+    defaultFeatures: ['Photoshop, Illustrator, Premiere Pro', 'Adobe Fonts & Cloud Storage', 'Semua Fitur Generative Fill AI', 'Akses Resmi Tanpa Crack'],
+    defaultWarranty: 'Garansi Full Masa Aktif',
+  },
+  {
+    id: 'figma',
+    name: 'Figma Professional',
+    icon: '🎯',
+    category: 'creative',
+    keywords: ['figma'],
+    logoFile: '/logos/figma.png',
+    defaultFeatures: ['Unlimited Version History', 'Shared Team Libraries', 'Dev Mode & Advanced Prototyping', 'Kolaborasi real-time tanpa batas'],
+    defaultWarranty: 'Garansi Full Durasi',
+  },
+  {
+    id: 'scribd',
+    name: 'Scribd / Everand',
+    icon: '📚',
+    category: 'office',
+    keywords: ['scribd', 'everand'],
+    logoFile: '/logos/scribd.png',
+    defaultFeatures: ['Jutaan Buku, Audiobook, & Dokumen', 'Download offline baca di aplikasi', 'Akses riset & materi kuliah lengkap', 'Garansi aktif anti-logout'],
+    defaultWarranty: 'Garansi Penuh',
+  },
+  {
+    id: 'duolingo',
+    name: 'Duolingo Super',
+    icon: '🦉',
+    category: 'office',
+    keywords: ['duolingo'],
+    logoFile: '/logos/duolingo.png',
+    defaultFeatures: ['Nyawa Tanpa Batas (Unlimited Hearts)', 'Bebas Iklan Pengganggu', 'Praktek Kesalahan Khusus', 'Belajar Bahasa Jadi 2x Lebih Cepat'],
+    defaultWarranty: 'Garansi Full Durasi',
+  },
+  {
+    id: 'vpn',
+    name: 'Premium VPN',
+    icon: '🛡️',
+    category: 'security',
+    keywords: ['vpn', 'nord', 'expressvpn', 'hma', 'surfshark'],
+    logoFile: '/logos/vpn.png',
+    defaultFeatures: ['Bypass Blokir & Enkripsi Militer', 'Ribuan Server di 100+ Negara', 'Kecepatan Tinggi Anti Lemot', 'Proteksi Privasi & Bebas Log'],
+    defaultWarranty: 'Garansi Full Masa Aktif',
+  },
+  {
+    id: 'zoom',
+    name: 'Zoom Pro Meeting',
+    icon: '📹',
+    category: 'office',
+    keywords: ['zoom'],
+    logoFile: '/logos/zoom.png',
+    defaultFeatures: ['Meeting Tanpa Batas Waktu 40 Menit', 'Kapasitas Hingga 100/300 Peserta', 'Cloud Recording 5GB', 'Fitur Co-host & Polling Interaktif'],
+    defaultWarranty: 'Garansi Durasi Penuh',
+  },
+  {
+    id: 'email',
+    name: 'Akun Email Fresh',
+    icon: '📧',
+    category: 'office',
+    keywords: ['gmail', 'outlook', 'hotmail', 'email'],
+    logoFile: '/logos/office.png',
+    defaultFeatures: ['Akun Baru Bersih (PVA)', 'Bisa Ganti Password & Recovery', 'Cocok untuk Registrasi & Bisnis', 'Format Langsung Email : Password'],
+    defaultWarranty: 'Garansi First Login',
+  },
+];
+
+export function matchProductPlatform(productName: string): PlatformConfig | null {
+  const lower = productName.toLowerCase();
+  for (const plat of PLATFORMS) {
+    if (plat.keywords.some((k) => lower.includes(k))) {
+      return plat;
+    }
+  }
+  return null;
+}
+
+export function extractDuration(name: string, description: string): string {
+  const combined = (name + ' ' + (description || '')).toLowerCase();
+
+  if (/1\s*(?:yr|year|tahun)|12\s*(?:m|bln|bulan)|365\s*hari/.test(combined)) {
+    return '1 Tahun';
+  }
+  if (/6\s*(?:m|bln|bulan)/.test(combined)) {
+    return '6 Bulan';
+  }
+  if (/3\s*(?:m|bln|bulan)/.test(combined)) {
+    return '3 Bulan';
+  }
+  if (/1\s*(?:m|bln|bulan)|30\s*(?:hari|days)/.test(combined)) {
+    return '30 Hari';
+  }
+  if (/14\s*(?:hari|days)/.test(combined)) {
+    return '14 Hari';
+  }
+  if (/7\s*(?:hari|days)/.test(combined)) {
+    return '7 Hari';
+  }
+  if (/lifetime|permanen/.test(combined)) {
+    return 'Permanen';
+  }
+
+  return 'Paket Spesial';
+}
+
+export function extractFeatures(description: string, fallbackFeatures: string[]): string[] {
+  if (!description) return fallbackFeatures;
+
+  const lines = description
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 5);
+
+  const parsed: string[] = [];
+
+  for (const line of lines) {
+    if (line.startsWith('-') || line.startsWith('•') || line.startsWith('🔻') || line.startsWith('✅') || line.startsWith('⚡')) {
+      const clean = line.replace(/^[-•🔻✅⚡⚠️]\s*/, '').trim();
+      if (clean && clean.length > 4 && !clean.toLowerCase().includes('connect to') && !clean.toLowerCase().includes('delivery instructions')) {
+        parsed.push(clean);
+      }
+    }
+    if (parsed.length >= 4) break;
+  }
+
+  if (parsed.length >= 2) {
+    return parsed;
+  }
+
+  return fallbackFeatures;
+}
+
+export function enrichProduct(product: SupplierProduct): EnrichedProduct {
+  const platform = matchProductPlatform(product.name);
+  const sellingPrice = calculateSellingPrice(product.price_idr);
+  const originalPrice = calculateOriginalPrice(sellingPrice);
+  const durationText = extractDuration(product.name, product.description);
+
+  let category: ProductCategory = 'other';
+  let platformName = product.name;
+  let platformIcon = '💎';
+  let logoUrl = '/banner.png';
+  let features = [
+    'Garansi aktif selama masa langganan',
+    'Pengiriman instan & otomatis 24/7',
+    'Kredensial aman & panduan lengkap',
+    'Customer service ramah siap bantu',
+  ];
+  let warrantyText = 'Garansi Penuh';
+
+  if (platform) {
+    category = platform.category;
+    platformName = platform.name;
+    platformIcon = platform.icon;
+    logoUrl = platform.logoFile;
+    features = extractFeatures(product.description, platform.defaultFeatures);
+    warrantyText = platform.defaultWarranty;
+  } else {
+    const lower = product.name.toLowerCase();
+    if (lower.includes('pdf') || lower.includes('vpn') || lower.includes('security')) {
+      category = 'security';
+      logoUrl = '/logos/vpn.png';
+    } else if (lower.includes('audio') || lower.includes('music') || lower.includes('stream') || lower.includes('video')) {
+      category = 'streaming';
+      logoUrl = '/logos/prime_video.png';
+    } else if (lower.includes('ai') || lower.includes('bot')) {
+      category = 'ai';
+      logoUrl = '/logos/claude.png';
+    } else {
+      category = 'office';
+      logoUrl = '/logos/office.png';
+    }
+  }
+
+  const isPopular =
+    product.name.toLowerCase().includes('netflix') ||
+    product.name.toLowerCase().includes('canva') ||
+    product.name.toLowerCase().includes('capcut') ||
+    product.name.toLowerCase().includes('claude') ||
+    product.name.toLowerCase().includes('office') ||
+    product.name.toLowerCase().includes('gemini');
+
+  return {
+    ...product,
+    platformId: platform ? platform.id : 'custom',
+    platformName,
+    platformIcon,
+    logoUrl,
+    category,
+    sellingPrice,
+    originalPrice,
+    durationText,
+    warrantyText,
+    features,
+    isPopular,
+  };
+}
+
+export const FALLBACK_PRODUCTS: SupplierProduct[] = [
+  {
+    id: '6a2fda51035a6d898f2106fe',
+    name: 'Capcut Pro 1 Month FW',
+    availability: 'in_stock',
+    price_idr: 25300,
+    description: `- Full 30 days private Pro Team account\n- Maximum 2 devices, with full warranty\n- Stable Account full 30 days\n- Login to mobile App & desktop App`,
+    requires_email: false,
+  },
+  {
+    id: '6a2fe23a1c8697b163aedcbd',
+    name: 'Microsoft Office 365 Plus 1 year',
+    availability: 'in_stock',
+    price_idr: 6700,
+    description: `Microsoft Office 365 Plus 1 Year\n- Word, Excel, PowerPoint, Outlook\n- 1TB OneDrive Storage\n- Support 5 Devices PC/Mac`,
+    requires_email: false,
+  },
+  {
+    id: '6a5b873847b606c66fc160b2',
+    name: 'Adobe Express 12M Premium',
+    availability: 'in_stock',
+    price_idr: 7400,
+    description: `- Upgrade instantly to Premium member 12 bulan\n- Fitur lengkap Adobe Express & Fonts\n- Full garansi resmi`,
+    requires_email: false,
+  },
+  {
+    id: '6a6207cf92969197bb382958',
+    name: 'iLovePdf Premium 1Yr',
+    availability: 'in_stock',
+    price_idr: 9600,
+    description: `🔻 Full access to all iLovePDF tools\n🔻 Unlimited document processing\n🔻 Access across Web, Mobile, and Desktop\n🔻 2000 AI Credits`,
+    requires_email: false,
+  },
+  {
+    id: '6a612473af18a2a83bc049a0',
+    name: 'Gmails Accounts Fresh PVA',
+    availability: 'in_stock',
+    price_idr: 13100,
+    description: `Fresh Gmail account format email | password. Siap pakai untuk pendaftaran dan verifikasi.`,
+    requires_email: false,
+  },
+];
+
+export async function getAllEnrichedProducts(): Promise<EnrichedProduct[]> {
+  try {
+    const rawProducts = await getSupplierProducts();
+    if (!rawProducts || rawProducts.length === 0) {
+      return FALLBACK_PRODUCTS.map(enrichProduct);
+    }
+    return rawProducts.map(enrichProduct);
+  } catch (err) {
+    console.error('[Supplier] Error fetching products for catalogue, using fallbacks:', err);
+    return FALLBACK_PRODUCTS.map(enrichProduct);
+  }
+}
+

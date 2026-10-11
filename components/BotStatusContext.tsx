@@ -1,0 +1,78 @@
+'use client';
+
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { BotStatus } from '@/lib/settings';
+
+interface BotStatusContextValue {
+  botStatus: BotStatus;
+  refreshStatus: () => Promise<void>;
+}
+
+const BotStatusContext = createContext<BotStatusContextValue>({
+  botStatus: 'online',
+  refreshStatus: async () => {},
+});
+
+export function BotStatusProvider({
+  initialStatus = 'online',
+  children,
+}: {
+  initialStatus?: BotStatus;
+  children: React.ReactNode;
+}) {
+  const [botStatus, setBotStatus] = useState<BotStatus>(initialStatus);
+
+  const fetchLatestStatus = async () => {
+    try {
+      const res = await fetch('/api/bot-status', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.status === 'online' || data?.status === 'maintenance') {
+          setBotStatus(data.status);
+        }
+      }
+    } catch {
+      // Ignore background fetch error
+    }
+  };
+
+  useEffect(() => {
+    // 1. Polling interval every 10 seconds
+    const interval = setInterval(fetchLatestStatus, 10000);
+
+    // 2. Refresh immediately when window/tab is focused
+    const handleFocus = () => {
+      fetchLatestStatus();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchLatestStatus();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  return (
+    <BotStatusContext.Provider value={{ botStatus, refreshStatus: fetchLatestStatus }}>
+      {children}
+    </BotStatusContext.Provider>
+  );
+}
+
+export function useBotStatus(): BotStatusContextValue {
+  return useContext(BotStatusContext);
+}

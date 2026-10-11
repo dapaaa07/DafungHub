@@ -1,26 +1,50 @@
 @import "tailwindcss";
 
+@theme {
+  --color-dafung-yellow: #FFDE00;
+  --color-dafung-black: #121212;
+  --color-dafung-cyan: #3AA8E8;
+  --color-dafung-surface: #F8F9FA;
+  --color-dafung-muted: #6B7280;
+  --color-dafung-border: #E5E7EB;
+  --color-dafung-white: #FFFFFF;
+  --color-dafung-success: #10B981;
+  --color-dafung-alert: #EF4444;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --dafung-yellow: #FFDE00;
+  --dafung-black: #121212;
+  --dafung-cyan: #3AA8E8;
+  --dafung-surface: #F8F9FA;
+  --dafung-muted: #6B7280;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #F8F9FA;
+  color: #121212;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Soft scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }

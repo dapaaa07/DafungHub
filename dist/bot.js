@@ -5476,12 +5476,17 @@ var init_settings = __esm({
 var pricing_exports = {};
 __export(pricing_exports, {
   ADMIN_TELEGRAM_ID: () => ADMIN_TELEGRAM_ID,
+  CS_WHATSAPP_INTL: () => CS_WHATSAPP_INTL,
+  CS_WHATSAPP_NUMBER: () => CS_WHATSAPP_NUMBER,
   GATEWAY_CHANNELS: () => GATEWAY_CHANNELS,
+  TELEGRAM_BOT_USERNAME: () => TELEGRAM_BOT_USERNAME,
   calculateGatewayFee: () => calculateGatewayFee,
+  calculateOriginalPrice: () => calculateOriginalPrice,
   calculateProfit: () => calculateProfit,
   calculateProtectedSellingPrice: () => calculateProtectedSellingPrice,
   calculateSellingPrice: () => calculateSellingPrice,
   defaultMarginConfig: () => defaultMarginConfig,
+  formatRupiah: () => formatRupiah,
   isAdmin: () => isAdmin,
   roundToMarketStandard: () => roundToMarketStandard
 });
@@ -5530,7 +5535,20 @@ function calculateProfit(sellingPrice, modalPrice, channelCode) {
   const net = sellingPrice - fee - modalPrice;
   return Math.max(0, Math.round(net));
 }
-var ADMIN_TELEGRAM_ID, GATEWAY_CHANNELS, defaultMarginConfig;
+function formatRupiah(amount) {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount);
+}
+function calculateOriginalPrice(sellingPrice) {
+  const multiplier = 1.35;
+  const raw = Math.round(sellingPrice * multiplier / 1e3) * 1e3;
+  return Math.max(sellingPrice + 1e4, raw);
+}
+var ADMIN_TELEGRAM_ID, GATEWAY_CHANNELS, defaultMarginConfig, CS_WHATSAPP_NUMBER, CS_WHATSAPP_INTL, TELEGRAM_BOT_USERNAME;
 var init_pricing = __esm({
   "lib/pricing.ts"() {
     "use strict";
@@ -5551,16 +5569,26 @@ var init_pricing = __esm({
       defaultFlatMarkup: 5e3,
       minProfit: 2e3
     };
+    CS_WHATSAPP_NUMBER = "081294950241";
+    CS_WHATSAPP_INTL = "6281294950241";
+    TELEGRAM_BOT_USERNAME = "dafung_hub_bot";
   }
 });
 
 // lib/supplier.ts
 var supplier_exports = {};
 __export(supplier_exports, {
+  FALLBACK_PRODUCTS: () => FALLBACK_PRODUCTS,
+  PLATFORMS: () => PLATFORMS,
   createSupplierOrder: () => createSupplierOrder,
+  enrichProduct: () => enrichProduct,
+  extractDuration: () => extractDuration,
+  extractFeatures: () => extractFeatures,
+  getAllEnrichedProducts: () => getAllEnrichedProducts,
   getSupplierBalance: () => getSupplierBalance,
   getSupplierProducts: () => getSupplierProducts,
-  getSupplierProfile: () => getSupplierProfile
+  getSupplierProfile: () => getSupplierProfile,
+  matchProductPlatform: () => matchProductPlatform
 });
 async function supplierRequest(endpoint, options = {}) {
   const url = `${SUPPLIER_BASE_URL}${endpoint}`;
@@ -5599,10 +5627,130 @@ async function createSupplierOrder(productId, quantity = 1, email) {
     })
   });
 }
-var SUPPLIER_BASE_URL, SUPPLIER_API_KEY;
+function matchProductPlatform(productName) {
+  const lower = productName.toLowerCase();
+  for (const plat of PLATFORMS) {
+    if (plat.keywords.some((k) => lower.includes(k))) {
+      return plat;
+    }
+  }
+  return null;
+}
+function extractDuration(name, description) {
+  const combined = (name + " " + (description || "")).toLowerCase();
+  if (/1\s*(?:yr|year|tahun)|12\s*(?:m|bln|bulan)|365\s*hari/.test(combined)) {
+    return "1 Tahun";
+  }
+  if (/6\s*(?:m|bln|bulan)/.test(combined)) {
+    return "6 Bulan";
+  }
+  if (/3\s*(?:m|bln|bulan)/.test(combined)) {
+    return "3 Bulan";
+  }
+  if (/1\s*(?:m|bln|bulan)|30\s*(?:hari|days)/.test(combined)) {
+    return "30 Hari";
+  }
+  if (/14\s*(?:hari|days)/.test(combined)) {
+    return "14 Hari";
+  }
+  if (/7\s*(?:hari|days)/.test(combined)) {
+    return "7 Hari";
+  }
+  if (/lifetime|permanen/.test(combined)) {
+    return "Permanen";
+  }
+  return "Paket Spesial";
+}
+function extractFeatures(description, fallbackFeatures) {
+  if (!description) return fallbackFeatures;
+  const lines = description.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 5);
+  const parsed = [];
+  for (const line of lines) {
+    if (line.startsWith("-") || line.startsWith("\u2022") || line.startsWith("\u{1F53B}") || line.startsWith("\u2705") || line.startsWith("\u26A1")) {
+      const clean = line.replace(/^[-•🔻✅⚡⚠️]\s*/, "").trim();
+      if (clean && clean.length > 4 && !clean.toLowerCase().includes("connect to") && !clean.toLowerCase().includes("delivery instructions")) {
+        parsed.push(clean);
+      }
+    }
+    if (parsed.length >= 4) break;
+  }
+  if (parsed.length >= 2) {
+    return parsed;
+  }
+  return fallbackFeatures;
+}
+function enrichProduct(product) {
+  const platform = matchProductPlatform(product.name);
+  const sellingPrice = calculateSellingPrice(product.price_idr);
+  const originalPrice = calculateOriginalPrice(sellingPrice);
+  const durationText = extractDuration(product.name, product.description);
+  let category = "other";
+  let platformName = product.name;
+  let platformIcon = "\u{1F48E}";
+  let logoUrl = "/banner.png";
+  let features = [
+    "Garansi aktif selama masa langganan",
+    "Pengiriman instan & otomatis 24/7",
+    "Kredensial aman & panduan lengkap",
+    "Customer service ramah siap bantu"
+  ];
+  let warrantyText = "Garansi Penuh";
+  if (platform) {
+    category = platform.category;
+    platformName = platform.name;
+    platformIcon = platform.icon;
+    logoUrl = platform.logoFile;
+    features = extractFeatures(product.description, platform.defaultFeatures);
+    warrantyText = platform.defaultWarranty;
+  } else {
+    const lower = product.name.toLowerCase();
+    if (lower.includes("pdf") || lower.includes("vpn") || lower.includes("security")) {
+      category = "security";
+      logoUrl = "/logos/vpn.png";
+    } else if (lower.includes("audio") || lower.includes("music") || lower.includes("stream") || lower.includes("video")) {
+      category = "streaming";
+      logoUrl = "/logos/prime_video.png";
+    } else if (lower.includes("ai") || lower.includes("bot")) {
+      category = "ai";
+      logoUrl = "/logos/claude.png";
+    } else {
+      category = "office";
+      logoUrl = "/logos/office.png";
+    }
+  }
+  const isPopular = product.name.toLowerCase().includes("netflix") || product.name.toLowerCase().includes("canva") || product.name.toLowerCase().includes("capcut") || product.name.toLowerCase().includes("claude") || product.name.toLowerCase().includes("office") || product.name.toLowerCase().includes("gemini");
+  return {
+    ...product,
+    platformId: platform ? platform.id : "custom",
+    platformName,
+    platformIcon,
+    logoUrl,
+    category,
+    sellingPrice,
+    originalPrice,
+    durationText,
+    warrantyText,
+    features,
+    isPopular
+  };
+}
+async function getAllEnrichedProducts() {
+  try {
+    const rawProducts = await getSupplierProducts();
+    if (!rawProducts || rawProducts.length === 0) {
+      return FALLBACK_PRODUCTS.map(enrichProduct);
+    }
+    return rawProducts.map(enrichProduct);
+  } catch (err) {
+    console.error("[Supplier] Error fetching products for catalogue, using fallbacks:", err);
+    return FALLBACK_PRODUCTS.map(enrichProduct);
+  }
+}
+var SUPPLIER_BASE_URL, SUPPLIER_API_KEY, PLATFORMS, FALLBACK_PRODUCTS;
 var init_supplier = __esm({
   "lib/supplier.ts"() {
     "use strict";
+    init_pricing();
     if (!process.env.SUPPLIER_API_KEY) {
       try {
         process.loadEnvFile?.();
@@ -5611,6 +5759,241 @@ var init_supplier = __esm({
     }
     SUPPLIER_BASE_URL = process.env.SUPPLIER_API_URL || "https://api.prastyaaneki.biz.id";
     SUPPLIER_API_KEY = process.env.SUPPLIER_API_KEY || "";
+    PLATFORMS = [
+      {
+        id: "netflix",
+        name: "Netflix Premium",
+        icon: "\u{1F534}",
+        category: "streaming",
+        keywords: ["netflix"],
+        logoFile: "/logos/netflix.png",
+        defaultFeatures: ["Kualitas Ultra HD 4K & HDR", "Anti-on hold & bebas buffering", "Bisa di HP, Laptop, & Smart TV", "Garansi ganti akun full durasi"],
+        defaultWarranty: "Garansi Full Durasi"
+      },
+      {
+        id: "canva",
+        name: "Canva Pro",
+        icon: "\u{1F3A8}",
+        category: "creative",
+        keywords: ["canva"],
+        logoFile: "/logos/canva.png",
+        defaultFeatures: ["100+ Juta Foto & Elemen Premium", "Background Remover 1-Klik", "Resize Desain Bebas", "Brand Kit & Cloud Storage Besar"],
+        defaultWarranty: "Garansi Akun Aktif"
+      },
+      {
+        id: "capcut",
+        name: "CapCut Pro",
+        icon: "\u2702\uFE0F",
+        category: "creative",
+        keywords: ["capcut"],
+        logoFile: "/logos/capcut.png",
+        defaultFeatures: ["Semua Efek & Filter VIP Terbuka", "Export 4K 60fps Tanpa Watermark", "AI Auto-Captions & Voiceover", "Support Android, iOS & PC Desktop"],
+        defaultWarranty: "Garansi 30 Hari Penuh"
+      },
+      {
+        id: "claude",
+        name: "Claude AI Pro",
+        icon: "\u{1F916}",
+        category: "ai",
+        keywords: ["claude"],
+        logoFile: "/logos/claude.png",
+        defaultFeatures: ["Akses Claude 3.5 Sonnet / Opus", "Batas Pesan 5x Lebih Banyak", "Coding & Analisis Dokumen Panjang", "Akses Fitur Terbaru Lebih Awal"],
+        defaultWarranty: "Garansi Full Durasi"
+      },
+      {
+        id: "gemini",
+        name: "Gemini AI Advanced",
+        icon: "\u2728",
+        category: "ai",
+        keywords: ["gemini"],
+        logoFile: "/logos/gemini.png",
+        defaultFeatures: ["Akses Model Gemini 1.5 Pro Ultra", "Context Window 1M Token", "Integrasi Google Workspace", "Pemrosesan Dokumen & Video Multimodal"],
+        defaultWarranty: "Garansi Full Durasi"
+      },
+      {
+        id: "codex",
+        name: "ChatGPT / OpenAI",
+        icon: "\u{1F4BB}",
+        category: "ai",
+        keywords: ["codex", "gpt", "chatgpt", "openai"],
+        logoFile: "/logos/codex.png",
+        defaultFeatures: ["Akses GPT-4o & Canvas Mode", "DALL-E 3 Image Generator", "Browsing Web & Code Interpreter", "Akses Tanpa Batas Jam Sibuk"],
+        defaultWarranty: "Garansi Akun Resmi"
+      },
+      {
+        id: "office",
+        name: "Microsoft 365 Office",
+        icon: "\u{1F4CA}",
+        category: "office",
+        keywords: ["office", "microsoft", "word", "excel"],
+        logoFile: "/logos/office.png",
+        defaultFeatures: ["Word, Excel, PPT, Outlook Terbaru", "1TB OneDrive Cloud Storage Aman", "Bisa untuk 5 Perangkat Sekaligus", "Akun Resmi & Terjamin"],
+        defaultWarranty: "Garansi 1 Tahun Penuh"
+      },
+      {
+        id: "prime_video",
+        name: "Prime Video",
+        icon: "\u{1F4FA}",
+        category: "streaming",
+        keywords: ["prime video", "amazon"],
+        logoFile: "/logos/prime_video.png",
+        defaultFeatures: ["Streaming Kualitas Full HD / 4K", "Film & Serial Eksklusif Amazon", "Audio jernih & multi-subtitle Indo", "Garansi lancar tanpa kendala"],
+        defaultWarranty: "Garansi Full Durasi"
+      },
+      {
+        id: "apple_tv",
+        name: "Apple TV+",
+        icon: "\u{1F34F}",
+        category: "streaming",
+        keywords: ["apple tv", "apple"],
+        logoFile: "/logos/apple_tv.png",
+        defaultFeatures: ["Apple Originals Kualitas 4K HDR", "Spatial Audio & Dolby Atmos", "Streaming di iPhone, iPad, Mac, TV", "Garansi resmi terpercaya"],
+        defaultWarranty: "Garansi Full Durasi"
+      },
+      {
+        id: "hbo",
+        name: "HBO Max",
+        icon: "\u{1F37F}",
+        category: "streaming",
+        keywords: ["hbo"],
+        logoFile: "/logos/hbo.png",
+        defaultFeatures: ["Warner Bros, HBO & DC Universe", "Kualitas 4K UHD & Audio Surround", "Profile pribadi bebas bentrok", "Garansi penggantian instan"],
+        defaultWarranty: "Garansi Full Durasi"
+      },
+      {
+        id: "notion",
+        name: "Notion AI & Plus",
+        icon: "\u{1F4D3}",
+        category: "ai",
+        keywords: ["notion"],
+        logoFile: "/logos/notion.png",
+        defaultFeatures: ["Unlimited Blocks & File Uploads", "Notion AI Writer & Summary", "Kolaborasi Tim & Workspace Terpadu", "Integrasi API & Database"],
+        defaultWarranty: "Garansi Penuh"
+      },
+      {
+        id: "adobe",
+        name: "Adobe Creative Cloud",
+        icon: "\u{1F58C}\uFE0F",
+        category: "creative",
+        keywords: ["adobe"],
+        logoFile: "/logos/adobe.png",
+        defaultFeatures: ["Photoshop, Illustrator, Premiere Pro", "Adobe Fonts & Cloud Storage", "Semua Fitur Generative Fill AI", "Akses Resmi Tanpa Crack"],
+        defaultWarranty: "Garansi Full Masa Aktif"
+      },
+      {
+        id: "figma",
+        name: "Figma Professional",
+        icon: "\u{1F3AF}",
+        category: "creative",
+        keywords: ["figma"],
+        logoFile: "/logos/figma.png",
+        defaultFeatures: ["Unlimited Version History", "Shared Team Libraries", "Dev Mode & Advanced Prototyping", "Kolaborasi real-time tanpa batas"],
+        defaultWarranty: "Garansi Full Durasi"
+      },
+      {
+        id: "scribd",
+        name: "Scribd / Everand",
+        icon: "\u{1F4DA}",
+        category: "office",
+        keywords: ["scribd", "everand"],
+        logoFile: "/logos/scribd.png",
+        defaultFeatures: ["Jutaan Buku, Audiobook, & Dokumen", "Download offline baca di aplikasi", "Akses riset & materi kuliah lengkap", "Garansi aktif anti-logout"],
+        defaultWarranty: "Garansi Penuh"
+      },
+      {
+        id: "duolingo",
+        name: "Duolingo Super",
+        icon: "\u{1F989}",
+        category: "office",
+        keywords: ["duolingo"],
+        logoFile: "/logos/duolingo.png",
+        defaultFeatures: ["Nyawa Tanpa Batas (Unlimited Hearts)", "Bebas Iklan Pengganggu", "Praktek Kesalahan Khusus", "Belajar Bahasa Jadi 2x Lebih Cepat"],
+        defaultWarranty: "Garansi Full Durasi"
+      },
+      {
+        id: "vpn",
+        name: "Premium VPN",
+        icon: "\u{1F6E1}\uFE0F",
+        category: "security",
+        keywords: ["vpn", "nord", "expressvpn", "hma", "surfshark"],
+        logoFile: "/logos/vpn.png",
+        defaultFeatures: ["Bypass Blokir & Enkripsi Militer", "Ribuan Server di 100+ Negara", "Kecepatan Tinggi Anti Lemot", "Proteksi Privasi & Bebas Log"],
+        defaultWarranty: "Garansi Full Masa Aktif"
+      },
+      {
+        id: "zoom",
+        name: "Zoom Pro Meeting",
+        icon: "\u{1F4F9}",
+        category: "office",
+        keywords: ["zoom"],
+        logoFile: "/logos/zoom.png",
+        defaultFeatures: ["Meeting Tanpa Batas Waktu 40 Menit", "Kapasitas Hingga 100/300 Peserta", "Cloud Recording 5GB", "Fitur Co-host & Polling Interaktif"],
+        defaultWarranty: "Garansi Durasi Penuh"
+      },
+      {
+        id: "email",
+        name: "Akun Email Fresh",
+        icon: "\u{1F4E7}",
+        category: "office",
+        keywords: ["gmail", "outlook", "hotmail", "email"],
+        logoFile: "/logos/office.png",
+        defaultFeatures: ["Akun Baru Bersih (PVA)", "Bisa Ganti Password & Recovery", "Cocok untuk Registrasi & Bisnis", "Format Langsung Email : Password"],
+        defaultWarranty: "Garansi First Login"
+      }
+    ];
+    FALLBACK_PRODUCTS = [
+      {
+        id: "6a2fda51035a6d898f2106fe",
+        name: "Capcut Pro 1 Month FW",
+        availability: "in_stock",
+        price_idr: 25300,
+        description: `- Full 30 days private Pro Team account
+- Maximum 2 devices, with full warranty
+- Stable Account full 30 days
+- Login to mobile App & desktop App`,
+        requires_email: false
+      },
+      {
+        id: "6a2fe23a1c8697b163aedcbd",
+        name: "Microsoft Office 365 Plus 1 year",
+        availability: "in_stock",
+        price_idr: 6700,
+        description: `Microsoft Office 365 Plus 1 Year
+- Word, Excel, PowerPoint, Outlook
+- 1TB OneDrive Storage
+- Support 5 Devices PC/Mac`,
+        requires_email: false
+      },
+      {
+        id: "6a5b873847b606c66fc160b2",
+        name: "Adobe Express 12M Premium",
+        availability: "in_stock",
+        price_idr: 7400,
+        description: `- Upgrade instantly to Premium member 12 bulan
+- Fitur lengkap Adobe Express & Fonts
+- Full garansi resmi`,
+        requires_email: false
+      },
+      {
+        id: "6a6207cf92969197bb382958",
+        name: "iLovePdf Premium 1Yr",
+        availability: "in_stock",
+        price_idr: 9600,
+        description: `\u{1F53B} Full access to all iLovePDF tools
+\u{1F53B} Unlimited document processing
+\u{1F53B} Access across Web, Mobile, and Desktop
+\u{1F53B} 2000 AI Credits`,
+        requires_email: false
+      },
+      {
+        id: "6a612473af18a2a83bc049a0",
+        name: "Gmails Accounts Fresh PVA",
+        availability: "in_stock",
+        price_idr: 13100,
+        description: `Fresh Gmail account format email | password. Siap pakai untuk pendaftaran dan verifikasi.`,
+        requires_email: false
+      }
+    ];
   }
 });
 
@@ -12497,7 +12880,7 @@ var init_fulfillment = __esm({
 // bot/menu.ts
 var menu_exports = {};
 __export(menu_exports, {
-  PLATFORMS: () => PLATFORMS,
+  PLATFORMS: () => PLATFORMS2,
   escapeHtml: () => escapeHtml2,
   extractQrisFromInvoiceData: () => extractQrisFromInvoiceData,
   filterProductsByPlatform: () => filterProductsByPlatform,
@@ -12506,7 +12889,7 @@ __export(menu_exports, {
   getPersistentKeyboard: () => getPersistentKeyboard,
   getPlatformLogoPath: () => getPlatformLogoPath,
   getPlatformsWithCounts: () => getPlatformsWithCounts,
-  matchProductPlatform: () => matchProductPlatform,
+  matchProductPlatform: () => matchProductPlatform2,
   registerMenuHandlers: () => registerMenuHandlers,
   sendAdminBalanceMenu: () => sendAdminBalanceMenu,
   sendAdminOrdersMenu: () => sendAdminOrdersMenu,
@@ -12672,9 +13055,9 @@ Selamat datang di <b>DaFung Hub \u2014 Bot Otomatis Produk Digital</b>.`,
     }
   );
 }
-function matchProductPlatform(productName) {
+function matchProductPlatform2(productName) {
   const lower = productName.toLowerCase();
-  for (const plat of PLATFORMS) {
+  for (const plat of PLATFORMS2) {
     if (plat.keywords.some((k) => lower.includes(k))) {
       return plat;
     }
@@ -12684,9 +13067,9 @@ function matchProductPlatform(productName) {
 function filterProductsByPlatform(products, platformId = "all") {
   if (!platformId || platformId === "all") return products;
   if (platformId === "other") {
-    return products.filter((p) => matchProductPlatform(p.name) === null);
+    return products.filter((p) => matchProductPlatform2(p.name) === null);
   }
-  const targetPlatform = PLATFORMS.find((p) => p.id === platformId);
+  const targetPlatform = PLATFORMS2.find((p) => p.id === platformId);
   if (!targetPlatform) return products;
   return products.filter(
     (p) => targetPlatform.keywords.some((k) => p.name.toLowerCase().includes(k))
@@ -12694,7 +13077,7 @@ function filterProductsByPlatform(products, platformId = "all") {
 }
 function getPlatformsWithCounts(products) {
   const result = [];
-  for (const plat of PLATFORMS) {
+  for (const plat of PLATFORMS2) {
     const matched = products.filter(
       (p) => plat.keywords.some((k) => p.name.toLowerCase().includes(k))
     );
@@ -12712,7 +13095,7 @@ function getPlatformLogoPath(platformId) {
     ];
     return candidatePaths.find((p) => import_fs.default.existsSync(p)) || null;
   }
-  const plat = PLATFORMS.find((p) => p.id === platformId);
+  const plat = PLATFORMS2.find((p) => p.id === platformId);
   const logoFile = plat?.logoFile || `${platformId}.png`;
   const logoPath = import_path.default.resolve(process.cwd(), "assets/logos", logoFile);
   if (import_fs.default.existsSync(logoPath)) {
@@ -12725,7 +13108,7 @@ async function sendPlatformsMenu(ctx, botInstance) {
   try {
     const products = await getSupplierProducts();
     const activePlatforms = getPlatformsWithCounts(products);
-    const otherCount = products.filter((p) => matchProductPlatform(p.name) === null).length;
+    const otherCount = products.filter((p) => matchProductPlatform2(p.name) === null).length;
     const keyboard = [];
     for (let i = 0; i < activePlatforms.length; i += 2) {
       const row = [];
@@ -12770,7 +13153,7 @@ async function sendProductsMenu(ctx, botInstance, page = 0, platformId = "all") 
   try {
     const allProducts = await getSupplierProducts();
     const products = filterProductsByPlatform(allProducts, platformId);
-    const targetPlat = PLATFORMS.find((p) => p.id === platformId);
+    const targetPlat = PLATFORMS2.find((p) => p.id === platformId);
     const platformTitle = platformId === "all" ? "SEMUA PRODUK" : platformId === "other" ? "PLATFORM LAINNYA" : targetPlat?.name.toUpperCase() || "PRODUK";
     const pageSize = 6;
     const totalPages = Math.ceil(products.length / pageSize) || 1;
@@ -12887,7 +13270,7 @@ Sentuh tombol di bawah untuk langsung membuat invoice pembayaran QRIS:`;
         }
       ]);
     }
-    const backPlat = platformId || matchProductPlatform(prod.name)?.id || "all";
+    const backPlat = platformId || matchProductPlatform2(prod.name)?.id || "all";
     buttons.push([
       { text: "\u25C0\uFE0F Kembali ke Daftar Produk", callback_data: `plat_${backPlat}` },
       { text: "\u{1F4C2} Pilih Platform Lain", callback_data: "menu_platforms" }
@@ -13511,7 +13894,7 @@ function registerMenuHandlers(botInstance) {
     });
   });
 }
-var import_fs, import_path, import_node, PLATFORMS;
+var import_fs, import_path, import_node, PLATFORMS2;
 var init_menu = __esm({
   "bot/menu.ts"() {
     "use strict";
@@ -13525,7 +13908,7 @@ var init_menu = __esm({
     init_pricing();
     init_fulfillment();
     init_settings();
-    PLATFORMS = [
+    PLATFORMS2 = [
       { id: "netflix", name: "Netflix", icon: "\u{1F534}", keywords: ["netflix"], logoFile: "netflix.png" },
       { id: "canva", name: "Canva", icon: "\u{1F3A8}", keywords: ["canva"], logoFile: "canva.png" },
       { id: "capcut", name: "Capcut", icon: "\u2702\uFE0F", keywords: ["capcut"], logoFile: "capcut.png" },
