@@ -1,6 +1,8 @@
 import { Bot, Context } from 'node-telegram-bot-api';
 import { registerBuyHandler } from './commands/buy';
-import { sendMainMenu, registerMenuHandlers } from './menu';
+import { sendMainMenu, sendMaintenanceMessage, registerMenuHandlers } from './menu';
+import { getBotStatus } from '../lib/settings';
+import { isAdmin } from '../lib/pricing';
 
 // Auto-load .env for standalone scripts / bot runners outside Next.js runtime
 if (!process.env.TELEGRAM_BOT_TOKEN) {
@@ -206,11 +208,22 @@ export async function sendSafePhoto(
 export function registerHandlers(botInstance: ExtendedBot): void {
   // /start command (interactive menu panel)
   botInstance.command('start', async (ctx: Context) => {
+    const status = await getBotStatus();
+    if (status === 'maintenance' && !isAdmin(ctx.from?.id)) {
+      await sendMaintenanceMessage(ctx, botInstance);
+      return;
+    }
     await sendMainMenu(ctx, botInstance);
   });
 
   // /help command
   botInstance.command('help', async (ctx: Context) => {
+    const status = await getBotStatus();
+    if (status === 'maintenance' && !isAdmin(ctx.from?.id)) {
+      await sendMaintenanceMessage(ctx, botInstance);
+      return;
+    }
+
     const helpMessage =
       'ℹ️ <b>Panduan Bantuan & Garansi DaFung Hub:</b>\n\n' +
       '1. Setelah pembayaran QRIS berhasil, kredensial akun akan dikirimkan otomatis.\n' +
@@ -230,6 +243,12 @@ export function registerHandlers(botInstance: ExtendedBot): void {
 
   // /status command
   botInstance.command('status', async (ctx: Context) => {
+    const status = await getBotStatus();
+    if (status === 'maintenance' && !isAdmin(ctx.from?.id)) {
+      await sendMaintenanceMessage(ctx, botInstance);
+      return;
+    }
+
     const text = ctx.message?.text || '';
     const parts = text.trim().split(/\s+/);
     const orderCode = parts[1];
@@ -362,6 +381,12 @@ export function registerHandlers(botInstance: ExtendedBot): void {
     }
 
     if (text) {
+      const status = await getBotStatus();
+      if (status === 'maintenance' && !isAdmin(ctx.from?.id)) {
+        await sendMaintenanceMessage(ctx, botInstance);
+        return;
+      }
+
       await sendSafeMessage(
         ctx,
         botInstance,

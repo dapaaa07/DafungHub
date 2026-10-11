@@ -29374,6 +29374,111 @@ var init_midtrans = __esm({
   }
 });
 
+// lib/settings.ts
+var settings_exports = {};
+__export(settings_exports, {
+  clearSettingsCache: () => clearSettingsCache,
+  getBotStatus: () => getBotStatus,
+  setBotStatus: () => setBotStatus
+});
+async function getBotStatus() {
+  const now = Date.now();
+  if (cachedStatus !== null && now < cacheExpiry) {
+    return cachedStatus;
+  }
+  try {
+    const res = await query(
+      "SELECT value FROM bot_settings WHERE key = $1 LIMIT 1",
+      ["bot_status"]
+    );
+    if (res.rows.length > 0) {
+      const val = res.rows[0].value;
+      cachedStatus = val === "maintenance" ? "maintenance" : "online";
+    } else {
+      cachedStatus = "online";
+    }
+    cacheExpiry = now + CACHE_TTL_MS;
+    return cachedStatus;
+  } catch (error) {
+    console.error("[Settings] Error fetching bot status, falling back:", error);
+    return cachedStatus ?? "online";
+  }
+}
+async function setBotStatus(status) {
+  try {
+    await query(
+      `INSERT INTO bot_settings (key, value, updated_at)
+       VALUES ('bot_status', $1, CURRENT_TIMESTAMP)
+       ON CONFLICT (key) DO UPDATE
+       SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+      [status]
+    );
+    cachedStatus = status;
+    cacheExpiry = Date.now() + CACHE_TTL_MS;
+    console.log(`[Settings] Bot operational status changed to: ${status.toUpperCase()}`);
+  } catch (error) {
+    console.error("[Settings] Failed to set bot status:", error);
+    throw error;
+  }
+}
+function clearSettingsCache() {
+  cachedStatus = null;
+  cacheExpiry = 0;
+}
+var cachedStatus, cacheExpiry, CACHE_TTL_MS;
+var init_settings = __esm({
+  "lib/settings.ts"() {
+    "use strict";
+    init_db();
+    cachedStatus = null;
+    cacheExpiry = 0;
+    CACHE_TTL_MS = 5e3;
+  }
+});
+
+// lib/pricing.ts
+var pricing_exports = {};
+__export(pricing_exports, {
+  ADMIN_TELEGRAM_ID: () => ADMIN_TELEGRAM_ID,
+  calculateProfit: () => calculateProfit,
+  calculateSellingPrice: () => calculateSellingPrice,
+  defaultMarginConfig: () => defaultMarginConfig,
+  isAdmin: () => isAdmin
+});
+function isAdmin(telegramId) {
+  if (!telegramId) return false;
+  return String(telegramId) === ADMIN_TELEGRAM_ID;
+}
+function calculateSellingPrice(modalPrice, customMarkup) {
+  if (modalPrice <= 0) return 0;
+  let markup = customMarkup ?? defaultMarginConfig.defaultFlatMarkup;
+  if (customMarkup === void 0) {
+    if (modalPrice < 1e4) {
+      markup = 3e3;
+    } else if (modalPrice < 5e4) {
+      markup = 5e3;
+    } else {
+      markup = 1e4;
+    }
+  }
+  const rawSellingPrice = modalPrice + markup;
+  return Math.ceil(rawSellingPrice / 500) * 500;
+}
+function calculateProfit(sellingPrice, modalPrice) {
+  return Math.max(0, sellingPrice - modalPrice);
+}
+var ADMIN_TELEGRAM_ID, defaultMarginConfig;
+var init_pricing = __esm({
+  "lib/pricing.ts"() {
+    "use strict";
+    ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID || "7133868769";
+    defaultMarginConfig = {
+      defaultFlatMarkup: 5e3,
+      minProfit: 2e3
+    };
+  }
+});
+
 // lib/supplier.ts
 var supplier_exports = {};
 __export(supplier_exports, {
@@ -29431,277 +29536,6 @@ var init_supplier = __esm({
     }
     SUPPLIER_BASE_URL = process.env.SUPPLIER_API_URL || "https://api.prastyaaneki.biz.id";
     SUPPLIER_API_KEY = process.env.SUPPLIER_API_KEY || "";
-  }
-});
-
-// lib/pricing.ts
-var pricing_exports = {};
-__export(pricing_exports, {
-  ADMIN_TELEGRAM_ID: () => ADMIN_TELEGRAM_ID,
-  calculateProfit: () => calculateProfit,
-  calculateSellingPrice: () => calculateSellingPrice,
-  defaultMarginConfig: () => defaultMarginConfig,
-  isAdmin: () => isAdmin
-});
-function isAdmin(telegramId) {
-  if (!telegramId) return false;
-  return String(telegramId) === ADMIN_TELEGRAM_ID;
-}
-function calculateSellingPrice(modalPrice, customMarkup) {
-  if (modalPrice <= 0) return 0;
-  let markup = customMarkup ?? defaultMarginConfig.defaultFlatMarkup;
-  if (customMarkup === void 0) {
-    if (modalPrice < 1e4) {
-      markup = 3e3;
-    } else if (modalPrice < 5e4) {
-      markup = 5e3;
-    } else {
-      markup = 1e4;
-    }
-  }
-  const rawSellingPrice = modalPrice + markup;
-  return Math.ceil(rawSellingPrice / 500) * 500;
-}
-function calculateProfit(sellingPrice, modalPrice) {
-  return Math.max(0, sellingPrice - modalPrice);
-}
-var ADMIN_TELEGRAM_ID, defaultMarginConfig;
-var init_pricing = __esm({
-  "lib/pricing.ts"() {
-    "use strict";
-    ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID || "7133868769";
-    defaultMarginConfig = {
-      defaultFlatMarkup: 5e3,
-      minProfit: 2e3
-    };
-  }
-});
-
-// bot/commands/buy.ts
-function escapeHtml(str) {
-  if (!str) return "";
-  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
-function generateOrderCode() {
-  const timestamp = Math.floor(Date.now() / 1e3);
-  const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
-  return `ORD-${timestamp}-${randomSuffix}`;
-}
-async function ensureUser(telegramId) {
-  const existingUser = await query(
-    "SELECT * FROM users WHERE telegram_id = $1",
-    [telegramId]
-  );
-  if (existingUser.rows.length > 0) {
-    return existingUser.rows[0];
-  }
-  const insertUser = await query(
-    `INSERT INTO users (telegram_id, role)
-     VALUES ($1, 'buyer')
-     ON CONFLICT (telegram_id) DO UPDATE SET telegram_id = EXCLUDED.telegram_id
-     RETURNING *`,
-    [telegramId]
-  );
-  return insertUser.rows[0];
-}
-async function handleBuy(ctx, productId, botInstance) {
-  const trimmedId = productId?.trim();
-  if (!trimmedId) {
-    await sendSafeMessage(
-      ctx,
-      botInstance,
-      "\u26A0\uFE0F <b>Format Pembelian Produk:</b>\nSilakan pilih produk dari menu katalog di bawah:",
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "\u{1F6CD}\uFE0F Buka Katalog Produk", callback_data: "menu_products" }],
-            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
-          ]
-        }
-      }
-    );
-    return;
-  }
-  let product = null;
-  try {
-    const res = await query(
-      "SELECT * FROM products WHERE id = $1 AND is_active = true",
-      [trimmedId]
-    );
-    if (res.rows.length > 0) {
-      product = res.rows[0];
-    }
-  } catch {
-    product = null;
-  }
-  if (!product) {
-    try {
-      const { getSupplierProducts: getSupplierProducts2 } = await Promise.resolve().then(() => (init_supplier(), supplier_exports));
-      const { calculateSellingPrice: calculateSellingPrice2 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
-      const supplierProducts = await getSupplierProducts2();
-      const supp = supplierProducts.find(
-        (p) => p.id === trimmedId || p.name.toLowerCase() === trimmedId.toLowerCase()
-      );
-      if (supp) {
-        const existingByName = await query(
-          "SELECT * FROM products WHERE name = $1 LIMIT 1",
-          [supp.name]
-        );
-        if (existingByName.rows.length > 0) {
-          product = existingByName.rows[0];
-        } else {
-          const sellingPrice = calculateSellingPrice2(supp.price_idr);
-          const ins = await query(
-            `INSERT INTO products (name, price, stock, is_active)
-             VALUES ($1, $2, $3, true)
-             RETURNING *`,
-            [supp.name, sellingPrice, supp.availability === "in_stock" ? 50 : 0]
-          );
-          product = ins.rows[0];
-        }
-      }
-    } catch {
-    }
-  }
-  if (!product) {
-    await sendSafeMessage(
-      ctx,
-      botInstance,
-      `\u274C Produk dengan ID "<b>${escapeHtml(trimmedId)}</b>" tidak ditemukan atau sudah tidak aktif.`,
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "\u{1F6CD}\uFE0F Buka Katalog Produk", callback_data: "menu_products" }],
-            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
-          ]
-        }
-      }
-    );
-    return;
-  }
-  if (product.stock <= 0) {
-    await sendSafeMessage(
-      ctx,
-      botInstance,
-      `\u274C Maaf, stok untuk produk "<b>${escapeHtml(product.name)}</b>" saat ini sedang habis.`,
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "\u{1F6CD}\uFE0F Lihat Produk Lain", callback_data: "menu_products" }],
-            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
-          ]
-        }
-      }
-    );
-    return;
-  }
-  const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
-  const telegramId = ctx.from?.id ? String(ctx.from.id) : String(chatId);
-  const user = await ensureUser(telegramId);
-  const orderCode = generateOrderCode();
-  let qrisResult;
-  try {
-    qrisResult = await createQrisTransaction(orderCode, product.price);
-  } catch (error) {
-    console.error("[Buy Command] Failed to create Midtrans QRIS transaction:", error);
-    await sendSafeMessage(
-      ctx,
-      botInstance,
-      "\u274C Gagal membuat invoice pembayaran QRIS. Silakan coba beberapa saat lagi.",
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "\u{1F504} Coba Lagi", callback_data: `buy_${trimmedId}` }],
-            [{ text: "\u{1F6CD}\uFE0F Buka Katalog Produk", callback_data: "menu_products" }],
-            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
-          ]
-        }
-      }
-    );
-    return;
-  }
-  await query(
-    `INSERT INTO orders (
-       user_id,
-       product_id,
-       order_code,
-       payment_status,
-       fulfillment_status,
-       invoice_data
-     ) VALUES ($1, $2, $3, 'unpaid', 'pending', $4)`,
-    [
-      user.id,
-      product.id,
-      orderCode,
-      JSON.stringify({
-        ...qrisResult.raw || {},
-        qr_code_url: qrisResult.qrCodeUrl,
-        qr_string: qrisResult.qrString
-      })
-    ]
-  );
-  const formattedPrice = `Rp ${product.price.toLocaleString("id-ID")}`;
-  const invoiceCaption = `\u{1F9FE} <b>INVOICE PEMBAYARAN QRIS</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u{1F4E6} <b>Produk:</b> ${escapeHtml(product.name)}
-\u{1F4B0} <b>Total:</b> ${escapeHtml(formattedPrice)}
-\u{1F194} <b>Kode Order:</b> <code>${escapeHtml(orderCode)}</code>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-
-\u{1F4CC} <b>Instruksi Pembayaran:</b>
-1. Scan kode QRIS di atas menggunakan GoPay, OVO, Dana, ShopeePay, BCA, atau Mobile Banking lainnya.
-2. Pastikan nominal pembayaran sesuai.
-3. Setelah pembayaran berhasil, kredensial akun akan dikirimkan otomatis ke sini.
-4. Cek status pembayaran kapan saja dengan menekan tombol <b>\u{1F504} Cek Status Pembayaran</b> di bawah.`;
-  const invoiceButtons = {
-    inline_keyboard: [
-      [{ text: "\u{1F504} Cek Status Pembayaran", callback_data: `status_${orderCode}` }],
-      [
-        { text: "\u{1F6CD}\uFE0F Beli Produk Lain", callback_data: "menu_products" },
-        { text: "\u{1F519} Menu Utama", callback_data: "menu_main" }
-      ]
-    ]
-  };
-  if (qrisResult.qrCodeUrl) {
-    try {
-      const photoSent = await sendSafePhoto(ctx, botInstance, qrisResult.qrCodeUrl, {
-        caption: invoiceCaption,
-        parse_mode: "HTML",
-        reply_markup: invoiceButtons
-      });
-      if (photoSent) return;
-    } catch (photoErr) {
-      console.warn("[Buy Command] sendSafePhoto failed, falling back to message text:", photoErr);
-    }
-  }
-  const fallbackMessage = invoiceCaption + (qrisResult.qrCodeUrl ? `
-
-\u{1F517} <b>Link Gambar QRIS:</b> ${escapeHtml(qrisResult.qrCodeUrl)}` : "") + (qrisResult.qrString ? `
-
-\u{1F4F1} <b>String QRIS:</b> <code>${escapeHtml(qrisResult.qrString)}</code>` : "");
-  await sendSafeMessage(ctx, botInstance, fallbackMessage, {
-    parse_mode: "HTML",
-    reply_markup: invoiceButtons
-  });
-}
-function registerBuyHandler(botInstance) {
-  botInstance.command("buy", async (ctx) => {
-    const text = ctx.message?.text || "";
-    const parts = text.trim().split(/\s+/);
-    const productId = parts[1] || "";
-    await handleBuy(ctx, productId, botInstance);
-  });
-}
-var init_buy = __esm({
-  "bot/commands/buy.ts"() {
-    "use strict";
-    init_db();
-    init_midtrans();
-    init_handler();
   }
 });
 
@@ -36290,7 +36124,7 @@ __export(fulfillment_exports, {
   getPendingQueueOrders: () => getPendingQueueOrders,
   processOrderPayment: () => processOrderPayment
 });
-function escapeHtml2(str) {
+function escapeHtml(str) {
   if (!str) return "";
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
@@ -36362,12 +36196,12 @@ async function processOrderPayment(orderCode, botInstance) {
         );
         const buyerSuccessMessage = `\u{1F389} <b>PEMBAYARAN SUKSES & PESANAN SELESAI!</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u{1F4E6} <b>Produk:</b> ${escapeHtml2(order.product_name)}
-\u{1F194} <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u{1F4E6} <b>Produk:</b> ${escapeHtml(order.product_name)}
+\u{1F194} <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
 \u{1F511} <b>Kredensial / Lisensi Akun Anda:</b>
-<code>${escapeHtml2(deliveredKey)}</code>
+<code>${escapeHtml(deliveredKey)}</code>
 
 \u{1F4CC} <i>Simpan kredensial ini baik-baik. Garansi berlaku sesuai ketentuan produk. Terima kasih telah berbelanja di DaFung Hub!</i>`;
         await sendSafeMessage(
@@ -36386,9 +36220,9 @@ async function processOrderPayment(orderCode, botInstance) {
         );
         const ownerAlert = `\u2705 <b>ORDER SELESAI OTOMATIS (H2H INSTAN)</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
-\u2022 <b>Produk:</b> ${escapeHtml2(order.product_name)}
-\u2022 <b>Pembeli:</b> <code>${escapeHtml2(buyerChatId)}</code>
+\u2022 <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>
+\u2022 <b>Produk:</b> ${escapeHtml(order.product_name)}
+\u2022 <b>Pembeli:</b> <code>${escapeHtml(buyerChatId)}</code>
 \u2022 <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
 \u2022 <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString("id-ID")}
 \u2022 <b>Untung Bersih:</b> <b>+Rp ${netProfit.toLocaleString("id-ID")}</b>
@@ -36418,9 +36252,9 @@ async function processOrderPayment(orderCode, botInstance) {
   );
   const buyerQueueMessage = `\u{1F9FE} <b>PEMBAYARAN DITERIMA!</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u{1F4E6} <b>Produk:</b> ${escapeHtml2(order.product_name)}
+\u{1F4E6} <b>Produk:</b> ${escapeHtml(order.product_name)}
 \u{1F4B0} <b>Total:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
-\u{1F194} <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u{1F194} <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
 \u23F3 <i>Pesanan Anda sedang disiapkan oleh antrean sistem kami (estimasi 1\u201310 menit).</i>
@@ -36441,9 +36275,9 @@ async function processOrderPayment(orderCode, botInstance) {
   );
   const ownerQueueAlert = `\u{1F514} <b>PESANAN BARU MASUK (MODE ANTREAN)</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
-\u2022 <b>Produk:</b> ${escapeHtml2(order.product_name)}
-\u2022 <b>Pembeli:</b> <code>${escapeHtml2(buyerChatId)}</code>
+\u2022 <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>
+\u2022 <b>Produk:</b> ${escapeHtml(order.product_name)}
+\u2022 <b>Pembeli:</b> <code>${escapeHtml(buyerChatId)}</code>
 \u2022 <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
 \u2022 <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString("id-ID")}
 \u2022 <b>Estimasi Untung:</b> <b>+Rp ${netProfit.toLocaleString("id-ID")}</b>
@@ -36453,7 +36287,7 @@ async function processOrderPayment(orderCode, botInstance) {
 \u{1F449} <i>Pilihan eksekusi pengiriman:</i>
 1. Klik tombol di bawah setelah Anda top up di supplier.
 2. Atau kirim kredensial manual dengan perintah:
-   <code>/kirim ${escapeHtml2(order.order_code)} &lt;email:password&gt;</code>`;
+   <code>/kirim ${escapeHtml(order.order_code)} &lt;email:password&gt;</code>`;
   const ownerActionButtons = {
     inline_keyboard: [
       [
@@ -36509,12 +36343,12 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance) {
   );
   const buyerMessage = `\u{1F389} <b>PESANAN ANDA TELAH SELESAI!</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u{1F4E6} <b>Produk:</b> ${escapeHtml2(order.product_name)}
-\u{1F194} <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u{1F4E6} <b>Produk:</b> ${escapeHtml(order.product_name)}
+\u{1F194} <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
 \u{1F511} <b>Kredensial / Detail Akun:</b>
-<code>${escapeHtml2(cleanKey)}</code>
+<code>${escapeHtml(cleanKey)}</code>
 
 \u{1F4CC} <i>Terima kasih telah berbelanja di DaFung Hub! Hubungi admin jika butuh bantuan atau klaim garansi.</i>`;
   await sendSafeMessage(
@@ -36589,7 +36423,7 @@ var init_fulfillment = __esm({
 var menu_exports = {};
 __export(menu_exports, {
   PLATFORMS: () => PLATFORMS,
-  escapeHtml: () => escapeHtml3,
+  escapeHtml: () => escapeHtml2,
   extractQrisFromInvoiceData: () => extractQrisFromInvoiceData,
   filterProductsByPlatform: () => filterProductsByPlatform,
   formatIndonesianDateTime: () => formatIndonesianDateTime,
@@ -36606,6 +36440,7 @@ __export(menu_exports, {
   sendApiMenu: () => sendApiMenu,
   sendDepositMenu: () => sendDepositMenu,
   sendMainMenu: () => sendMainMenu,
+  sendMaintenanceMessage: () => sendMaintenanceMessage,
   sendOrderInvoice: () => sendOrderInvoice,
   sendOrderStatus: () => sendOrderStatus,
   sendOrdersMenu: () => sendOrdersMenu,
@@ -36614,7 +36449,7 @@ __export(menu_exports, {
   sendProductsMenu: () => sendProductsMenu,
   sendProfileMenu: () => sendProfileMenu
 });
-function escapeHtml3(str) {
+function escapeHtml2(str) {
   if (!str) return "";
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
@@ -36678,13 +36513,51 @@ function getPersistentKeyboard(isOwner = false) {
     is_persistent: true
   };
 }
+async function sendMaintenanceMessage(ctx, botInstance) {
+  const maintenanceText = `\u{1F6A7} <b>MOHON MAAF, BOT SEDANG DALAM PEMELIHARAAN</b> \u{1F6A7}
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Halo kak! Saat ini sistem <b>DaFung Hub</b> sedang dalam mode pemeliharaan (maintenance) rutin untuk peningkatan performa dan update layanan.
+
+Seluruh transaksi dan pemesanan sementara ditangguhkan sampai pemeliharaan selesai demi kenyamanan dan keamanan transaksi Anda.
+
+Silakan cek status kembali secara berkala, atau hubungi kami:
+\u2022 <b>Admin Support:</b> @DappaSecc
+\u2022 <b>Channel Info:</b> @DafungHub
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+<i>Sistem akan otomatis aktif kembali setelah maintenance selesai. Terima kasih atas pengertiannya!</i>`;
+  const buttons = {
+    inline_keyboard: [
+      [
+        { text: "\u{1F504} Cek Status Lagi", callback_data: "check_maintenance_status" }
+      ],
+      [
+        { text: "\u{1F4E2} Channel Info (@DafungHub)", url: "https://t.me/DafungHub" },
+        { text: "\u{1F4AC} Hubungi Admin", url: "https://t.me/DappaSecc" }
+      ]
+    ]
+  };
+  return await sendSafeMessage(ctx, botInstance, maintenanceText, {
+    parse_mode: "HTML",
+    reply_markup: buttons
+  });
+}
 async function sendMainMenu(ctx, botInstance) {
   const isOwner = isAdmin(ctx.from?.id);
+  const botStatus = await getBotStatus();
+  if (!isOwner && botStatus === "maintenance") {
+    await sendMaintenanceMessage(ctx, botInstance);
+    return;
+  }
   const rawName = ctx.from?.first_name || ctx.from?.username || "Kak";
   const userName = isOwner ? `${rawName} \u{1F451} (Owner)` : rawName;
   const dateTimeStr = formatIndonesianDateTime();
-  const captionText = `Hello, ${escapeHtml3(userName)}
-| ${escapeHtml3(dateTimeStr)} \u201D`;
+  let captionText = `Hello, ${escapeHtml2(userName)}
+| ${escapeHtml2(dateTimeStr)} \u201D`;
+  if (isOwner && botStatus === "maintenance") {
+    captionText += `
+
+\u26A0\uFE0F <i>(Perhatian: Mode MAINTENANCE aktif. Pengguna biasa sedang diblokir).</i>`;
+  }
   const inlineMarkup = getMainMenuInlineKeyboard(isOwner);
   const candidatePaths = [
     import_path.default.resolve(process.cwd(), "banner.jpg"),
@@ -36855,7 +36728,7 @@ async function sendProductsMenu(ctx, botInstance, page = 0, platformId = "all") 
       { text: "\u{1F4C2} Pilih Platform Lain", callback_data: "menu_platforms" },
       { text: "\u{1F519} Menu Utama", callback_data: "menu_main" }
     ]);
-    const caption = `\u{1F4E6} <b>KATALOG PRODUK: ${escapeHtml3(platformTitle)}</b>
+    const caption = `\u{1F4E6} <b>KATALOG PRODUK: ${escapeHtml2(platformTitle)}</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 Pilih paket akun digital yang Anda inginkan di bawah:`;
     await sendSafeMessage(ctx, botInstance, caption, {
@@ -36922,12 +36795,12 @@ async function sendProductDetail(ctx, botInstance, productId, platformId = "all"
     const statusStr = prod.availability === "in_stock" ? "\u{1F7E2} Stok Tersedia" : "\u{1F534} Stok Habis";
     const detailText = `\u{1F4E6} <b>DETAIL PRODUK</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 Nama: <b>${escapeHtml3(prod.name)}</b>
-\u2022 Harga: <b>${escapeHtml3(priceStr)}</b>
+\u2022 Nama: <b>${escapeHtml2(prod.name)}</b>
+\u2022 Harga: <b>${escapeHtml2(priceStr)}</b>
 \u2022 Status: <b>${statusStr}</b>
 ` + (prod.description ? `
 \u{1F4DD} <b>Deskripsi / Ketentuan:</b>
-${escapeHtml3(prod.description.substring(0, 300))}
+${escapeHtml2(prod.description.substring(0, 300))}
 ` : "") + `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 Sentuh tombol di bawah untuk langsung membuat invoice pembayaran QRIS:`;
     const buttons = [];
@@ -36979,9 +36852,9 @@ async function sendProfileMenu(ctx, botInstance) {
   }
   const profileText = `\u{1F464} <b>PROFIL PENGGUNA</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 Nama: <b>${escapeHtml3(firstName)}</b>
-\u2022 Username: <b>${escapeHtml3(username)}</b>
-\u2022 Telegram ID: <code>${escapeHtml3(telegramId)}</code>
+\u2022 Nama: <b>${escapeHtml2(firstName)}</b>
+\u2022 Username: <b>${escapeHtml2(username)}</b>
+\u2022 Telegram ID: <code>${escapeHtml2(telegramId)}</code>
 \u2022 Saldo Akun: <b>Rp ${balance.toLocaleString("id-ID")}</b>
 \u2022 Status: <b>Active Member</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
@@ -37055,7 +36928,7 @@ Silakan pilih menu <b>\u{1F7E2} Produk</b> untuk mulai membeli akun digital!
       const isUnpaid = ord.payment_status === "unpaid";
       const statusIcon = isUnpaid ? "\u23F3" : ord.fulfillment_status === "delivered" ? "\u{1F7E2}" : ord.fulfillment_status === "processing" ? "\u{1F7E1}" : "\u26AA";
       const statusLabel = isUnpaid ? "MENUNGGU PEMBAYARAN" : ord.fulfillment_status.toUpperCase();
-      text += `\u2022 ${statusIcon} <code>${escapeHtml3(ord.order_code)}</code> | Status: <b>${statusLabel}</b>
+      text += `\u2022 ${statusIcon} <code>${escapeHtml2(ord.order_code)}</code> | Status: <b>${statusLabel}</b>
 `;
       const btnText = isUnpaid ? `\u{1F4B3} Bayar / Buka QRIS: ${ord.order_code}` : `\u{1F50D} Cek Status: ${ord.order_code}`;
       buttons.push([
@@ -37099,9 +36972,9 @@ async function sendOrderInvoice(ctx, botInstance, order) {
   const priceStr = order.product_price ? `Rp ${order.product_price.toLocaleString("id-ID")}` : "-";
   const invoiceCaption = `\u{1F9FE} <b>INVOICE PEMBAYARAN QRIS</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u{1F4E6} <b>Produk:</b> ${escapeHtml3(prodName)}
-\u{1F4B0} <b>Total:</b> ${escapeHtml3(priceStr)}
-\u{1F194} <b>Kode Order:</b> <code>${escapeHtml3(order.order_code)}</code>
+\u{1F4E6} <b>Produk:</b> ${escapeHtml2(prodName)}
+\u{1F4B0} <b>Total:</b> ${escapeHtml2(priceStr)}
+\u{1F194} <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
 \u{1F4CA} <b>Status:</b> \u23F3 <b>MENUNGGU PEMBAYARAN</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
@@ -37133,9 +37006,9 @@ async function sendOrderInvoice(ctx, botInstance, order) {
   }
   const fallbackMessage = invoiceCaption + (qrCodeUrl ? `
 
-\u{1F517} <b>Link Gambar QRIS:</b> ${escapeHtml3(qrCodeUrl)}` : "") + (qrString ? `
+\u{1F517} <b>Link Gambar QRIS:</b> ${escapeHtml2(qrCodeUrl)}` : "") + (qrString ? `
 
-\u{1F4F1} <b>String QRIS:</b> <code>${escapeHtml3(qrString)}</code>` : "");
+\u{1F4F1} <b>String QRIS:</b> <code>${escapeHtml2(qrString)}</code>` : "");
   await sendSafeMessage(ctx, botInstance, fallbackMessage, {
     parse_mode: "HTML",
     reply_markup: invoiceButtons
@@ -37153,7 +37026,7 @@ async function sendOrderStatus(ctx, botInstance, orderCode) {
     await sendSafeMessage(
       ctx,
       botInstance,
-      `\u274C Order <code>${escapeHtml3(orderCode)}</code> tidak ditemukan.`,
+      `\u274C Order <code>${escapeHtml2(orderCode)}</code> tidak ditemukan.`,
       {
         parse_mode: "HTML",
         reply_markup: {
@@ -37171,12 +37044,12 @@ async function sendOrderStatus(ctx, botInstance, orderCode) {
     await sendOrderInvoice(ctx, botInstance, o);
     return;
   }
-  const payStatusStr = o.payment_status === "paid" ? "\u{1F7E2} LUNAS (PAID)" : o.payment_status === "expired" ? "\u{1F534} KADALUWARSA (EXPIRED)" : escapeHtml3(String(o.payment_status).toUpperCase());
-  const fulStatusStr = o.fulfillment_status === "delivered" ? "\u{1F7E2} SELESAI (DELIVERED)" : o.fulfillment_status === "processing" ? "\u{1F7E1} DALAM PROSES (ANTREAN SISTEM)" : escapeHtml3(String(o.fulfillment_status).toUpperCase());
+  const payStatusStr = o.payment_status === "paid" ? "\u{1F7E2} LUNAS (PAID)" : o.payment_status === "expired" ? "\u{1F534} KADALUWARSA (EXPIRED)" : escapeHtml2(String(o.payment_status).toUpperCase());
+  const fulStatusStr = o.fulfillment_status === "delivered" ? "\u{1F7E2} SELESAI (DELIVERED)" : o.fulfillment_status === "processing" ? "\u{1F7E1} DALAM PROSES (ANTREAN SISTEM)" : escapeHtml2(String(o.fulfillment_status).toUpperCase());
   let statText = `\u{1F50D} <b>STATUS PESANAN</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 Kode Order: <code>${escapeHtml3(o.order_code)}</code>
-\u2022 Produk: <b>${escapeHtml3(o.product_name || "Akun Digital")}</b>
+\u2022 Kode Order: <code>${escapeHtml2(o.order_code)}</code>
+\u2022 Produk: <b>${escapeHtml2(o.product_name || "Akun Digital")}</b>
 \u2022 Pembayaran: <b>${payStatusStr}</b>
 \u2022 Pengiriman: <b>${fulStatusStr}</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
@@ -37241,9 +37114,11 @@ async function sendAdminPanel(ctx, botInstance) {
   } catch {
   }
   const pendingOrders = await getPendingQueueOrders();
+  const botStatus = await getBotStatus();
   const adminText = `\u{1F451} <b>PANEL OWNER & ADMIN DAFUNG HUB</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u2022 <b>Owner:</b> @DappaSecc (<code>${ADMIN_TELEGRAM_ID}</code>)
+\u2022 <b>Status Sistem:</b> ${botStatus === "online" ? "\u{1F7E2} ONLINE (Melayani Pembeli)" : "\u{1F534} MAINTENANCE (Sedang Perbaikan)"}
 \u2022 <b>Saldo Supplier Live:</b> <b>Rp ${balance.toLocaleString("id-ID")}</b>
 \u2022 <b>Status Mode:</b> ${balance > 0 ? "\u{1F7E2} H2H Auto-Fulfill" : "\u{1F7E1} Mode Antrean (0 Modal)"}
 \u2022 <b>Antrean Order:</b> <b>${pendingOrders.length} Pesanan Butuh Diproses</b>
@@ -37251,6 +37126,9 @@ async function sendAdminPanel(ctx, botInstance) {
 Gunakan panel kontrol di bawah untuk mengelola bisnis:`;
   const adminButtons = {
     inline_keyboard: [
+      [
+        botStatus === "online" ? { text: "\u{1F534} Ubah ke Mode MAINTENANCE", callback_data: "admin_set_maintenance" } : { text: "\u{1F7E2} Aktifkan Bot (Set ONLINE)", callback_data: "admin_set_online" }
+      ],
       [
         {
           text: `\u{1F4E6} Antrean Pesanan (${pendingOrders.length})`,
@@ -37281,8 +37159,8 @@ async function sendAdminQueueMenu(ctx, botInstance) {
 `;
   } else {
     for (const ord of queueOrders) {
-      text += `\u2022 <b>${escapeHtml3(ord.order_code)}</b>
-  \u{1F4E6} ${escapeHtml3(ord.product_name)} (Rp ${ord.product_price.toLocaleString("id-ID")})
+      text += `\u2022 <b>${escapeHtml2(ord.order_code)}</b>
+  \u{1F4E6} ${escapeHtml2(ord.product_name)} (Rp ${ord.product_price.toLocaleString("id-ID")})
   \u{1F464} Buyer: <code>${ord.telegram_id}</code>
 
 `;
@@ -37320,7 +37198,7 @@ async function sendAdminBalanceMenu(ctx, botInstance) {
   }
   const text = `\u{1F4B3} <b>INFORMASI SALDO & AKUN SUPPLIER</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 <b>Username Supplier:</b> ${escapeHtml3(username)}
+\u2022 <b>Username Supplier:</b> ${escapeHtml2(username)}
 \u2022 <b>User ID Supplier:</b> <code>${userId}</code>
 \u2022 <b>Saldo Deposit:</b> <b>Rp ${balance.toLocaleString("id-ID")}</b>
 \u2022 <b>Status H2H:</b> ${balance > 0 ? "\u{1F7E2} Saldo Tersedia (Order Instan Aktif)" : "\u{1F7E1} Saldo Rp 0 (Mode Antrean Aktif)"}
@@ -37363,7 +37241,7 @@ async function sendAdminOrdersMenu(ctx, botInstance) {
     for (const o of recentOrders) {
       const statusIcon = o.fulfillment_status === "delivered" ? "\u{1F7E2}" : o.fulfillment_status === "processing" ? "\u{1F7E1}" : "\u26AA";
       text += `${statusIcon} <code>${o.order_code}</code>
-  \u{1F4E6} ${escapeHtml3(o.product_name)} (Rp ${o.product_price.toLocaleString("id-ID")})
+  \u{1F4E6} ${escapeHtml2(o.product_name)} (Rp ${o.product_price.toLocaleString("id-ID")})
   \u2022 Bayar: <b>${o.payment_status.toUpperCase()}</b> | Status: <b>${o.fulfillment_status.toUpperCase()}</b>
 
 `;
@@ -37392,6 +37270,26 @@ function registerMenuHandlers(botInstance) {
     try {
       if (data === "admin_panel") {
         await sendAdminPanel(ctx, botInstance);
+      } else if (data === "admin_set_maintenance") {
+        if (isAdmin(ctx.from?.id)) {
+          await setBotStatus("maintenance");
+          await sendAdminPanel(ctx, botInstance);
+        }
+        return;
+      } else if (data === "admin_set_online") {
+        if (isAdmin(ctx.from?.id)) {
+          await setBotStatus("online");
+          await sendAdminPanel(ctx, botInstance);
+        }
+        return;
+      } else if (data === "check_maintenance_status") {
+        const currentStatus = await getBotStatus();
+        if (currentStatus === "maintenance") {
+          await sendMaintenanceMessage(ctx, botInstance);
+        } else {
+          await sendMainMenu(ctx, botInstance);
+        }
+        return;
       } else if (data === "admin_queue") {
         await sendAdminQueueMenu(ctx, botInstance);
       } else if (data === "admin_balance") {
@@ -37410,6 +37308,9 @@ function registerMenuHandlers(botInstance) {
             ]
           }
         });
+      } else if (!isAdmin(ctx.from?.id) && await getBotStatus() === "maintenance") {
+        await sendMaintenanceMessage(ctx, botInstance);
+        return;
       } else if (data === "menu_main") {
         await sendMainMenu(ctx, botInstance);
       } else if (data === "menu_products" || data === "menu_platforms") {
@@ -37536,6 +37437,7 @@ var init_menu = __esm({
     init_buy();
     init_pricing();
     init_fulfillment();
+    init_settings();
     PLATFORMS = [
       { id: "netflix", name: "Netflix", icon: "\u{1F534}", keywords: ["netflix"], logoFile: "netflix.png" },
       { id: "canva", name: "Canva", icon: "\u{1F3A8}", keywords: ["canva"], logoFile: "canva.png" },
@@ -37556,6 +37458,242 @@ var init_menu = __esm({
       { id: "scribd", name: "Scribd", icon: "\u{1F4DA}", keywords: ["scribd"], logoFile: "scribd.png" },
       { id: "email", name: "Akun Email", icon: "\u{1F4E7}", keywords: ["gmail", "outlook", "hotmail", "email"], logoFile: "office.png" }
     ];
+  }
+});
+
+// bot/commands/buy.ts
+function escapeHtml3(str) {
+  if (!str) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function generateOrderCode() {
+  const timestamp = Math.floor(Date.now() / 1e3);
+  const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
+  return `ORD-${timestamp}-${randomSuffix}`;
+}
+async function ensureUser(telegramId) {
+  const existingUser = await query(
+    "SELECT * FROM users WHERE telegram_id = $1",
+    [telegramId]
+  );
+  if (existingUser.rows.length > 0) {
+    return existingUser.rows[0];
+  }
+  const insertUser = await query(
+    `INSERT INTO users (telegram_id, role)
+     VALUES ($1, 'buyer')
+     ON CONFLICT (telegram_id) DO UPDATE SET telegram_id = EXCLUDED.telegram_id
+     RETURNING *`,
+    [telegramId]
+  );
+  return insertUser.rows[0];
+}
+async function handleBuy(ctx, productId, botInstance) {
+  const { getBotStatus: getBotStatus2 } = await Promise.resolve().then(() => (init_settings(), settings_exports));
+  const { isAdmin: isAdmin2 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
+  const status = await getBotStatus2();
+  if (status === "maintenance" && !isAdmin2(ctx.from?.id)) {
+    const { sendMaintenanceMessage: sendMaintenanceMessage2 } = await Promise.resolve().then(() => (init_menu(), menu_exports));
+    await sendMaintenanceMessage2(ctx, botInstance);
+    return;
+  }
+  const trimmedId = productId?.trim();
+  if (!trimmedId) {
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      "\u26A0\uFE0F <b>Format Pembelian Produk:</b>\nSilakan pilih produk dari menu katalog di bawah:",
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "\u{1F6CD}\uFE0F Buka Katalog Produk", callback_data: "menu_products" }],
+            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+          ]
+        }
+      }
+    );
+    return;
+  }
+  let product = null;
+  try {
+    const res = await query(
+      "SELECT * FROM products WHERE id = $1 AND is_active = true",
+      [trimmedId]
+    );
+    if (res.rows.length > 0) {
+      product = res.rows[0];
+    }
+  } catch {
+    product = null;
+  }
+  if (!product) {
+    try {
+      const { getSupplierProducts: getSupplierProducts2 } = await Promise.resolve().then(() => (init_supplier(), supplier_exports));
+      const { calculateSellingPrice: calculateSellingPrice2 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
+      const supplierProducts = await getSupplierProducts2();
+      const supp = supplierProducts.find(
+        (p) => p.id === trimmedId || p.name.toLowerCase() === trimmedId.toLowerCase()
+      );
+      if (supp) {
+        const existingByName = await query(
+          "SELECT * FROM products WHERE name = $1 LIMIT 1",
+          [supp.name]
+        );
+        if (existingByName.rows.length > 0) {
+          product = existingByName.rows[0];
+        } else {
+          const sellingPrice = calculateSellingPrice2(supp.price_idr);
+          const ins = await query(
+            `INSERT INTO products (name, price, stock, is_active)
+             VALUES ($1, $2, $3, true)
+             RETURNING *`,
+            [supp.name, sellingPrice, supp.availability === "in_stock" ? 50 : 0]
+          );
+          product = ins.rows[0];
+        }
+      }
+    } catch {
+    }
+  }
+  if (!product) {
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      `\u274C Produk dengan ID "<b>${escapeHtml3(trimmedId)}</b>" tidak ditemukan atau sudah tidak aktif.`,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "\u{1F6CD}\uFE0F Buka Katalog Produk", callback_data: "menu_products" }],
+            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+          ]
+        }
+      }
+    );
+    return;
+  }
+  if (product.stock <= 0) {
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      `\u274C Maaf, stok untuk produk "<b>${escapeHtml3(product.name)}</b>" saat ini sedang habis.`,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "\u{1F6CD}\uFE0F Lihat Produk Lain", callback_data: "menu_products" }],
+            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+          ]
+        }
+      }
+    );
+    return;
+  }
+  const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
+  const telegramId = ctx.from?.id ? String(ctx.from.id) : String(chatId);
+  const user = await ensureUser(telegramId);
+  const orderCode = generateOrderCode();
+  let qrisResult;
+  try {
+    qrisResult = await createQrisTransaction(orderCode, product.price);
+  } catch (error) {
+    console.error("[Buy Command] Failed to create Midtrans QRIS transaction:", error);
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      "\u274C Gagal membuat invoice pembayaran QRIS. Silakan coba beberapa saat lagi.",
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "\u{1F504} Coba Lagi", callback_data: `buy_${trimmedId}` }],
+            [{ text: "\u{1F6CD}\uFE0F Buka Katalog Produk", callback_data: "menu_products" }],
+            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+          ]
+        }
+      }
+    );
+    return;
+  }
+  await query(
+    `INSERT INTO orders (
+       user_id,
+       product_id,
+       order_code,
+       payment_status,
+       fulfillment_status,
+       invoice_data
+     ) VALUES ($1, $2, $3, 'unpaid', 'pending', $4)`,
+    [
+      user.id,
+      product.id,
+      orderCode,
+      JSON.stringify({
+        ...qrisResult.raw || {},
+        qr_code_url: qrisResult.qrCodeUrl,
+        qr_string: qrisResult.qrString
+      })
+    ]
+  );
+  const formattedPrice = `Rp ${product.price.toLocaleString("id-ID")}`;
+  const invoiceCaption = `\u{1F9FE} <b>INVOICE PEMBAYARAN QRIS</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F4E6} <b>Produk:</b> ${escapeHtml3(product.name)}
+\u{1F4B0} <b>Total:</b> ${escapeHtml3(formattedPrice)}
+\u{1F194} <b>Kode Order:</b> <code>${escapeHtml3(orderCode)}</code>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+
+\u{1F4CC} <b>Instruksi Pembayaran:</b>
+1. Scan kode QRIS di atas menggunakan GoPay, OVO, Dana, ShopeePay, BCA, atau Mobile Banking lainnya.
+2. Pastikan nominal pembayaran sesuai.
+3. Setelah pembayaran berhasil, kredensial akun akan dikirimkan otomatis ke sini.
+4. Cek status pembayaran kapan saja dengan menekan tombol <b>\u{1F504} Cek Status Pembayaran</b> di bawah.`;
+  const invoiceButtons = {
+    inline_keyboard: [
+      [{ text: "\u{1F504} Cek Status Pembayaran", callback_data: `status_${orderCode}` }],
+      [
+        { text: "\u{1F6CD}\uFE0F Beli Produk Lain", callback_data: "menu_products" },
+        { text: "\u{1F519} Menu Utama", callback_data: "menu_main" }
+      ]
+    ]
+  };
+  if (qrisResult.qrCodeUrl) {
+    try {
+      const photoSent = await sendSafePhoto(ctx, botInstance, qrisResult.qrCodeUrl, {
+        caption: invoiceCaption,
+        parse_mode: "HTML",
+        reply_markup: invoiceButtons
+      });
+      if (photoSent) return;
+    } catch (photoErr) {
+      console.warn("[Buy Command] sendSafePhoto failed, falling back to message text:", photoErr);
+    }
+  }
+  const fallbackMessage = invoiceCaption + (qrisResult.qrCodeUrl ? `
+
+\u{1F517} <b>Link Gambar QRIS:</b> ${escapeHtml3(qrisResult.qrCodeUrl)}` : "") + (qrisResult.qrString ? `
+
+\u{1F4F1} <b>String QRIS:</b> <code>${escapeHtml3(qrisResult.qrString)}</code>` : "");
+  await sendSafeMessage(ctx, botInstance, fallbackMessage, {
+    parse_mode: "HTML",
+    reply_markup: invoiceButtons
+  });
+}
+function registerBuyHandler(botInstance) {
+  botInstance.command("buy", async (ctx) => {
+    const text = ctx.message?.text || "";
+    const parts = text.trim().split(/\s+/);
+    const productId = parts[1] || "";
+    await handleBuy(ctx, productId, botInstance);
+  });
+}
+var init_buy = __esm({
+  "bot/commands/buy.ts"() {
+    "use strict";
+    init_db();
+    init_midtrans();
+    init_handler();
   }
 });
 
@@ -37665,9 +37803,19 @@ async function sendSafePhoto(ctx, botInstance, photo, options) {
 }
 function registerHandlers(botInstance) {
   botInstance.command("start", async (ctx) => {
+    const status = await getBotStatus();
+    if (status === "maintenance" && !isAdmin(ctx.from?.id)) {
+      await sendMaintenanceMessage(ctx, botInstance);
+      return;
+    }
     await sendMainMenu(ctx, botInstance);
   });
   botInstance.command("help", async (ctx) => {
+    const status = await getBotStatus();
+    if (status === "maintenance" && !isAdmin(ctx.from?.id)) {
+      await sendMaintenanceMessage(ctx, botInstance);
+      return;
+    }
     const helpMessage = "\u2139\uFE0F <b>Panduan Bantuan & Garansi DaFung Hub:</b>\n\n1. Setelah pembayaran QRIS berhasil, kredensial akun akan dikirimkan otomatis.\n2. Jika ada kendala pesanan, silakan sertakan kode order kamu.\n3. Admin akan meninjau komplain dan memproses penggantian atau refund.";
     await sendSafeMessage(ctx, botInstance, helpMessage, {
       parse_mode: "HTML",
@@ -37680,6 +37828,11 @@ function registerHandlers(botInstance) {
     });
   });
   botInstance.command("status", async (ctx) => {
+    const status = await getBotStatus();
+    if (status === "maintenance" && !isAdmin(ctx.from?.id)) {
+      await sendMaintenanceMessage(ctx, botInstance);
+      return;
+    }
     const text = ctx.message?.text || "";
     const parts = text.trim().split(/\s+/);
     const orderCode = parts[1];
@@ -37790,6 +37943,11 @@ function registerHandlers(botInstance) {
       return;
     }
     if (text) {
+      const status = await getBotStatus();
+      if (status === "maintenance" && !isAdmin(ctx.from?.id)) {
+        await sendMaintenanceMessage(ctx, botInstance);
+        return;
+      }
       await sendSafeMessage(
         ctx,
         botInstance,
@@ -37868,6 +38026,8 @@ var init_handler = __esm({
     import_node_telegram_bot_api = require("node-telegram-bot-api");
     init_buy();
     init_menu();
+    init_settings();
+    init_pricing();
     if (!process.env.TELEGRAM_BOT_TOKEN) {
       try {
         process.loadEnvFile?.();

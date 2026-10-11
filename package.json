@@ -15,7 +15,10 @@
     "db:seed": "tsx scripts/seed.ts",
     "test": "tsx --test tests/**/*.test.ts",
     "set-webhook": "tsx scripts/set-webhook.ts",
-    "bot": "tsx scripts/run-bot.ts"
+    "bot": "tsx scripts/run-bot.ts",
+    "web:dev": "npm --prefix dafung-web run dev",
+    "web:build": "npm --prefix dafung-web run build",
+    "web:start": "npm --prefix dafung-web run start"
   },
   "dependencies": {
     "crypto-js": "^4.2.0",

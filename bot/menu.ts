@@ -11,6 +11,7 @@ import {
   adminRetrySupplierFulfill,
   getPendingQueueOrders,
 } from '../lib/fulfillment';
+import { getBotStatus, setBotStatus } from '../lib/settings';
 
 /**
  * Escape HTML special characters for safe Telegram HTML parse mode
@@ -109,17 +110,65 @@ export function getPersistentKeyboard(isOwner: boolean = false) {
 }
 
 /**
+ * Send friendly maintenance notification to non-admin users
+ */
+export async function sendMaintenanceMessage(
+  ctx: Context,
+  botInstance: ExtendedBot
+): Promise<unknown> {
+  const maintenanceText =
+    `🚧 <b>MOHON MAAF, BOT SEDANG DALAM PEMELIHARAAN</b> 🚧\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `Halo kak! Saat ini sistem <b>DaFung Hub</b> sedang dalam mode pemeliharaan (maintenance) rutin untuk peningkatan performa dan update layanan.\n\n` +
+    `Seluruh transaksi dan pemesanan sementara ditangguhkan sampai pemeliharaan selesai demi kenyamanan dan keamanan transaksi Anda.\n\n` +
+    `Silakan cek status kembali secara berkala, atau hubungi kami:\n` +
+    `• <b>Admin Support:</b> @DappaSecc\n` +
+    `• <b>Channel Info:</b> @DafungHub\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `<i>Sistem akan otomatis aktif kembali setelah maintenance selesai. Terima kasih atas pengertiannya!</i>`;
+
+  const buttons = {
+    inline_keyboard: [
+      [
+        { text: '🔄 Cek Status Lagi', callback_data: 'check_maintenance_status' },
+      ],
+      [
+        { text: '📢 Channel Info (@DafungHub)', url: 'https://t.me/DafungHub' },
+        { text: '💬 Hubungi Admin', url: 'https://t.me/DappaSecc' },
+      ],
+    ],
+  };
+
+  return await sendSafeMessage(ctx, botInstance, maintenanceText, {
+    parse_mode: 'HTML',
+    reply_markup: buttons,
+  });
+}
+
+/**
  * Send the interactive main menu with banner and buttons
  */
 export async function sendMainMenu(ctx: Context, botInstance: ExtendedBot): Promise<void> {
   const isOwner = isAdmin(ctx.from?.id);
+  const botStatus = await getBotStatus();
+
+  // Non-admins are redirected to maintenance message if active
+  if (!isOwner && botStatus === 'maintenance') {
+    await sendMaintenanceMessage(ctx, botInstance);
+    return;
+  }
+
   const rawName = ctx.from?.first_name || ctx.from?.username || 'Kak';
   const userName = isOwner ? `${rawName} 👑 (Owner)` : rawName;
   const dateTimeStr = formatIndonesianDateTime();
 
-  const captionText =
+  let captionText =
     `Hello, ${escapeHtml(userName)}\n` +
     `| ${escapeHtml(dateTimeStr)} ”`;
+
+  if (isOwner && botStatus === 'maintenance') {
+    captionText += `\n\n⚠️ <i>(Perhatian: Mode MAINTENANCE aktif. Pengguna biasa sedang diblokir).</i>`;
+  }
 
   const inlineMarkup = getMainMenuInlineKeyboard(isOwner);
 
@@ -888,11 +937,13 @@ export async function sendAdminPanel(ctx: Context, botInstance: ExtendedBot): Pr
   } catch {}
 
   const pendingOrders = await getPendingQueueOrders();
+  const botStatus = await getBotStatus();
 
   const adminText =
     `👑 <b>PANEL OWNER & ADMIN DAFUNG HUB</b>\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
     `• <b>Owner:</b> @DappaSecc (<code>${ADMIN_TELEGRAM_ID}</code>)\n` +
+    `• <b>Status Sistem:</b> ${botStatus === 'online' ? '🟢 ONLINE (Melayani Pembeli)' : '🔴 MAINTENANCE (Sedang Perbaikan)'}\n` +
     `• <b>Saldo Supplier Live:</b> <b>Rp ${balance.toLocaleString('id-ID')}</b>\n` +
     `• <b>Status Mode:</b> ${balance > 0 ? '🟢 H2H Auto-Fulfill' : '🟡 Mode Antrean (0 Modal)'}\n` +
     `• <b>Antrean Order:</b> <b>${pendingOrders.length} Pesanan Butuh Diproses</b>\n` +
@@ -901,6 +952,11 @@ export async function sendAdminPanel(ctx: Context, botInstance: ExtendedBot): Pr
 
   const adminButtons = {
     inline_keyboard: [
+      [
+        botStatus === 'online'
+          ? { text: '🔴 Ubah ke Mode MAINTENANCE', callback_data: 'admin_set_maintenance' }
+          : { text: '🟢 Aktifkan Bot (Set ONLINE)', callback_data: 'admin_set_online' },
+      ],
       [
         {
           text: `📦 Antrean Pesanan (${pendingOrders.length})`,
@@ -1079,6 +1135,26 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
       // OWNER / ADMIN CALLBACKS
       if (data === 'admin_panel') {
         await sendAdminPanel(ctx, botInstance);
+      } else if (data === 'admin_set_maintenance') {
+        if (isAdmin(ctx.from?.id)) {
+          await setBotStatus('maintenance');
+          await sendAdminPanel(ctx, botInstance);
+        }
+        return;
+      } else if (data === 'admin_set_online') {
+        if (isAdmin(ctx.from?.id)) {
+          await setBotStatus('online');
+          await sendAdminPanel(ctx, botInstance);
+        }
+        return;
+      } else if (data === 'check_maintenance_status') {
+        const currentStatus = await getBotStatus();
+        if (currentStatus === 'maintenance') {
+          await sendMaintenanceMessage(ctx, botInstance);
+        } else {
+          await sendMainMenu(ctx, botInstance);
+        }
+        return;
       } else if (data === 'admin_queue') {
         await sendAdminQueueMenu(ctx, botInstance);
       } else if (data === 'admin_balance') {
@@ -1097,6 +1173,11 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
             ],
           },
         });
+      }
+      // INTERCEPT ALL BUYER CALLBACKS DURING MAINTENANCE
+      else if (!isAdmin(ctx.from?.id) && (await getBotStatus()) === 'maintenance') {
+        await sendMaintenanceMessage(ctx, botInstance);
+        return;
       }
       // BUYER CALLBACKS
       else if (data === 'menu_main') {

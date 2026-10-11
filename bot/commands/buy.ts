@@ -54,6 +54,15 @@ export async function handleBuy(
   productId: string,
   botInstance: ExtendedBot
 ): Promise<void> {
+  const { getBotStatus } = await import('../../lib/settings');
+  const { isAdmin } = await import('../../lib/pricing');
+  const status = await getBotStatus();
+  if (status === 'maintenance' && !isAdmin(ctx.from?.id)) {
+    const { sendMaintenanceMessage } = await import('../menu');
+    await sendMaintenanceMessage(ctx, botInstance);
+    return;
+  }
+
   const trimmedId = productId?.trim();
 
   if (!trimmedId) {

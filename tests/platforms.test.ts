@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import test, { after } from 'node:test';
+import test, { after, before } from 'node:test';
 import { Bot, Context } from 'node-telegram-bot-api';
 import { ExtendedBot } from '../bot/handler';
 import { pool } from '../lib/db';
+import { setBotStatus, clearSettingsCache } from '../lib/settings';
 import {
   PLATFORMS,
   filterProductsByPlatform,
@@ -15,6 +16,11 @@ import {
 } from '../bot/menu';
 import { getSupplierProducts } from '../lib/supplier';
 import fs from 'fs';
+
+before(async () => {
+  clearSettingsCache();
+  await setBotStatus('online');
+});
 
 after(async () => {
   await pool.end();
@@ -160,8 +166,11 @@ test('Product Detail: handles supplier product IDs with underscores correctly', 
     reply: async () => {},
   } as unknown as Context;
 
-  // Test an actual Netflix product ID from supplier with underscores
-  const netflixProdId = 'rd_x37c5f1b16c6a69a60b55643b';
+  // Retrieve an actual Netflix product from supplier dynamically
+  const allProds = await getSupplierProducts();
+  const netflixProds = filterProductsByPlatform(allProds, 'netflix');
+  const targetProd = netflixProds[0] || allProds[0];
+  const netflixProdId = targetProd.id;
   await sendProductDetail(mockCtx, botInstance, netflixProdId, 'netflix');
 
   assert.ok(sentText.includes('DETAIL PRODUK'), 'Must show product detail header');
@@ -184,7 +193,10 @@ test('Product Detail: registerMenuHandlers correctly parses colon-separated pdet
 
   registerMenuHandlers(botInstance);
 
-  const netflixProdId = 'rd_x37c5f1b16c6a69a60b55643b';
+  const allProds = await getSupplierProducts();
+  const netflixProds = filterProductsByPlatform(allProds, 'netflix');
+  const targetProd = netflixProds[0] || allProds[0];
+  const netflixProdId = targetProd.id;
   await botInstance.handleUpdate({
     update_id: 301,
     callback_query: {

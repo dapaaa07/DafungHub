@@ -44,3 +44,5 @@ next-env.d.ts
 # archives
 *.zip
 
+# local web storefront (exclude from git & Vercel deployment)
+dafung-web/
