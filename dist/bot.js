@@ -37858,6 +37858,9 @@ async function initBot(options) {
     console.log("[Telegram Bot] Configured in webhook mode.");
   }
 }
+async function handleWebhookUpdate(update) {
+  await bot.handleUpdate(update);
+}
 var import_node_telegram_bot_api, activeBotMessages, bot;
 var init_handler = __esm({
   "bot/handler.ts"() {
@@ -37882,31 +37885,71 @@ var init_handler = __esm({
 // scripts/run-bot.ts
 var import_http = __toESM(require("http"));
 init_handler();
-console.log("\u{1F916} Starting DaFung Hub Telegram Bot...");
+init_fulfillment();
+console.log("\u{1F916} Starting DaFung Hub Telegram Bot Service...");
 var port = process.env.PORT || 3e3;
 var server = import_http.default.createServer((req, res) => {
+  if (req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
+    req.on("end", async () => {
+      try {
+        const data = JSON.parse(body || "{}");
+        if (req.url?.includes("midtrans")) {
+          const orderId = data.order_id;
+          const status = data.transaction_status;
+          const fraud = data.fraud_status;
+          const isPaid = status === "settlement" || status === "capture" && fraud === "accept";
+          if (isPaid && orderId) {
+            console.log(`[Midtrans Webhook] Payment confirmed for order: ${orderId}`);
+            await processOrderPayment(orderId, bot);
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ status: "ok", order_id: orderId, paid: isPaid }));
+          return;
+        }
+        await initBot({ mode: "webhook" });
+        await handleWebhookUpdate(data);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (err) {
+        console.error("[Webhook Error]:", err);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+      }
+    });
+    return;
+  }
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(
     JSON.stringify({
       status: "ok",
-      service: "DaFung Hub Telegram Bot",
+      service: "DaFung Hub Telegram Bot & Webhook Service",
+      mode: process.env.TELEGRAM_BOT_MODE || "webhook",
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
     })
   );
 });
 server.listen(port, () => {
-  console.log(`\u{1F310} Health check HTTP server active on port ${port}`);
+  console.log(`\u{1F310} Webhook & Health check HTTP server active on port ${port}`);
 });
 async function start() {
-  try {
-    await bot.api.deleteWebhook({ drop_pending_updates: false });
-    console.log("\u2705 Webhook cleared.");
-  } catch (err) {
-    console.warn("\u26A0\uFE0F Notice: deleteWebhook check skipped or timed out:", err.message);
+  const mode = process.env.TELEGRAM_BOT_MODE || "webhook";
+  if (mode === "polling") {
+    try {
+      await bot.api.deleteWebhook({ drop_pending_updates: false });
+      console.log("\u2705 Webhook cleared.");
+    } catch (err) {
+      console.warn("\u26A0\uFE0F deleteWebhook skipped:", err.message);
+    }
+    await initBot({ mode: "polling" });
+    console.log("\u{1F680} Bot is LIVE in polling mode!");
+  } else {
+    await initBot({ mode: "webhook" });
+    console.log("\u{1F680} Bot is READY in webhook mode!");
   }
-  await initBot({ mode: "polling" });
-  console.log("\u{1F680} Bot is LIVE and listening for messages!");
-  console.log("\u{1F4F1} Silakan buka Telegram dan chat dengan @dafung_hub_bot");
 }
 start().catch((err) => {
   console.error("\u274C Failed to start bot:", err);
