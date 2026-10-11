@@ -3213,11 +3213,11 @@ var require_connection = __commonJS({
           }
         });
       }
-      connect(port, host) {
+      connect(port2, host) {
         const self2 = this;
         this._connecting = true;
         this.stream.setNoDelay(true);
-        this.stream.connect(port, host);
+        this.stream.connect(port2, host);
         this.stream.once("connect", function() {
           if (self2._keepAlive) {
             self2.stream.setKeepAlive(true, self2._keepAliveInitialDelayMillis);
@@ -20939,7 +20939,7 @@ var require_form_data = __commonJS({
     var CombinedStream = require_combined_stream();
     var util = require("util");
     var path2 = require("path");
-    var http = require("http");
+    var http2 = require("http");
     var https = require("https");
     var parseUrl = require("url").parse;
     var fs2 = require("fs");
@@ -21214,7 +21214,7 @@ var require_form_data = __commonJS({
       if (options.protocol === "https:") {
         request = https.request(options);
       } else {
-        request = http.request(options);
+        request = http2.request(options);
       }
       this.getLength(function(err, length) {
         if (err && err !== "Unknown stream") {
@@ -22386,9 +22386,9 @@ var require_agent = __commonJS({
           if (proxy.auth) {
             headers["Proxy-Authorization"] = `Basic ${Buffer.from(proxy.auth).toString("base64")}`;
           }
-          let { host, port, secureEndpoint } = opts;
-          if (!isDefaultPort(port, secureEndpoint)) {
-            host += `:${port}`;
+          let { host, port: port2, secureEndpoint } = opts;
+          if (!isDefaultPort(port2, secureEndpoint)) {
+            host += `:${port2}`;
           }
           headers.Host = host;
           headers.Connection = "close";
@@ -22429,8 +22429,8 @@ var require_agent = __commonJS({
     function resume(socket) {
       socket.resume();
     }
-    function isDefaultPort(port, secure) {
-      return Boolean(!secure && port === 80 || secure && port === 443);
+    function isDefaultPort(port2, secure) {
+      return Boolean(!secure && port2 === 80 || secure && port2 === 443);
     }
     function isHTTPS(protocol) {
       return typeof protocol === "string" ? /^https:?$/i.test(protocol) : false;
@@ -22492,7 +22492,7 @@ var require_follow_redirects = __commonJS({
   "node_modules/follow-redirects/index.js"(exports2, module2) {
     var url = require("url");
     var URL2 = url.URL;
-    var http = require("http");
+    var http2 = require("http");
     var https = require("https");
     var Writable = require("stream").Writable;
     var assert = require("assert");
@@ -22999,7 +22999,7 @@ var require_follow_redirects = __commonJS({
     function escapeRegex(regex) {
       return regex.replace(/[[\]\\/()*+?.^$|]/g, "\\$&");
     }
-    module2.exports = wrap({ http, https });
+    module2.exports = wrap({ http: http2, https });
     module2.exports.wrap = wrap;
   }
 });
@@ -23012,9 +23012,9 @@ var require_axios = __commonJS({
     var crypto = require("crypto");
     var url = require("url");
     var HttpsProxyAgent = require_dist2();
-    var http = require("http");
+    var http2 = require("http");
     var https = require("https");
-    var http2 = require("http2");
+    var http22 = require("http2");
     var util = require("util");
     var path2 = require("path");
     var followRedirects = require_follow_redirects();
@@ -24828,14 +24828,14 @@ var require_axios = __commonJS({
       var parsedUrl = (typeof url2 === "string" ? parseUrl(url2) : url2) || {};
       var proto = parsedUrl.protocol;
       var hostname = parsedUrl.host;
-      var port = parsedUrl.port;
+      var port2 = parsedUrl.port;
       if (typeof hostname !== "string" || !hostname || typeof proto !== "string") {
         return "";
       }
       proto = proto.split(":", 1)[0];
       hostname = hostname.replace(/:\d*$/, "");
-      port = parseInt(port) || DEFAULT_PORTS$1[proto] || 0;
-      if (!shouldProxy(hostname, port)) {
+      port2 = parseInt(port2) || DEFAULT_PORTS$1[proto] || 0;
+      if (!shouldProxy(hostname, port2)) {
         return "";
       }
       var proxy = getEnv(proto + "_proxy") || getEnv("all_proxy");
@@ -24844,7 +24844,7 @@ var require_axios = __commonJS({
       }
       return proxy;
     }
-    function shouldProxy(hostname, port) {
+    function shouldProxy(hostname, port2) {
       var NO_PROXY = getEnv("no_proxy").toLowerCase();
       if (!NO_PROXY) {
         return true;
@@ -24859,7 +24859,7 @@ var require_axios = __commonJS({
         var parsedProxy = proxy.match(/^(.+):(\d+)$/);
         var parsedProxyHostname = parsedProxy ? parsedProxy[1] : proxy;
         var parsedProxyPort = parsedProxy ? parseInt(parsedProxy[2]) : 0;
-        if (parsedProxyPort && parsedProxyPort !== port) {
+        if (parsedProxyPort && parsedProxyPort !== port2) {
           return true;
         }
         if (!/^[.*]/.test(parsedProxyHostname)) {
@@ -25169,7 +25169,7 @@ var require_axios = __commonJS({
             }
           }
         }
-        const session = http2.connect(authority, options);
+        const session = http22.connect(authority, options);
         let removed;
         let timer;
         const removeSession = () => {
@@ -25539,7 +25539,7 @@ var require_axios = __commonJS({
       if (noProxy === "*") {
         return true;
       }
-      const port = Number.parseInt(parsed.port, 10) || DEFAULT_PORTS[parsed.protocol.split(":", 1)[0]] || 0;
+      const port2 = Number.parseInt(parsed.port, 10) || DEFAULT_PORTS[parsed.protocol.split(":", 1)[0]] || 0;
       const hostname = normalizeNoProxyHost(parsed.hostname.toLowerCase());
       const hostnameBytes = ipToBytes(hostname);
       return noProxy.split(/[\s,]+/).some((entry) => {
@@ -25558,7 +25558,7 @@ var require_axios = __commonJS({
         if (!entryHost) {
           return false;
         }
-        if (entryPort && entryPort !== port) {
+        if (entryPort && entryPort !== port2) {
           return false;
         }
         if (entryHost.charAt(0) === "*") {
@@ -25828,7 +25828,7 @@ var require_axios = __commonJS({
       return Boolean(agentOptions && utils$1.hasOwnProp(agentOptions, "proxyEnv") && agentOptions.proxyEnv != null);
     }
     function getProxyEnvAgent(options, configHttpAgent, configHttpsAgent) {
-      return isHttps.test(options.protocol) ? configHttpsAgent || https.globalAgent : configHttpAgent || http.globalAgent;
+      return isHttps.test(options.protocol) ? configHttpsAgent || https.globalAgent : configHttpAgent || http2.globalAgent;
     }
     function getTunnelingAgent(agentOptions, userHttpsAgent) {
       const key = agentOptions.protocol + "//" + agentOptions.hostname + ":" + (agentOptions.port || "") + "#" + (agentOptions.auth || "");
@@ -26080,7 +26080,7 @@ var require_axios = __commonJS({
           HTTP2_HEADER_METHOD,
           HTTP2_HEADER_PATH,
           HTTP2_HEADER_STATUS
-        } = http2.constants;
+        } = http22.constants;
         const http2Headers = {
           [HTTP2_HEADER_SCHEME]: options.protocol.replace(":", ""),
           [HTTP2_HEADER_METHOD]: options.method,
@@ -26404,7 +26404,7 @@ var require_axios = __commonJS({
           if (configTransport) {
             transport = configTransport;
           } else if (maxRedirects === 0) {
-            transport = isHttpsRequest ? https : http;
+            transport = isHttpsRequest ? https : http2;
             isNativeTransport = true;
           } else {
             transportEnforcesMaxBodyLength = true;
@@ -37880,8 +37880,23 @@ var init_handler = __esm({
 });
 
 // scripts/run-bot.ts
+var import_http = __toESM(require("http"));
 init_handler();
 console.log("\u{1F916} Starting DaFung Hub Telegram Bot...");
+var port = process.env.PORT || 3e3;
+var server = import_http.default.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(
+    JSON.stringify({
+      status: "ok",
+      service: "DaFung Hub Telegram Bot",
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    })
+  );
+});
+server.listen(port, () => {
+  console.log(`\u{1F310} Health check HTTP server active on port ${port}`);
+});
 async function start() {
   try {
     await bot.api.deleteWebhook({ drop_pending_updates: false });
