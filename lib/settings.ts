@@ -53,8 +53,9 @@ export async function setBotStatus(status: BotStatus): Promise<void> {
     cacheExpiry = Date.now() + CACHE_TTL_MS;
     console.log(`[Settings] Bot operational status changed to: ${status.toUpperCase()}`);
   } catch (error) {
-    console.error('[Settings] Failed to set bot status:', error);
-    throw error;
+    console.error('[Settings] Failed to set bot status in DB, fallback to memory cache:', error);
+    cachedStatus = status;
+    cacheExpiry = Date.now() + CACHE_TTL_MS;
   }
 }
 

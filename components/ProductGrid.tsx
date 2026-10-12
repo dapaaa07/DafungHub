@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { EnrichedProduct, ProductCategory } from '@/lib/types';
 import CategoryFilter from './CategoryFilter';
 import ProductCard from './ProductCard';
@@ -12,16 +12,50 @@ interface ProductGridProps {
 }
 
 export default function ProductGrid({ initialProducts }: ProductGridProps) {
+  const [products, setProducts] = useState<EnrichedProduct[]>(initialProducts);
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('popular');
   const [stockOnly, setStockOnly] = useState(false);
   const [activeModalProduct, setActiveModalProduct] = useState<EnrichedProduct | null>(null);
 
+  // Auto-sync live prices & catalogue from /api/products in real-time
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLiveProducts = async () => {
+      try {
+        const isStaticHost =
+          typeof window !== 'undefined' &&
+          (window.location.hostname === 'store.dafung.web.id' ||
+           window.location.protocol === 'file:' ||
+           window.location.hostname.includes('github.io'));
+        const endpoint = isStaticHost
+          ? 'https://dafung-hub.vercel.app/api/products'
+          : '/api/products';
+
+        const res = await fetch(endpoint, { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (isMounted && data.success && Array.isArray(data.products) && data.products.length > 0) {
+          setProducts(data.products);
+        }
+      } catch (err) {
+        console.debug('Live products auto-sync failed, retaining initial:', err);
+      }
+    };
+
+    fetchLiveProducts();
+    const interval = setInterval(fetchLiveProducts, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   // Compute category counts
   const categoryCounts = useMemo(() => {
     const counts: Record<ProductCategory, number> = {
-      all: initialProducts.length,
+      all: products.length,
       streaming: 0,
       ai: 0,
       creative: 0,
@@ -30,7 +64,7 @@ export default function ProductGrid({ initialProducts }: ProductGridProps) {
       other: 0,
     };
 
-    initialProducts.forEach((p) => {
+    products.forEach((p) => {
       if (counts[p.category] !== undefined) {
         counts[p.category]++;
       } else {
@@ -39,11 +73,11 @@ export default function ProductGrid({ initialProducts }: ProductGridProps) {
     });
 
     return counts;
-  }, [initialProducts]);
+  }, [products]);
 
   // Filter & sort products
   const filteredProducts = useMemo(() => {
-    let list = [...initialProducts];
+    let list = [...products];
 
     // Filter by Category
     if (selectedCategory !== 'all') {
@@ -121,7 +155,7 @@ export default function ProductGrid({ initialProducts }: ProductGridProps) {
         <div className="flex items-center justify-between text-xs text-gray-500 font-medium px-1">
           <span>
             Menampilkan <strong className="text-black">{filteredProducts.length}</strong> dari{' '}
-            {initialProducts.length} produk
+            {products.length} produk
           </span>
           {searchQuery && (
             <button

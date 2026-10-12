@@ -5372,6 +5372,15 @@ var init_esm = __esm({
 });
 
 // lib/db.ts
+var db_exports = {};
+__export(db_exports, {
+  default: () => db_default,
+  getClient: () => getClient,
+  getPool: () => getPool,
+  pool: () => pool,
+  query: () => query,
+  testConnection: () => testConnection
+});
 function createPool() {
   const connectionString = process.env.DATABASE_URL;
   const isRemote = connectionString?.includes("supabase.co") || connectionString?.includes("pooler.supabase.com") || connectionString?.includes("sslmode=require");
@@ -5383,6 +5392,9 @@ function createPool() {
     ssl: isRemote ? { rejectUnauthorized: false } : void 0
   });
 }
+function getPool() {
+  return pool;
+}
 async function query(text, params) {
   const start2 = Date.now();
   const res = await pool.query(text, params);
@@ -5392,7 +5404,19 @@ async function query(text, params) {
   }
   return res;
 }
-var pool;
+async function getClient() {
+  return await pool.connect();
+}
+async function testConnection() {
+  try {
+    const res = await pool.query("SELECT 1 as alive");
+    return res.rows?.[0]?.alive === 1;
+  } catch (error) {
+    console.error("Failed to connect to PostgreSQL database:", error);
+    return false;
+  }
+}
+var pool, db_default;
 var init_db = __esm({
   "lib/db.ts"() {
     "use strict";
@@ -5407,6 +5431,7 @@ var init_db = __esm({
     if (process.env.NODE_ENV !== "production") {
       globalThis.postgresPoolGlobal = pool;
     }
+    db_default = pool;
   }
 });
 
@@ -5453,8 +5478,9 @@ async function setBotStatus(status) {
     cacheExpiry = Date.now() + CACHE_TTL_MS;
     console.log(`[Settings] Bot operational status changed to: ${status.toUpperCase()}`);
   } catch (error) {
-    console.error("[Settings] Failed to set bot status:", error);
-    throw error;
+    console.error("[Settings] Failed to set bot status in DB, fallback to memory cache:", error);
+    cachedStatus = status;
+    cacheExpiry = Date.now() + CACHE_TTL_MS;
   }
 }
 function clearSettingsCache() {
@@ -5485,10 +5511,15 @@ __export(pricing_exports, {
   calculateProfit: () => calculateProfit,
   calculateProtectedSellingPrice: () => calculateProtectedSellingPrice,
   calculateSellingPrice: () => calculateSellingPrice,
+  clearCustomPricesCache: () => clearCustomPricesCache,
   defaultMarginConfig: () => defaultMarginConfig,
+  deleteCustomPrice: () => deleteCustomPrice,
   formatRupiah: () => formatRupiah,
+  getCustomPrices: () => getCustomPrices,
+  getEffectiveSellingPrice: () => getEffectiveSellingPrice,
   isAdmin: () => isAdmin,
-  roundToMarketStandard: () => roundToMarketStandard
+  roundToMarketStandard: () => roundToMarketStandard,
+  setCustomPrice: () => setCustomPrice
 });
 function isAdmin(telegramId) {
   if (!telegramId) return false;
@@ -5548,7 +5579,111 @@ function calculateOriginalPrice(sellingPrice) {
   const raw = Math.round(sellingPrice * multiplier / 1e3) * 1e3;
   return Math.max(sellingPrice + 1e4, raw);
 }
-var ADMIN_TELEGRAM_ID, GATEWAY_CHANNELS, defaultMarginConfig, CS_WHATSAPP_NUMBER, CS_WHATSAPP_INTL, TELEGRAM_BOT_USERNAME;
+async function getCustomPrices() {
+  const now = Date.now();
+  if (cachedCustomPrices !== null && now < customPricesExpiry) {
+    return cachedCustomPrices;
+  }
+  const priceMap = /* @__PURE__ */ new Map();
+  try {
+    const { query: query2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    await query2(`
+      CREATE TABLE IF NOT EXISTS product_prices (
+        product_id VARCHAR(100) PRIMARY KEY,
+        product_name VARCHAR(255),
+        custom_price INTEGER NOT NULL CHECK (custom_price >= 0),
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `).catch(() => {
+    });
+    const res = await query2(
+      "SELECT product_id, custom_price FROM product_prices"
+    );
+    for (const row of res.rows) {
+      priceMap.set(row.product_id, Number(row.custom_price));
+    }
+    cachedCustomPrices = priceMap;
+    customPricesExpiry = now + PRICES_CACHE_TTL_MS;
+    return priceMap;
+  } catch (err) {
+    console.error("[Pricing] Failed to fetch custom prices from DB, using fallback cache:", err);
+    return cachedCustomPrices ?? priceMap;
+  }
+}
+async function setCustomPrice(productId, price, productName) {
+  const cleanId = productId.trim();
+  const cleanPrice = Math.max(0, Math.round(price));
+  if (!cachedCustomPrices) {
+    cachedCustomPrices = /* @__PURE__ */ new Map();
+  }
+  cachedCustomPrices.set(cleanId, cleanPrice);
+  customPricesExpiry = Date.now() + PRICES_CACHE_TTL_MS;
+  try {
+    const { query: query2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    await query2(`
+      CREATE TABLE IF NOT EXISTS product_prices (
+        product_id VARCHAR(100) PRIMARY KEY,
+        product_name VARCHAR(255),
+        custom_price INTEGER NOT NULL CHECK (custom_price >= 0),
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `).catch(() => {
+    });
+    await query2(
+      `INSERT INTO product_prices (product_id, product_name, custom_price, updated_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+       ON CONFLICT (product_id) DO UPDATE
+       SET custom_price = EXCLUDED.custom_price,
+           product_name = COALESCE(EXCLUDED.product_name, product_prices.product_name),
+           updated_at = CURRENT_TIMESTAMP`,
+      [cleanId, productName || null, cleanPrice]
+    );
+    await query2(
+      `UPDATE products SET price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 OR name = $3`,
+      [cleanPrice, cleanId, productName || cleanId]
+    ).catch(() => {
+    });
+  } catch (err) {
+    console.error("[Pricing] Failed to persist custom price to DB:", err);
+  }
+}
+async function deleteCustomPrice(productId) {
+  const cleanId = productId.trim();
+  if (cachedCustomPrices) {
+    cachedCustomPrices.delete(cleanId);
+    customPricesExpiry = Date.now() + PRICES_CACHE_TTL_MS;
+  }
+  try {
+    const { query: query2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    await query2("DELETE FROM product_prices WHERE product_id = $1", [cleanId]);
+  } catch (err) {
+    console.error("[Pricing] Failed to delete custom price from DB:", err);
+  }
+}
+function clearCustomPricesCache() {
+  cachedCustomPrices = null;
+  customPricesExpiry = 0;
+}
+function getEffectiveSellingPrice(product, customPricesMap) {
+  if (customPricesMap && customPricesMap.size > 0) {
+    if (customPricesMap.has(product.id)) {
+      return customPricesMap.get(product.id);
+    }
+    if (product.name && customPricesMap.has(product.name)) {
+      return customPricesMap.get(product.name);
+    }
+    const lowerName = product.name?.toLowerCase() || "";
+    const lowerId = product.id.toLowerCase();
+    for (const [key, val] of customPricesMap.entries()) {
+      const lowerKey = key.toLowerCase();
+      if (lowerKey === lowerId || lowerName && lowerKey === lowerName) {
+        return val;
+      }
+    }
+  }
+  return calculateSellingPrice(product.price_idr);
+}
+var ADMIN_TELEGRAM_ID, GATEWAY_CHANNELS, defaultMarginConfig, CS_WHATSAPP_NUMBER, CS_WHATSAPP_INTL, TELEGRAM_BOT_USERNAME, cachedCustomPrices, customPricesExpiry, PRICES_CACHE_TTL_MS;
 var init_pricing = __esm({
   "lib/pricing.ts"() {
     "use strict";
@@ -5572,6 +5707,9 @@ var init_pricing = __esm({
     CS_WHATSAPP_NUMBER = "081294950241";
     CS_WHATSAPP_INTL = "6281294950241";
     TELEGRAM_BOT_USERNAME = "dafung_hub_bot";
+    cachedCustomPrices = null;
+    customPricesExpiry = 0;
+    PRICES_CACHE_TTL_MS = 5e3;
   }
 });
 
@@ -5679,9 +5817,9 @@ function extractFeatures(description, fallbackFeatures) {
   }
   return fallbackFeatures;
 }
-function enrichProduct(product) {
+function enrichProduct(product, customPricesMap) {
   const platform = matchProductPlatform(product.name);
-  const sellingPrice = calculateSellingPrice(product.price_idr);
+  const sellingPrice = getEffectiveSellingPrice(product, customPricesMap);
   const originalPrice = calculateOriginalPrice(sellingPrice);
   const durationText = extractDuration(product.name, product.description);
   let category = "other";
@@ -5736,14 +5874,15 @@ function enrichProduct(product) {
 }
 async function getAllEnrichedProducts() {
   try {
-    const rawProducts = await getSupplierProducts();
-    if (!rawProducts || rawProducts.length === 0) {
-      return FALLBACK_PRODUCTS.map(enrichProduct);
-    }
-    return rawProducts.map(enrichProduct);
+    const [rawProducts, customPrices] = await Promise.all([
+      getSupplierProducts().catch(() => FALLBACK_PRODUCTS),
+      getCustomPrices().catch(() => /* @__PURE__ */ new Map())
+    ]);
+    const productsToEnrich = !rawProducts || rawProducts.length === 0 ? FALLBACK_PRODUCTS : rawProducts;
+    return productsToEnrich.map((p) => enrichProduct(p, customPrices));
   } catch (err) {
     console.error("[Supplier] Error fetching products for catalogue, using fallbacks:", err);
-    return FALLBACK_PRODUCTS.map(enrichProduct);
+    return FALLBACK_PRODUCTS.map((p) => enrichProduct(p));
   }
 }
 var SUPPLIER_BASE_URL, SUPPLIER_API_KEY, PLATFORMS, FALLBACK_PRODUCTS;
@@ -12894,6 +13033,7 @@ __export(menu_exports, {
   sendAdminBalanceMenu: () => sendAdminBalanceMenu,
   sendAdminOrdersMenu: () => sendAdminOrdersMenu,
   sendAdminPanel: () => sendAdminPanel,
+  sendAdminPricesMenu: () => sendAdminPricesMenu,
   sendAdminQueueMenu: () => sendAdminQueueMenu,
   sendApiMenu: () => sendApiMenu,
   sendDepositMenu: () => sendDepositMenu,
@@ -13151,7 +13291,10 @@ Silakan pilih platform akun digital yang Anda inginkan di bawah:`;
 }
 async function sendProductsMenu(ctx, botInstance, page = 0, platformId = "all") {
   try {
-    const allProducts = await getSupplierProducts();
+    const [allProducts, customPrices] = await Promise.all([
+      getSupplierProducts().catch(() => []),
+      getCustomPrices().catch(() => /* @__PURE__ */ new Map())
+    ]);
     const products = filterProductsByPlatform(allProducts, platformId);
     const targetPlat = PLATFORMS2.find((p) => p.id === platformId);
     const platformTitle = platformId === "all" ? "SEMUA PRODUK" : platformId === "other" ? "PLATFORM LAINNYA" : targetPlat?.name.toUpperCase() || "PRODUK";
@@ -13160,7 +13303,7 @@ async function sendProductsMenu(ctx, botInstance, page = 0, platformId = "all") 
     const safePage = Math.max(0, Math.min(page, totalPages - 1));
     const currentSlice = products.slice(safePage * pageSize, (safePage + 1) * pageSize);
     const buttons = currentSlice.map((prod) => {
-      const sellingPrice = calculateSellingPrice(prod.price_idr);
+      const sellingPrice = getEffectiveSellingPrice(prod, customPrices);
       const priceStr = `Rp ${sellingPrice.toLocaleString("id-ID")}`;
       const icon = targetPlat?.icon || (prod.availability === "in_stock" ? "\u{1F7E2}" : "\u{1F534}");
       const prefix = prod.availability === "in_stock" ? `${icon} ` : "\u{1F534} [Habis] ";
@@ -13248,7 +13391,8 @@ async function sendProductDetail(ctx, botInstance, productId, platformId = "all"
       );
       return;
     }
-    const sellingPrice = calculateSellingPrice(prod.price_idr);
+    const customPrices = await getCustomPrices().catch(() => /* @__PURE__ */ new Map());
+    const sellingPrice = getEffectiveSellingPrice(prod, customPrices);
     const priceStr = `Rp ${sellingPrice.toLocaleString("id-ID")}`;
     const statusStr = prod.availability === "in_stock" ? "\u{1F7E2} Stok Tersedia" : "\u{1F534} Stok Habis";
     const detailText = `\u{1F4E6} <b>DETAIL PRODUK</b>
@@ -13583,7 +13727,11 @@ async function sendAdminPanel(ctx, botInstance) {
     balance = balRes.balance || 0;
   } catch {
   }
-  const pendingOrders = await getPendingQueueOrders();
+  let pendingOrders = [];
+  try {
+    pendingOrders = await getPendingQueueOrders();
+  } catch {
+  }
   const botStatus = await getBotStatus();
   const adminText = `\u{1F451} <b>PANEL OWNER & ADMIN DAFUNG HUB</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
@@ -13598,6 +13746,9 @@ Gunakan panel kontrol di bawah untuk mengelola bisnis:`;
     inline_keyboard: [
       [
         botStatus === "online" ? { text: "\u{1F534} Ubah ke Mode MAINTENANCE", callback_data: "admin_set_maintenance" } : { text: "\u{1F7E2} Aktifkan Bot (Set ONLINE)", callback_data: "admin_set_online" }
+      ],
+      [
+        { text: "\u{1F4B0} Atur & Kelola Harga Produk", callback_data: "admin_prices" }
       ],
       [
         {
@@ -13728,6 +13879,82 @@ async function sendAdminOrdersMenu(ctx, botInstance) {
     reply_markup: buttons
   });
 }
+async function sendAdminPricesMenu(ctx, botInstance, page = 0) {
+  if (!isAdmin(ctx.from?.id)) return;
+  try {
+    const [products, customPrices] = await Promise.all([
+      getSupplierProducts().catch(() => []),
+      getCustomPrices().catch(() => /* @__PURE__ */ new Map())
+    ]);
+    const pageSize = 5;
+    const totalPages = Math.ceil(products.length / pageSize) || 1;
+    const safePage = Math.max(0, Math.min(page, totalPages - 1));
+    const currentSlice = products.slice(safePage * pageSize, (safePage + 1) * pageSize);
+    let text = `\u{1F4B0} <b>KELOLA HARGA PRODUK (SINKRON WEB & BOT)</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Daftar harga aktif saat ini (Halaman ${safePage + 1}/${totalPages}):
+
+`;
+    const buttons = [];
+    for (const prod of currentSlice) {
+      const hasCustom = customPrices.has(prod.id) || customPrices.has(prod.name);
+      const effectivePrice = getEffectiveSellingPrice(prod, customPrices);
+      const modalPrice = prod.price_idr;
+      const profit = effectivePrice - modalPrice;
+      text += `\u2022 <b>${escapeHtml2(prod.name)}</b>
+  \u{1F194} ID: <code>${prod.id}</code>
+  \u{1F4B5} Jual: <b>Rp ${effectivePrice.toLocaleString("id-ID")}</b> ${hasCustom ? "<i>(Custom Override \u2728)</i>" : "<i>(Auto Markup)</i>"}
+  \u{1F4E6} Modal: Rp ${modalPrice.toLocaleString("id-ID")} | Margin: <b>+Rp ${profit.toLocaleString("id-ID")}</b>
+
+`;
+      buttons.push([
+        {
+          text: `\u270F\uFE0F Ubah: ${prod.name.substring(0, 22)}...`,
+          callback_data: `admin_editprice_${prod.id}`
+        }
+      ]);
+    }
+    text += `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F4A1} <b>Cara Cepat Ubah Harga:</b>
+Ketik perintah: <code>/editprice &lt;id_atau_nama&gt; &lt;harga&gt;</code>
+Contoh: <code>/editprice capcut 28000</code>
+
+\u{1F504} <b>Kembalikan ke Rumus Auto:</b>
+<code>/resetprice &lt;id_atau_nama&gt;</code>
+`;
+    const navRow = [];
+    if (safePage > 0) {
+      navRow.push({ text: "\u25C0\uFE0F Sebelumnya", callback_data: `admin_prices_page_${safePage - 1}` });
+    }
+    navRow.push({ text: `Hal ${safePage + 1}/${totalPages}`, callback_data: "noop" });
+    if (safePage < totalPages - 1) {
+      navRow.push({ text: "Berikutnya \u25B6\uFE0F", callback_data: `admin_prices_page_${safePage + 1}` });
+    }
+    if (totalPages > 1) {
+      buttons.push(navRow);
+    }
+    buttons.push([
+      { text: "\u{1F504} Refresh Harga", callback_data: "admin_prices" },
+      { text: "\u{1F519} Kembali ke Panel Owner", callback_data: "admin_panel" }
+    ]);
+    await sendSafeMessage(ctx, botInstance, text, {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: buttons }
+    });
+  } catch (err) {
+    console.error("[Admin] Error loading product prices:", err);
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      "\u26A0\uFE0F Gagal memuat daftar harga produk.",
+      {
+        reply_markup: {
+          inline_keyboard: [[{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]]
+        }
+      }
+    );
+  }
+}
 function registerMenuHandlers(botInstance) {
   botInstance.on("callback_query", async (ctx) => {
     const data = ctx.callbackQuery?.data || "";
@@ -13766,6 +13993,32 @@ function registerMenuHandlers(botInstance) {
         await sendAdminBalanceMenu(ctx, botInstance);
       } else if (data === "admin_orders") {
         await sendAdminOrdersMenu(ctx, botInstance);
+      } else if (data === "admin_prices") {
+        await sendAdminPricesMenu(ctx, botInstance, 0);
+      } else if (data.startsWith("admin_prices_page_")) {
+        const page = parseInt(data.replace("admin_prices_page_", ""), 10) || 0;
+        await sendAdminPricesMenu(ctx, botInstance, page);
+      } else if (data.startsWith("admin_editprice_")) {
+        const prodId = data.replace("admin_editprice_", "");
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `\u270F\uFE0F <b>Ubah Harga Produk:</b> <code>${escapeHtml2(prodId)}</code>
+
+Silakan ketik di chat:
+<code>/editprice ${escapeHtml2(prodId)} &lt;harga_baru&gt;</code>
+
+Contoh: <code>/editprice ${escapeHtml2(prodId)} 30000</code>`,
+          {
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "\u{1F519} Kembali ke Daftar Harga", callback_data: "admin_prices" }],
+                [{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]
+              ]
+            }
+          }
+        );
       } else if (data.startsWith("admin_process_")) {
         const orderCode = data.replace("admin_process_", "");
         const retryResult = await adminRetrySupplierFulfill(orderCode, botInstance);
@@ -38130,6 +38383,8 @@ async function handleBuy(ctx, productId, botInstance) {
     return;
   }
   let product = null;
+  const { getCustomPrices: getCustomPrices2, getEffectiveSellingPrice: getEffectiveSellingPrice2 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
+  const customPrices = await getCustomPrices2().catch(() => /* @__PURE__ */ new Map());
   try {
     const res = await query(
       "SELECT * FROM products WHERE id = $1 AND is_active = true",
@@ -38144,30 +38399,50 @@ async function handleBuy(ctx, productId, botInstance) {
   if (!product) {
     try {
       const { getSupplierProducts: getSupplierProducts2 } = await Promise.resolve().then(() => (init_supplier(), supplier_exports));
-      const { calculateSellingPrice: calculateSellingPrice2 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
-      const supplierProducts = await getSupplierProducts2();
+      const supplierProducts = await getSupplierProducts2().catch(() => []);
       const supp = supplierProducts.find(
         (p) => p.id === trimmedId || p.name.toLowerCase() === trimmedId.toLowerCase()
       );
       if (supp) {
+        const effectivePrice = getEffectiveSellingPrice2(supp, customPrices);
         const existingByName = await query(
           "SELECT * FROM products WHERE name = $1 LIMIT 1",
           [supp.name]
         );
         if (existingByName.rows.length > 0) {
           product = existingByName.rows[0];
+          if (product.price !== effectivePrice) {
+            product.price = effectivePrice;
+            await query(
+              "UPDATE products SET price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+              [effectivePrice, product.id]
+            ).catch(() => {
+            });
+          }
         } else {
-          const sellingPrice = calculateSellingPrice2(supp.price_idr);
           const ins = await query(
             `INSERT INTO products (name, price, stock, is_active)
              VALUES ($1, $2, $3, true)
              RETURNING *`,
-            [supp.name, sellingPrice, supp.availability === "in_stock" ? 50 : 0]
+            [supp.name, effectivePrice, supp.availability === "in_stock" ? 50 : 0]
           );
           product = ins.rows[0];
         }
       }
     } catch {
+    }
+  } else {
+    const effectivePrice = getEffectiveSellingPrice2(
+      { id: product.id, name: product.name, price_idr: product.price },
+      customPrices
+    );
+    if (product.price !== effectivePrice) {
+      product.price = effectivePrice;
+      await query(
+        "UPDATE products SET price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+        [effectivePrice, product.id]
+      ).catch(() => {
+      });
     }
   }
   if (!product) {
@@ -38557,17 +38832,174 @@ function registerHandlers(botInstance) {
     );
   });
   botInstance.command("editprice", async (ctx) => {
-    await sendSafeMessage(
-      ctx,
-      botInstance,
-      "\u{1F4B0} Format ubah harga: <code>/editprice &lt;product_id&gt; &lt;harga_baru&gt;</code>",
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [[{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]]
+    if (!isAdmin(ctx.from?.id)) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        "\u26D4 <b>Akses Ditolak:</b> Perintah ini hanya dapat dijalankan oleh Owner DaFung Hub.",
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [[{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]]
+          }
+        }
+      );
+      return;
+    }
+    const text = ctx.message?.text || "";
+    const parts = text.trim().split(/\s+/);
+    const targetQuery = parts[1];
+    const newPriceStr = parts[2];
+    if (!targetQuery || !newPriceStr) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        "\u{1F4B0} <b>Format Ubah Harga Produk:</b>\n<code>/editprice &lt;id_atau_nama&gt; &lt;harga_baru&gt;</code>\n\nContoh:\n\u2022 <code>/editprice capcut 28000</code>\n\u2022 <code>/editprice netflix 85000</code>\n\u2022 <code>/editprice 6a2fda51035a6d898f2106fe 27000</code>\n\n<i>Harga akan otomatis tersinkronisasi ke Bot dan Website secara real-time.</i>",
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "\u{1F4CB} Buka Daftar Harga Produk", callback_data: "admin_prices" }],
+              [{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]
+            ]
+          }
+        }
+      );
+      return;
+    }
+    const newPrice = parseInt(newPriceStr.replace(/[^0-9]/g, ""), 10);
+    if (isNaN(newPrice) || newPrice < 0) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        "\u274C <b>Harga tidak valid:</b> Harap masukkan angka nominal rupiah yang benar (misal: <code>28000</code>).",
+        { parse_mode: "HTML" }
+      );
+      return;
+    }
+    try {
+      const { getSupplierProducts: getSupplierProducts2 } = await Promise.resolve().then(() => (init_supplier(), supplier_exports));
+      const { setCustomPrice: setCustomPrice2 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
+      const products = await getSupplierProducts2().catch(() => []);
+      const q = targetQuery.toLowerCase();
+      let matched = products.find((p) => p.id.toLowerCase() === q);
+      if (!matched) {
+        matched = products.find((p) => p.name.toLowerCase() === q);
+      }
+      if (!matched) {
+        const matches = products.filter((p) => p.name.toLowerCase().includes(q));
+        if (matches.length > 0) {
+          matched = matches[0];
         }
       }
-    );
+      if (!matched) {
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `\u274C Produk dengan ID atau nama "<b>${targetQuery}</b>" tidak ditemukan di katalog.`,
+          {
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "\u{1F4CB} Cek ID di Daftar Harga", callback_data: "admin_prices" }],
+                [{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]
+              ]
+            }
+          }
+        );
+        return;
+      }
+      await setCustomPrice2(matched.id, newPrice, matched.name);
+      const profit = newPrice - matched.price_idr;
+      const successText = `\u2705 <b>HARGA BERHASIL DIUBAH!</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F4E6} <b>Produk:</b> ${matched.name}
+\u{1F194} <b>ID:</b> <code>${matched.id}</code>
+\u{1F4B0} <b>Harga Baru:</b> <b>Rp ${newPrice.toLocaleString("id-ID")}</b>
+\u{1F4E6} <b>Modal Supplier:</b> Rp ${matched.price_idr.toLocaleString("id-ID")}
+\u{1F4C8} <b>Margin Laba:</b> <b>+Rp ${profit.toLocaleString("id-ID")}</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u26A1 <i>Tersinkronisasi otomatis ke Bot Telegram & Website secara Real-Time!</i>`;
+      await sendSafeMessage(ctx, botInstance, successText, {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "\u{1F4CB} Lihat di Daftar Harga", callback_data: "admin_prices" }],
+            [{ text: "\u{1F6CD}\uFE0F Cek Tampilan Katalog", callback_data: "plat_all" }],
+            [{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]
+          ]
+        }
+      });
+    } catch (err) {
+      console.error("[Admin] Error executing /editprice:", err);
+      await sendSafeMessage(ctx, botInstance, "\u26A0\uFE0F Gagal mengubah harga produk. Silakan coba kembali.");
+    }
+  });
+  botInstance.command("resetprice", async (ctx) => {
+    if (!isAdmin(ctx.from?.id)) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        "\u26D4 <b>Akses Ditolak:</b> Khusus Owner DaFung Hub.",
+        { parse_mode: "HTML" }
+      );
+      return;
+    }
+    const text = ctx.message?.text || "";
+    const parts = text.trim().split(/\s+/);
+    const targetQuery = parts[1];
+    if (!targetQuery) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        "\u{1F504} Format reset harga: <code>/resetprice &lt;id_atau_nama&gt;</code>\nContoh: <code>/resetprice capcut</code>",
+        { parse_mode: "HTML" }
+      );
+      return;
+    }
+    try {
+      const { getSupplierProducts: getSupplierProducts2 } = await Promise.resolve().then(() => (init_supplier(), supplier_exports));
+      const { deleteCustomPrice: deleteCustomPrice2, calculateSellingPrice: calculateSellingPrice4 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
+      const products = await getSupplierProducts2().catch(() => []);
+      const q = targetQuery.toLowerCase();
+      let matched = products.find((p) => p.id.toLowerCase() === q);
+      if (!matched) {
+        const matches = products.filter((p) => p.name.toLowerCase().includes(q));
+        if (matches.length > 0) matched = matches[0];
+      }
+      if (!matched) {
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `\u274C Produk "<b>${targetQuery}</b>" tidak ditemukan.`,
+          { parse_mode: "HTML" }
+        );
+        return;
+      }
+      await deleteCustomPrice2(matched.id);
+      const defaultPrice = calculateSellingPrice4(matched.price_idr);
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        `\u{1F504} <b>HARGA DIRESET KE FORMULA STANDAR</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F4E6} <b>Produk:</b> ${matched.name}
+\u{1F4B0} <b>Harga Normal:</b> <b>Rp ${defaultPrice.toLocaleString("id-ID")}</b>
+\u26A1 <i>Sinkronisasi real-time berhasil diperbarui.</i>`,
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "\u{1F4CB} Buka Daftar Harga", callback_data: "admin_prices" }],
+              [{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]
+            ]
+          }
+        }
+      );
+    } catch (err) {
+      console.error("[Admin] Error executing /resetprice:", err);
+      await sendSafeMessage(ctx, botInstance, "\u26A0\uFE0F Gagal mereset harga produk.");
+    }
   });
   botInstance.on("message", async (ctx) => {
     const text = ctx.message?.text?.trim();

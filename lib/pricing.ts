@@ -156,3 +156,39 @@ export function calculateOriginalPrice(sellingPrice: number): number {
   return Math.max(sellingPrice + 10000, raw);
 }
 
+// =========================================================================
+// UNIFIED PRODUCT PRICING RESOLUTION (CLIENT & SERVER SAFE)
+// =========================================================================
+
+/**
+ * Get effective selling price: custom price override (if set) or calculated supplier price
+ */
+export function getEffectiveSellingPrice(
+  product: { id: string; name?: string; price_idr: number },
+  customPricesMap?: Map<string, number>
+): number {
+  if (customPricesMap && customPricesMap.size > 0) {
+    // 1. Direct match by product id
+    if (customPricesMap.has(product.id)) {
+      return customPricesMap.get(product.id)!;
+    }
+    // 2. Direct match by exact name
+    if (product.name && customPricesMap.has(product.name)) {
+      return customPricesMap.get(product.name)!;
+    }
+    // 3. Case-insensitive match or alias keyword match
+    const lowerName = product.name?.toLowerCase() || '';
+    const lowerId = product.id.toLowerCase();
+    for (const [key, val] of customPricesMap.entries()) {
+      const lowerKey = key.toLowerCase();
+      if (lowerKey === lowerId || (lowerName && lowerKey === lowerName)) {
+        return val;
+      }
+    }
+  }
+
+  return calculateSellingPrice(product.price_idr);
+}
+
+
+

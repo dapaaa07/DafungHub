@@ -6,7 +6,8 @@ import { ExtendedBot, sendSafeMessage, sendSafePhoto } from './handler';
 import { getSupplierProducts, getSupplierProfile, getSupplierBalance, SupplierProduct } from '../lib/supplier';
 import { query, Order, Product } from '../lib/db';
 import { handleBuy } from './commands/buy';
-import { isAdmin, calculateSellingPrice, ADMIN_TELEGRAM_ID } from '../lib/pricing';
+import { isAdmin, calculateSellingPrice, ADMIN_TELEGRAM_ID, getEffectiveSellingPrice } from '../lib/pricing';
+import { getCustomPrices } from '../lib/custom-prices';
 import {
   adminRetrySupplierFulfill,
   getPendingQueueOrders,
@@ -380,7 +381,10 @@ export async function sendProductsMenu(
   platformId: string = 'all'
 ): Promise<void> {
   try {
-    const allProducts = await getSupplierProducts();
+    const [allProducts, customPrices] = await Promise.all([
+      getSupplierProducts().catch(() => []),
+      getCustomPrices().catch(() => new Map<string, number>()),
+    ]);
     const products = filterProductsByPlatform(allProducts, platformId);
 
     const targetPlat = PLATFORMS.find((p) => p.id === platformId);
@@ -398,7 +402,7 @@ export async function sendProductsMenu(
     const currentSlice = products.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
     const buttons = currentSlice.map((prod: SupplierProduct) => {
-      const sellingPrice = calculateSellingPrice(prod.price_idr);
+      const sellingPrice = getEffectiveSellingPrice(prod, customPrices);
       const priceStr = `Rp ${sellingPrice.toLocaleString('id-ID')}`;
       const icon = targetPlat?.icon || (prod.availability === 'in_stock' ? '🟢' : '🔴');
       const prefix = prod.availability === 'in_stock' ? `${icon} ` : '🔴 [Habis] ';
@@ -506,7 +510,8 @@ export async function sendProductDetail(
       return;
     }
 
-    const sellingPrice = calculateSellingPrice(prod.price_idr);
+    const customPrices = await getCustomPrices().catch(() => new Map<string, number>());
+    const sellingPrice = getEffectiveSellingPrice(prod, customPrices);
     const priceStr = `Rp ${sellingPrice.toLocaleString('id-ID')}`;
     const statusStr = prod.availability === 'in_stock' ? '🟢 Stok Tersedia' : '🔴 Stok Habis';
 
@@ -955,7 +960,10 @@ export async function sendAdminPanel(ctx: Context, botInstance: ExtendedBot): Pr
     balance = balRes.balance || 0;
   } catch {}
 
-  const pendingOrders = await getPendingQueueOrders();
+  let pendingOrders: Order[] = [];
+  try {
+    pendingOrders = await getPendingQueueOrders();
+  } catch {}
   const botStatus = await getBotStatus();
 
   const adminText =
@@ -975,6 +983,9 @@ export async function sendAdminPanel(ctx: Context, botInstance: ExtendedBot): Pr
         botStatus === 'online'
           ? { text: '🔴 Ubah ke Mode MAINTENANCE', callback_data: 'admin_set_maintenance' }
           : { text: '🟢 Aktifkan Bot (Set ONLINE)', callback_data: 'admin_set_online' },
+      ],
+      [
+        { text: '💰 Atur & Kelola Harga Produk', callback_data: 'admin_prices' },
       ],
       [
         {
@@ -1134,6 +1145,99 @@ export async function sendAdminOrdersMenu(ctx: Context, botInstance: ExtendedBot
 }
 
 /**
+ * Send Admin Prices Menu (view & manage manual product prices)
+ */
+export async function sendAdminPricesMenu(
+  ctx: Context,
+  botInstance: ExtendedBot,
+  page: number = 0
+): Promise<void> {
+  if (!isAdmin(ctx.from?.id)) return;
+
+  try {
+    const [products, customPrices] = await Promise.all([
+      getSupplierProducts().catch(() => []),
+      getCustomPrices().catch(() => new Map<string, number>()),
+    ]);
+
+    const pageSize = 5;
+    const totalPages = Math.ceil(products.length / pageSize) || 1;
+    const safePage = Math.max(0, Math.min(page, totalPages - 1));
+    const currentSlice = products.slice(safePage * pageSize, (safePage + 1) * pageSize);
+
+    let text =
+      `💰 <b>KELOLA HARGA PRODUK (SINKRON WEB & BOT)</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n` +
+      `Daftar harga aktif saat ini (Halaman ${safePage + 1}/${totalPages}):\n\n`;
+
+    const buttons = [];
+
+    for (const prod of currentSlice) {
+      const hasCustom = customPrices.has(prod.id) || customPrices.has(prod.name);
+      const effectivePrice = getEffectiveSellingPrice(prod, customPrices);
+      const modalPrice = prod.price_idr;
+      const profit = effectivePrice - modalPrice;
+
+      text +=
+        `• <b>${escapeHtml(prod.name)}</b>\n` +
+        `  🆔 ID: <code>${prod.id}</code>\n` +
+        `  💵 Jual: <b>Rp ${effectivePrice.toLocaleString('id-ID')}</b> ${hasCustom ? '<i>(Custom Override ✨)</i>' : '<i>(Auto Markup)</i>'}\n` +
+        `  📦 Modal: Rp ${modalPrice.toLocaleString('id-ID')} | Margin: <b>+Rp ${profit.toLocaleString('id-ID')}</b>\n\n`;
+
+      buttons.push([
+        {
+          text: `✏️ Ubah: ${prod.name.substring(0, 22)}...`,
+          callback_data: `admin_editprice_${prod.id}`,
+        },
+      ]);
+    }
+
+    text +=
+      `━━━━━━━━━━━━━━━━━━━\n` +
+      `💡 <b>Cara Cepat Ubah Harga:</b>\n` +
+      `Ketik perintah: <code>/editprice &lt;id_atau_nama&gt; &lt;harga&gt;</code>\n` +
+      `Contoh: <code>/editprice capcut 28000</code>\n\n` +
+      `🔄 <b>Kembalikan ke Rumus Auto:</b>\n` +
+      `<code>/resetprice &lt;id_atau_nama&gt;</code>\n`;
+
+    // Pagination buttons
+    const navRow = [];
+    if (safePage > 0) {
+      navRow.push({ text: '◀️ Sebelumnya', callback_data: `admin_prices_page_${safePage - 1}` });
+    }
+    navRow.push({ text: `Hal ${safePage + 1}/${totalPages}`, callback_data: 'noop' });
+    if (safePage < totalPages - 1) {
+      navRow.push({ text: 'Berikutnya ▶️', callback_data: `admin_prices_page_${safePage + 1}` });
+    }
+    if (totalPages > 1) {
+      buttons.push(navRow);
+    }
+
+    buttons.push([
+      { text: '🔄 Refresh Harga', callback_data: 'admin_prices' },
+      { text: '🔙 Kembali ke Panel Owner', callback_data: 'admin_panel' },
+    ]);
+
+    await sendSafeMessage(ctx, botInstance, text, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: buttons },
+    });
+  } catch (err) {
+    console.error('[Admin] Error loading product prices:', err);
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      '⚠️ Gagal memuat daftar harga produk.',
+      {
+        reply_markup: {
+          inline_keyboard: [[{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }]],
+        },
+      }
+    );
+  }
+}
+
+/**
  * Register all menu button and callback handlers
  */
 export function registerMenuHandlers(botInstance: ExtendedBot): void {
@@ -1180,6 +1284,30 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
         await sendAdminBalanceMenu(ctx, botInstance);
       } else if (data === 'admin_orders') {
         await sendAdminOrdersMenu(ctx, botInstance);
+      } else if (data === 'admin_prices') {
+        await sendAdminPricesMenu(ctx, botInstance, 0);
+      } else if (data.startsWith('admin_prices_page_')) {
+        const page = parseInt(data.replace('admin_prices_page_', ''), 10) || 0;
+        await sendAdminPricesMenu(ctx, botInstance, page);
+      } else if (data.startsWith('admin_editprice_')) {
+        const prodId = data.replace('admin_editprice_', '');
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `✏️ <b>Ubah Harga Produk:</b> <code>${escapeHtml(prodId)}</code>\n\n` +
+          `Silakan ketik di chat:\n` +
+          `<code>/editprice ${escapeHtml(prodId)} &lt;harga_baru&gt;</code>\n\n` +
+          `Contoh: <code>/editprice ${escapeHtml(prodId)} 30000</code>`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '🔙 Kembali ke Daftar Harga', callback_data: 'admin_prices' }],
+                [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+              ],
+            },
+          }
+        );
       } else if (data.startsWith('admin_process_')) {
         const orderCode = data.replace('admin_process_', '');
         const retryResult = await adminRetrySupplierFulfill(orderCode, botInstance);

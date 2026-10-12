@@ -85,6 +85,10 @@ export async function handleBuy(
 
   // 1. Fetch product from database or supplier catalogue
   let product: Product | null = null;
+  const { getEffectiveSellingPrice } = await import('../../lib/pricing');
+  const { getCustomPrices } = await import('../../lib/custom-prices');
+  const customPrices = await getCustomPrices().catch(() => new Map<string, number>());
+
   try {
     const res = await query<Product>(
       'SELECT * FROM products WHERE id = $1 AND is_active = true',
@@ -101,31 +105,50 @@ export async function handleBuy(
   if (!product) {
     try {
       const { getSupplierProducts } = await import('../../lib/supplier');
-      const { calculateSellingPrice } = await import('../../lib/pricing');
-      const supplierProducts = await getSupplierProducts();
+      const supplierProducts = await getSupplierProducts().catch(() => []);
       const supp = supplierProducts.find(
         (p) => p.id === trimmedId || p.name.toLowerCase() === trimmedId.toLowerCase()
       );
       if (supp) {
+        const effectivePrice = getEffectiveSellingPrice(supp, customPrices);
         const existingByName = await query<Product>(
           'SELECT * FROM products WHERE name = $1 LIMIT 1',
           [supp.name]
         );
         if (existingByName.rows.length > 0) {
           product = existingByName.rows[0];
+          if (product.price !== effectivePrice) {
+            product.price = effectivePrice;
+            await query(
+              'UPDATE products SET price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+              [effectivePrice, product.id]
+            ).catch(() => {});
+          }
         } else {
-          const sellingPrice = calculateSellingPrice(supp.price_idr);
           const ins = await query<Product>(
             `INSERT INTO products (name, price, stock, is_active)
              VALUES ($1, $2, $3, true)
              RETURNING *`,
-            [supp.name, sellingPrice, supp.availability === 'in_stock' ? 50 : 0]
+            [supp.name, effectivePrice, supp.availability === 'in_stock' ? 50 : 0]
           );
           product = ins.rows[0];
         }
       }
     } catch {
       // Ignore supplier lookup failure
+    }
+  } else {
+    // If product was found by ID, ensure its price reflects custom price override if any
+    const effectivePrice = getEffectiveSellingPrice(
+      { id: product.id, name: product.name, price_idr: product.price },
+      customPrices
+    );
+    if (product.price !== effectivePrice) {
+      product.price = effectivePrice;
+      await query(
+        'UPDATE products SET price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [effectivePrice, product.id]
+      ).catch(() => {});
     }
   }
 

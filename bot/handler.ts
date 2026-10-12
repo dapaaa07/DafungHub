@@ -358,17 +358,204 @@ export function registerHandlers(botInstance: ExtendedBot): void {
   });
 
   botInstance.command('editprice', async (ctx: Context) => {
-    await sendSafeMessage(
-      ctx,
-      botInstance,
-      '💰 Format ubah harga: <code>/editprice &lt;product_id&gt; &lt;harga_baru&gt;</code>',
-      {
+    if (!isAdmin(ctx.from?.id)) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '⛔ <b>Akses Ditolak:</b> Perintah ini hanya dapat dijalankan oleh Owner DaFung Hub.',
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [[{ text: '🔙 Menu Utama', callback_data: 'menu_main' }]],
+          },
+        }
+      );
+      return;
+    }
+
+    const text = ctx.message?.text || '';
+    const parts = text.trim().split(/\s+/);
+    const targetQuery = parts[1];
+    const newPriceStr = parts[2];
+
+    if (!targetQuery || !newPriceStr) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '💰 <b>Format Ubah Harga Produk:</b>\n' +
+        '<code>/editprice &lt;id_atau_nama&gt; &lt;harga_baru&gt;</code>\n\n' +
+        'Contoh:\n' +
+        '• <code>/editprice capcut 28000</code>\n' +
+        '• <code>/editprice netflix 85000</code>\n' +
+        '• <code>/editprice 6a2fda51035a6d898f2106fe 27000</code>\n\n' +
+        '<i>Harga akan otomatis tersinkronisasi ke Bot dan Website secara real-time.</i>',
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '📋 Buka Daftar Harga Produk', callback_data: 'admin_prices' }],
+              [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    const newPrice = parseInt(newPriceStr.replace(/[^0-9]/g, ''), 10);
+    if (isNaN(newPrice) || newPrice < 0) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '❌ <b>Harga tidak valid:</b> Harap masukkan angka nominal rupiah yang benar (misal: <code>28000</code>).',
+        { parse_mode: 'HTML' }
+      );
+      return;
+    }
+
+    try {
+      const { getSupplierProducts } = await import('../lib/supplier');
+      const { setCustomPrice } = await import('../lib/custom-prices');
+      const products = await getSupplierProducts().catch(() => []);
+
+      const q = targetQuery.toLowerCase();
+      // 1. Match by exact ID
+      let matched = products.find((p) => p.id.toLowerCase() === q);
+
+      // 2. Match by exact name
+      if (!matched) {
+        matched = products.find((p) => p.name.toLowerCase() === q);
+      }
+
+      // 3. Match by keyword (e.g. 'capcut', 'netflix', 'canva')
+      if (!matched) {
+        const matches = products.filter((p) => p.name.toLowerCase().includes(q));
+        if (matches.length > 0) {
+          matched = matches[0];
+        }
+      }
+
+      if (!matched) {
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `❌ Produk dengan ID atau nama "<b>${targetQuery}</b>" tidak ditemukan di katalog.`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '📋 Cek ID di Daftar Harga', callback_data: 'admin_prices' }],
+                [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+              ],
+            },
+          }
+        );
+        return;
+      }
+
+      await setCustomPrice(matched.id, newPrice, matched.name);
+      const profit = newPrice - matched.price_idr;
+
+      const successText =
+        `✅ <b>HARGA BERHASIL DIUBAH!</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━\n` +
+        `📦 <b>Produk:</b> ${matched.name}\n` +
+        `🆔 <b>ID:</b> <code>${matched.id}</code>\n` +
+        `💰 <b>Harga Baru:</b> <b>Rp ${newPrice.toLocaleString('id-ID')}</b>\n` +
+        `📦 <b>Modal Supplier:</b> Rp ${matched.price_idr.toLocaleString('id-ID')}\n` +
+        `📈 <b>Margin Laba:</b> <b>+Rp ${profit.toLocaleString('id-ID')}</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━\n` +
+        `⚡ <i>Tersinkronisasi otomatis ke Bot Telegram & Website secara Real-Time!</i>`;
+
+      await sendSafeMessage(ctx, botInstance, successText, {
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: [[{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }]],
+          inline_keyboard: [
+            [{ text: '📋 Lihat di Daftar Harga', callback_data: 'admin_prices' }],
+            [{ text: '🛍️ Cek Tampilan Katalog', callback_data: 'plat_all' }],
+            [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+          ],
         },
+      });
+    } catch (err) {
+      console.error('[Admin] Error executing /editprice:', err);
+      await sendSafeMessage(ctx, botInstance, '⚠️ Gagal mengubah harga produk. Silakan coba kembali.');
+    }
+  });
+
+  botInstance.command('resetprice', async (ctx: Context) => {
+    if (!isAdmin(ctx.from?.id)) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '⛔ <b>Akses Ditolak:</b> Khusus Owner DaFung Hub.',
+        { parse_mode: 'HTML' }
+      );
+      return;
+    }
+
+    const text = ctx.message?.text || '';
+    const parts = text.trim().split(/\s+/);
+    const targetQuery = parts[1];
+
+    if (!targetQuery) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '🔄 Format reset harga: <code>/resetprice &lt;id_atau_nama&gt;</code>\nContoh: <code>/resetprice capcut</code>',
+        { parse_mode: 'HTML' }
+      );
+      return;
+    }
+
+    try {
+      const { getSupplierProducts } = await import('../lib/supplier');
+      const { deleteCustomPrice } = await import('../lib/custom-prices');
+      const { calculateSellingPrice } = await import('../lib/pricing');
+      const products = await getSupplierProducts().catch(() => []);
+
+      const q = targetQuery.toLowerCase();
+      let matched = products.find((p) => p.id.toLowerCase() === q);
+      if (!matched) {
+        const matches = products.filter((p) => p.name.toLowerCase().includes(q));
+        if (matches.length > 0) matched = matches[0];
       }
-    );
+
+      if (!matched) {
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `❌ Produk "<b>${targetQuery}</b>" tidak ditemukan.`,
+          { parse_mode: 'HTML' }
+        );
+        return;
+      }
+
+      await deleteCustomPrice(matched.id);
+      const defaultPrice = calculateSellingPrice(matched.price_idr);
+
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        `🔄 <b>HARGA DIRESET KE FORMULA STANDAR</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━\n` +
+        `📦 <b>Produk:</b> ${matched.name}\n` +
+        `💰 <b>Harga Normal:</b> <b>Rp ${defaultPrice.toLocaleString('id-ID')}</b>\n` +
+        `⚡ <i>Sinkronisasi real-time berhasil diperbarui.</i>`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '📋 Buka Daftar Harga', callback_data: 'admin_prices' }],
+              [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+            ],
+          },
+        }
+      );
+    } catch (err) {
+      console.error('[Admin] Error executing /resetprice:', err);
+      await sendSafeMessage(ctx, botInstance, '⚠️ Gagal mereset harga produk.');
+    }
   });
 
   // Fallback for general non-command text messages (interactive panel, no typing required)

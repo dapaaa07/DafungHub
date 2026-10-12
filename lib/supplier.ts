@@ -111,7 +111,8 @@ export async function createSupplierOrder(
 }
 
 import { EnrichedProduct, PlatformConfig, ProductCategory } from './types';
-import { calculateSellingPrice, calculateOriginalPrice } from './pricing';
+import { calculateSellingPrice, calculateOriginalPrice, getEffectiveSellingPrice } from './pricing';
+import { getCustomPrices } from './custom-prices';
 
 export const PLATFORMS: PlatformConfig[] = [
   {
@@ -361,9 +362,12 @@ export function extractFeatures(description: string, fallbackFeatures: string[])
   return fallbackFeatures;
 }
 
-export function enrichProduct(product: SupplierProduct): EnrichedProduct {
+export function enrichProduct(
+  product: SupplierProduct,
+  customPricesMap?: Map<string, number>
+): EnrichedProduct {
   const platform = matchProductPlatform(product.name);
-  const sellingPrice = calculateSellingPrice(product.price_idr);
+  const sellingPrice = getEffectiveSellingPrice(product, customPricesMap);
   const originalPrice = calculateOriginalPrice(sellingPrice);
   const durationText = extractDuration(product.name, product.description);
 
@@ -472,14 +476,15 @@ export const FALLBACK_PRODUCTS: SupplierProduct[] = [
 
 export async function getAllEnrichedProducts(): Promise<EnrichedProduct[]> {
   try {
-    const rawProducts = await getSupplierProducts();
-    if (!rawProducts || rawProducts.length === 0) {
-      return FALLBACK_PRODUCTS.map(enrichProduct);
-    }
-    return rawProducts.map(enrichProduct);
+    const [rawProducts, customPrices] = await Promise.all([
+      getSupplierProducts().catch(() => FALLBACK_PRODUCTS),
+      getCustomPrices().catch(() => new Map<string, number>()),
+    ]);
+    const productsToEnrich = !rawProducts || rawProducts.length === 0 ? FALLBACK_PRODUCTS : rawProducts;
+    return productsToEnrich.map((p) => enrichProduct(p, customPrices));
   } catch (err) {
     console.error('[Supplier] Error fetching products for catalogue, using fallbacks:', err);
-    return FALLBACK_PRODUCTS.map(enrichProduct);
+    return FALLBACK_PRODUCTS.map((p) => enrichProduct(p));
   }
 }
 
