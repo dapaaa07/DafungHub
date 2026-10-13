@@ -5372,15 +5372,6 @@ var init_esm = __esm({
 });
 
 // lib/db.ts
-var db_exports = {};
-__export(db_exports, {
-  default: () => db_default,
-  getClient: () => getClient,
-  getPool: () => getPool,
-  pool: () => pool,
-  query: () => query,
-  testConnection: () => testConnection
-});
 function createPool() {
   const connectionString = process.env.DATABASE_URL;
   const isRemote = connectionString?.includes("supabase.co") || connectionString?.includes("pooler.supabase.com") || connectionString?.includes("sslmode=require");
@@ -5392,9 +5383,6 @@ function createPool() {
     ssl: isRemote ? { rejectUnauthorized: false } : void 0
   });
 }
-function getPool() {
-  return pool;
-}
 async function query(text, params) {
   const start2 = Date.now();
   const res = await pool.query(text, params);
@@ -5404,19 +5392,7 @@ async function query(text, params) {
   }
   return res;
 }
-async function getClient() {
-  return await pool.connect();
-}
-async function testConnection() {
-  try {
-    const res = await pool.query("SELECT 1 as alive");
-    return res.rows?.[0]?.alive === 1;
-  } catch (error) {
-    console.error("Failed to connect to PostgreSQL database:", error);
-    return false;
-  }
-}
-var pool, db_default;
+var pool;
 var init_db = __esm({
   "lib/db.ts"() {
     "use strict";
@@ -5431,7 +5407,6 @@ var init_db = __esm({
     if (process.env.NODE_ENV !== "production") {
       globalThis.postgresPoolGlobal = pool;
     }
-    db_default = pool;
   }
 });
 
@@ -5511,15 +5486,11 @@ __export(pricing_exports, {
   calculateProfit: () => calculateProfit,
   calculateProtectedSellingPrice: () => calculateProtectedSellingPrice,
   calculateSellingPrice: () => calculateSellingPrice,
-  clearCustomPricesCache: () => clearCustomPricesCache,
   defaultMarginConfig: () => defaultMarginConfig,
-  deleteCustomPrice: () => deleteCustomPrice,
   formatRupiah: () => formatRupiah,
-  getCustomPrices: () => getCustomPrices,
   getEffectiveSellingPrice: () => getEffectiveSellingPrice,
   isAdmin: () => isAdmin,
-  roundToMarketStandard: () => roundToMarketStandard,
-  setCustomPrice: () => setCustomPrice
+  roundToMarketStandard: () => roundToMarketStandard
 });
 function isAdmin(telegramId) {
   if (!telegramId) return false;
@@ -5579,91 +5550,6 @@ function calculateOriginalPrice(sellingPrice) {
   const raw = Math.round(sellingPrice * multiplier / 1e3) * 1e3;
   return Math.max(sellingPrice + 1e4, raw);
 }
-async function getCustomPrices() {
-  const now = Date.now();
-  if (cachedCustomPrices !== null && now < customPricesExpiry) {
-    return cachedCustomPrices;
-  }
-  const priceMap = /* @__PURE__ */ new Map();
-  try {
-    const { query: query2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    await query2(`
-      CREATE TABLE IF NOT EXISTS product_prices (
-        product_id VARCHAR(100) PRIMARY KEY,
-        product_name VARCHAR(255),
-        custom_price INTEGER NOT NULL CHECK (custom_price >= 0),
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `).catch(() => {
-    });
-    const res = await query2(
-      "SELECT product_id, custom_price FROM product_prices"
-    );
-    for (const row of res.rows) {
-      priceMap.set(row.product_id, Number(row.custom_price));
-    }
-    cachedCustomPrices = priceMap;
-    customPricesExpiry = now + PRICES_CACHE_TTL_MS;
-    return priceMap;
-  } catch (err) {
-    console.error("[Pricing] Failed to fetch custom prices from DB, using fallback cache:", err);
-    return cachedCustomPrices ?? priceMap;
-  }
-}
-async function setCustomPrice(productId, price, productName) {
-  const cleanId = productId.trim();
-  const cleanPrice = Math.max(0, Math.round(price));
-  if (!cachedCustomPrices) {
-    cachedCustomPrices = /* @__PURE__ */ new Map();
-  }
-  cachedCustomPrices.set(cleanId, cleanPrice);
-  customPricesExpiry = Date.now() + PRICES_CACHE_TTL_MS;
-  try {
-    const { query: query2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    await query2(`
-      CREATE TABLE IF NOT EXISTS product_prices (
-        product_id VARCHAR(100) PRIMARY KEY,
-        product_name VARCHAR(255),
-        custom_price INTEGER NOT NULL CHECK (custom_price >= 0),
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `).catch(() => {
-    });
-    await query2(
-      `INSERT INTO product_prices (product_id, product_name, custom_price, updated_at)
-       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-       ON CONFLICT (product_id) DO UPDATE
-       SET custom_price = EXCLUDED.custom_price,
-           product_name = COALESCE(EXCLUDED.product_name, product_prices.product_name),
-           updated_at = CURRENT_TIMESTAMP`,
-      [cleanId, productName || null, cleanPrice]
-    );
-    await query2(
-      `UPDATE products SET price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 OR name = $3`,
-      [cleanPrice, cleanId, productName || cleanId]
-    ).catch(() => {
-    });
-  } catch (err) {
-    console.error("[Pricing] Failed to persist custom price to DB:", err);
-  }
-}
-async function deleteCustomPrice(productId) {
-  const cleanId = productId.trim();
-  if (cachedCustomPrices) {
-    cachedCustomPrices.delete(cleanId);
-    customPricesExpiry = Date.now() + PRICES_CACHE_TTL_MS;
-  }
-  try {
-    const { query: query2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    await query2("DELETE FROM product_prices WHERE product_id = $1", [cleanId]);
-  } catch (err) {
-    console.error("[Pricing] Failed to delete custom price from DB:", err);
-  }
-}
-function clearCustomPricesCache() {
-  cachedCustomPrices = null;
-  customPricesExpiry = 0;
-}
 function getEffectiveSellingPrice(product, customPricesMap) {
   if (customPricesMap && customPricesMap.size > 0) {
     if (customPricesMap.has(product.id)) {
@@ -5683,7 +5569,7 @@ function getEffectiveSellingPrice(product, customPricesMap) {
   }
   return calculateSellingPrice(product.price_idr);
 }
-var ADMIN_TELEGRAM_ID, GATEWAY_CHANNELS, defaultMarginConfig, CS_WHATSAPP_NUMBER, CS_WHATSAPP_INTL, TELEGRAM_BOT_USERNAME, cachedCustomPrices, customPricesExpiry, PRICES_CACHE_TTL_MS;
+var ADMIN_TELEGRAM_ID, GATEWAY_CHANNELS, defaultMarginConfig, CS_WHATSAPP_NUMBER, CS_WHATSAPP_INTL, TELEGRAM_BOT_USERNAME;
 var init_pricing = __esm({
   "lib/pricing.ts"() {
     "use strict";
@@ -5707,6 +5593,104 @@ var init_pricing = __esm({
     CS_WHATSAPP_NUMBER = "081294950241";
     CS_WHATSAPP_INTL = "6281294950241";
     TELEGRAM_BOT_USERNAME = "dafung_hub_bot";
+  }
+});
+
+// lib/custom-prices.ts
+var custom_prices_exports = {};
+__export(custom_prices_exports, {
+  clearCustomPricesCache: () => clearCustomPricesCache,
+  deleteCustomPrice: () => deleteCustomPrice,
+  getCustomPrices: () => getCustomPrices,
+  setCustomPrice: () => setCustomPrice
+});
+async function getCustomPrices() {
+  const now = Date.now();
+  if (cachedCustomPrices !== null && now < customPricesExpiry) {
+    return cachedCustomPrices;
+  }
+  const priceMap = /* @__PURE__ */ new Map();
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS product_prices (
+        product_id VARCHAR(100) PRIMARY KEY,
+        product_name VARCHAR(255),
+        custom_price INTEGER NOT NULL CHECK (custom_price >= 0),
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `).catch(() => {
+    });
+    const res = await query(
+      "SELECT product_id, custom_price FROM product_prices"
+    );
+    for (const row of res.rows) {
+      priceMap.set(row.product_id, Number(row.custom_price));
+    }
+    cachedCustomPrices = priceMap;
+    customPricesExpiry = now + PRICES_CACHE_TTL_MS;
+    return priceMap;
+  } catch (err) {
+    console.error("[CustomPrices] Failed to fetch custom prices from DB, using fallback cache:", err);
+    return cachedCustomPrices ?? priceMap;
+  }
+}
+async function setCustomPrice(productId, price, productName) {
+  const cleanId = productId.trim();
+  const cleanPrice = Math.max(0, Math.round(price));
+  if (!cachedCustomPrices) {
+    cachedCustomPrices = /* @__PURE__ */ new Map();
+  }
+  cachedCustomPrices.set(cleanId, cleanPrice);
+  customPricesExpiry = Date.now() + PRICES_CACHE_TTL_MS;
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS product_prices (
+        product_id VARCHAR(100) PRIMARY KEY,
+        product_name VARCHAR(255),
+        custom_price INTEGER NOT NULL CHECK (custom_price >= 0),
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `).catch(() => {
+    });
+    await query(
+      `INSERT INTO product_prices (product_id, product_name, custom_price, updated_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+       ON CONFLICT (product_id) DO UPDATE
+       SET custom_price = EXCLUDED.custom_price,
+           product_name = COALESCE(EXCLUDED.product_name, product_prices.product_name),
+           updated_at = CURRENT_TIMESTAMP`,
+      [cleanId, productName || null, cleanPrice]
+    );
+    await query(
+      `UPDATE products SET price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 OR name = $3`,
+      [cleanPrice, cleanId, productName || cleanId]
+    ).catch(() => {
+    });
+  } catch (err) {
+    console.error("[CustomPrices] Failed to persist custom price to DB:", err);
+  }
+}
+async function deleteCustomPrice(productId) {
+  const cleanId = productId.trim();
+  if (cachedCustomPrices) {
+    cachedCustomPrices.delete(cleanId);
+    customPricesExpiry = Date.now() + PRICES_CACHE_TTL_MS;
+  }
+  try {
+    await query("DELETE FROM product_prices WHERE product_id = $1", [cleanId]);
+  } catch (err) {
+    console.error("[CustomPrices] Failed to delete custom price from DB:", err);
+  }
+}
+function clearCustomPricesCache() {
+  cachedCustomPrices = null;
+  customPricesExpiry = 0;
+}
+var cachedCustomPrices, customPricesExpiry, PRICES_CACHE_TTL_MS;
+var init_custom_prices = __esm({
+  "lib/custom-prices.ts"() {
+    "use strict";
+    init_db();
     cachedCustomPrices = null;
     customPricesExpiry = 0;
     PRICES_CACHE_TTL_MS = 5e3;
@@ -5890,6 +5874,7 @@ var init_supplier = __esm({
   "lib/supplier.ts"() {
     "use strict";
     init_pricing();
+    init_custom_prices();
     if (!process.env.SUPPLIER_API_KEY) {
       try {
         process.loadEnvFile?.();
@@ -14159,6 +14144,7 @@ var init_menu = __esm({
     init_db();
     init_buy();
     init_pricing();
+    init_custom_prices();
     init_fulfillment();
     init_settings();
     PLATFORMS2 = [
@@ -38383,7 +38369,8 @@ async function handleBuy(ctx, productId, botInstance) {
     return;
   }
   let product = null;
-  const { getCustomPrices: getCustomPrices2, getEffectiveSellingPrice: getEffectiveSellingPrice2 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
+  const { getEffectiveSellingPrice: getEffectiveSellingPrice2 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
+  const { getCustomPrices: getCustomPrices2 } = await Promise.resolve().then(() => (init_custom_prices(), custom_prices_exports));
   const customPrices = await getCustomPrices2().catch(() => /* @__PURE__ */ new Map());
   try {
     const res = await query(
@@ -38879,7 +38866,7 @@ function registerHandlers(botInstance) {
     }
     try {
       const { getSupplierProducts: getSupplierProducts2 } = await Promise.resolve().then(() => (init_supplier(), supplier_exports));
-      const { setCustomPrice: setCustomPrice2 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
+      const { setCustomPrice: setCustomPrice2 } = await Promise.resolve().then(() => (init_custom_prices(), custom_prices_exports));
       const products = await getSupplierProducts2().catch(() => []);
       const q = targetQuery.toLowerCase();
       let matched = products.find((p) => p.id.toLowerCase() === q);
@@ -38959,7 +38946,8 @@ function registerHandlers(botInstance) {
     }
     try {
       const { getSupplierProducts: getSupplierProducts2 } = await Promise.resolve().then(() => (init_supplier(), supplier_exports));
-      const { deleteCustomPrice: deleteCustomPrice2, calculateSellingPrice: calculateSellingPrice4 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
+      const { deleteCustomPrice: deleteCustomPrice2 } = await Promise.resolve().then(() => (init_custom_prices(), custom_prices_exports));
+      const { calculateSellingPrice: calculateSellingPrice4 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
       const products = await getSupplierProducts2().catch(() => []);
       const q = targetQuery.toLowerCase();
       let matched = products.find((p) => p.id.toLowerCase() === q);

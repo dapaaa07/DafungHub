@@ -119,7 +119,7 @@ export default function ProductGrid({ initialProducts }: ProductGridProps) {
     }
 
     return list;
-  }, [initialProducts, selectedCategory, searchQuery, sortBy, stockOnly]);
+  }, [products, selectedCategory, searchQuery, sortBy, stockOnly]);
 
   return (
     <section id="katalog" className="py-16 sm:py-24 bg-[#F8F9FA]">

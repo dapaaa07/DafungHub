@@ -21,10 +21,18 @@ export default function Navbar() {
             <span className="inline-flex items-center gap-1 font-semibold text-[#FFDE00]">
               <Zap className="w-3.5 h-3.5 fill-[#FFDE00]" /> Info Layanan:
             </span>
-            <span className="text-gray-300">
-              {isOnline
-                ? '🟢 Bot Telegram Online 24 Jam — Siap Melayani Transaksi Otomatis!'
-                : '⚠️ Bot Telegram sedang maintenance. Pemesanan dialihkan via WhatsApp CS!'}
+            <span className="inline-flex items-center gap-2 text-gray-300">
+              {isOnline ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 inline-block" />
+                  <span>Bot Telegram Online 24 Jam — Siap Melayani Transaksi Otomatis!</span>
+                </>
+              ) : (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0 inline-block" />
+                  <span className="text-amber-200">Bot Telegram sedang maintenance. Pemesanan dialihkan via WhatsApp CS!</span>
+                </>
+              )}
             </span>
           </div>
           <div className="hidden md:flex items-center gap-4 text-gray-300 text-xs">

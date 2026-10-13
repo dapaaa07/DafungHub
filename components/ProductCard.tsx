@@ -34,7 +34,9 @@ export default function ProductCard({ product, onSelect }: ProductCardProps) {
                   className="object-contain max-h-9 w-auto"
                 />
               ) : (
-                <span className="text-xl">{product.platformIcon}</span>
+                <span className="text-xs font-black tracking-wider uppercase text-gray-700">
+                  {product.platformName.slice(0, 3)}
+                </span>
               )}
             </div>
             <div>
@@ -53,8 +55,8 @@ export default function ProductCard({ product, onSelect }: ProductCardProps) {
               {product.durationText}
             </span>
             {isAvailable ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 Ready
               </span>
             ) : (
@@ -136,7 +138,7 @@ export default function ProductCard({ product, onSelect }: ProductCardProps) {
               title={isOnline ? 'Stok produk sedang habis' : 'Bot Telegram sedang maintenance'}
             >
               <Send className="w-3 h-3 text-gray-400" />
-              <span className="truncate">{isOnline ? 'Habis' : 'Bot Maint.'}</span>
+              <span className="truncate">{isOnline ? 'Stok Habis' : 'Maintenance'}</span>
             </button>
           )}
         </div>

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Image from 'next/image';
-import { X, Send, MessageCircle, ShieldCheck, CheckCircle2, Clock } from 'lucide-react';
+import { X, Send, MessageCircle, ShieldCheck, CheckCircle2, Clock, ArrowRight } from 'lucide-react';
 import { EnrichedProduct } from '@/lib/types';
 import { formatRupiah, CS_WHATSAPP_INTL, TELEGRAM_BOT_USERNAME } from '@/lib/pricing';
 import { useBotStatus } from './BotStatusContext';
@@ -86,7 +86,9 @@ Mohon panduan ketersediaan & metode pembayarannya. Terima kasih!`;
                   className="object-contain max-h-12 w-auto"
                 />
               ) : (
-                <span className="text-2xl sm:text-3xl">{product.platformIcon}</span>
+                <span className="text-sm font-black tracking-wider uppercase text-gray-700">
+                  {product.platformName.slice(0, 3)}
+                </span>
               )}
             </div>
 
@@ -116,8 +118,9 @@ Mohon panduan ketersediaan & metode pembayarannya. Terima kasih!`;
                 {formatRupiah(product.sellingPrice)}
               </span>
             </div>
-            <span className="px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-bold bg-[#FFDE00] text-[#121212]">
-              ⚡ Garansi Aktif
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-bold bg-[#FFDE00] text-[#121212]">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Garansi Aktif</span>
             </span>
           </div>
 
@@ -160,8 +163,9 @@ Mohon panduan ketersediaan & metode pembayarannya. Terima kasih!`;
                   <div className="text-left min-w-0">
                     <div className="font-extrabold text-xs sm:text-sm flex items-center gap-1.5 flex-wrap">
                       <span>Pesan via Telegram Bot</span>
-                      <span className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                        🟢 Auto Order 24 Jam
+                      <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        <span>Auto Order 24 Jam</span>
                       </span>
                     </div>
                     <div className="text-[11px] text-gray-300 truncate">
@@ -169,9 +173,7 @@ Mohon panduan ketersediaan & metode pembayarannya. Terima kasih!`;
                     </div>
                   </div>
                 </div>
-                <span className="text-[#FFDE00] font-bold text-sm shrink-0 ml-2">
-                  →
-                </span>
+                <ArrowRight className="w-4 h-4 text-[#FFDE00] shrink-0 ml-2" />
               </a>
             ) : (
               <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed opacity-75">
@@ -220,9 +222,7 @@ Mohon panduan ketersediaan & metode pembayarannya. Terima kasih!`;
                   </div>
                 </div>
               </div>
-              <span className="text-[#121212] font-bold text-sm shrink-0 ml-2">
-                →
-              </span>
+              <ArrowRight className="w-4 h-4 text-[#121212] shrink-0 ml-2" />
             </a>
           </div>
 

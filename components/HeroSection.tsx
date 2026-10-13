@@ -10,11 +10,7 @@ export default function HeroSection() {
   const isOnline = botStatus === 'online';
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-[#121212] via-[#1a1a1a] to-[#121212] text-white pt-12 pb-20 lg:pt-20 lg:pb-28">
-      {/* Background Decorative Tech Glows */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#FFDE00]/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute top-1/3 right-10 w-96 h-96 bg-[#3AA8E8]/10 rounded-full blur-3xl pointer-events-none" />
-
+    <section className="relative overflow-hidden bg-gradient-to-b from-[#121212] via-[#161616] to-[#121212] text-white pt-12 pb-20 lg:pt-20 lg:pb-28 border-b border-gray-800/80">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           {/* Left Column: Headlines & CTAs */}
@@ -54,7 +50,7 @@ export default function HeroSection() {
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl font-extrabold text-base text-[#121212] bg-[#FFDE00] hover:bg-[#FFE838] shadow-lg shadow-yellow-400/20 hover:scale-[1.02] active:scale-95 transition-all"
               >
                 <span>Eksplor Katalog Produk</span>
-                <ArrowDown className="w-4 h-4 animate-bounce" />
+                <ArrowDown className="w-4 h-4" />
               </a>
 
               {/* Secondary Action Button (Dynamic Online vs Maintenance) */}
@@ -151,8 +147,14 @@ export default function HeroSection() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-red-600/20 flex items-center justify-center text-red-500 font-bold">
-                      🔴
+                    <div className="w-10 h-10 rounded-xl bg-black/40 border border-white/10 p-1.5 flex items-center justify-center shrink-0">
+                      <Image
+                        src="/logos/netflix.png"
+                        alt="Netflix"
+                        width={28}
+                        height={28}
+                        className="object-contain"
+                      />
                     </div>
                     <div>
                       <div className="font-bold text-sm text-white">Netflix Premium UHD</div>
@@ -166,8 +168,14 @@ export default function HeroSection() {
 
                 <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-cyan-600/20 flex items-center justify-center text-cyan-400 font-bold">
-                      ✂️
+                    <div className="w-10 h-10 rounded-xl bg-black/40 border border-white/10 p-1.5 flex items-center justify-center shrink-0">
+                      <Image
+                        src="/logos/capcut.png"
+                        alt="CapCut"
+                        width={28}
+                        height={28}
+                        className="object-contain"
+                      />
                     </div>
                     <div>
                       <div className="font-bold text-sm text-white">CapCut Pro & Canva</div>
@@ -181,8 +189,14 @@ export default function HeroSection() {
 
                 <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-indigo-600/20 flex items-center justify-center text-indigo-400 font-bold">
-                      🤖
+                    <div className="w-10 h-10 rounded-xl bg-black/40 border border-white/10 p-1.5 flex items-center justify-center shrink-0">
+                      <Image
+                        src="/logos/claude.png"
+                        alt="Claude AI"
+                        width={28}
+                        height={28}
+                        className="object-contain"
+                      />
                     </div>
                     <div>
                       <div className="font-bold text-sm text-white">Claude AI & Gemini Advanced</div>

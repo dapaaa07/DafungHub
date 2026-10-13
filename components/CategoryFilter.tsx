@@ -1,6 +1,17 @@
 'use client';
 
-import { Search, X, ArrowUpDown } from 'lucide-react';
+import {
+  Search,
+  X,
+  ArrowUpDown,
+  Layers,
+  Tv,
+  Bot,
+  Palette,
+  Briefcase,
+  ShieldCheck,
+  LucideIcon,
+} from 'lucide-react';
 import { ProductCategory } from '@/lib/types';
 
 interface CategoryFilterProps {
@@ -15,13 +26,19 @@ interface CategoryFilterProps {
   counts: Record<ProductCategory, number>;
 }
 
-export const CATEGORIES: { id: ProductCategory; label: string; icon: string }[] = [
-  { id: 'all', label: 'Semua Produk', icon: '🌟' },
-  { id: 'streaming', label: 'Streaming Video', icon: '🍿' },
-  { id: 'ai', label: 'AI & Produktivitas', icon: '🤖' },
-  { id: 'creative', label: 'Desain & Kreatif', icon: '🎨' },
-  { id: 'office', label: 'Office & Bisnis', icon: '📊' },
-  { id: 'security', label: 'Security & VPN', icon: '🛡️' },
+export interface CategoryItem {
+  id: ProductCategory;
+  label: string;
+  icon: LucideIcon;
+}
+
+export const CATEGORIES: CategoryItem[] = [
+  { id: 'all', label: 'Semua Produk', icon: Layers },
+  { id: 'streaming', label: 'Streaming Video', icon: Tv },
+  { id: 'ai', label: 'AI & Produktivitas', icon: Bot },
+  { id: 'creative', label: 'Desain & Kreatif', icon: Palette },
+  { id: 'office', label: 'Office & Bisnis', icon: Briefcase },
+  { id: 'security', label: 'Security & VPN', icon: ShieldCheck },
 ];
 
 export default function CategoryFilter({
@@ -85,10 +102,10 @@ export default function CategoryFilter({
               onChange={(e) => onSortChange(e.target.value)}
               className="appearance-none bg-white border border-gray-200 text-gray-700 text-xs font-bold py-3 pl-3.5 pr-8 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFDE00] shadow-sm cursor-pointer"
             >
-              <option value="popular">🔥 Paling Populer</option>
-              <option value="price_asc">💰 Harga Terendah</option>
-              <option value="price_desc">💎 Harga Tertinggi</option>
-              <option value="name_asc">🔤 Nama A - Z</option>
+              <option value="popular">Paling Populer</option>
+              <option value="price_asc">Harga Terendah</option>
+              <option value="price_desc">Harga Tertinggi</option>
+              <option value="name_asc">Nama A - Z</option>
             </select>
             <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
@@ -98,6 +115,7 @@ export default function CategoryFilter({
       {/* Category Pill Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
         {CATEGORIES.map((cat) => {
+          const Icon = cat.icon;
           const isActive = currentCategory === cat.id;
           const count = counts[cat.id] ?? 0;
 
@@ -111,7 +129,7 @@ export default function CategoryFilter({
                   : 'bg-white text-gray-700 hover:text-black hover:bg-gray-100 border border-gray-200'
               }`}
             >
-              <span>{cat.icon}</span>
+              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#FFDE00]' : 'text-gray-500'}`} />
               <span>{cat.label}</span>
               <span
                 className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
