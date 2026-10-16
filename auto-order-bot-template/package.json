@@ -1,0 +1,41 @@
+{
+  "name": "auto-order-bot-template",
+  "version": "1.0.0",
+  "description": "Commercial-grade white-label Telegram auto-order and instant fulfillment bot template",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node18 --outfile=dist/index.js --external:pg-native --external:node-telegram-bot-api",
+    "setup:db": "tsx scripts/setup-db.ts",
+    "set-webhook": "tsx scripts/set-webhook.ts",
+    "test": "tsx --test tests/**/*.test.ts"
+  },
+  "keywords": [
+    "telegram-bot",
+    "auto-order",
+    "digital-products",
+    "qris",
+    "sakurupiah",
+    "midtrans",
+    "ecommerce"
+  ],
+  "author": "DaFung Hub",
+  "license": "Commercial",
+  "dependencies": {
+    "crypto-js": "^4.2.0",
+    "midtrans-client": "^1.4.3",
+    "node-telegram-bot-api": "^2.1.0",
+    "pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5"
+  },
+  "devDependencies": {
+    "@types/crypto-js": "^4.2.2",
+    "@types/midtrans-client": "^1.4.0",
+    "@types/node": "^20",
+    "@types/node-telegram-bot-api": "^0.64.15",
+    "@types/pg": "^8.23.1",
+    "esbuild": "^0.25.0"
+  }
+}
