@@ -16,13 +16,13 @@ export default function HeroSection() {
           {/* Left Column: Headlines & CTAs */}
           <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
             {/* Pill Tag */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-semibold text-gray-200">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs font-semibold text-gray-200">
               <div className="relative w-4 h-4 rounded-full overflow-hidden shrink-0 bg-[#FFDE00]">
                 <Image src="/logo-d.png" alt="Dafung Hub Icon" fill className="object-cover" />
               </div>
               <span className="text-[#FFDE00] font-bold">Dafung Hub</span>
               <span className="text-gray-400">|</span>
-              <span>Platform Langganan Digital #1</span>
+              <span>Katalog Akun & Layanan Digital</span>
             </div>
 
             {/* Main Title */}
@@ -39,7 +39,7 @@ export default function HeroSection() {
 
             {/* Subtitle */}
             <p className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-              Dapatkan akses akun premium resmi untuk produktivitas, streaming, desain, dan AI dengan harga distributor termurah. Didukung sistem bot otomatis 24 jam dan garansi full masa aktif!
+              Dapatkan akses akun premium untuk produktivitas, streaming, desain, dan AI dengan harga terjangkau. Didukung bot otomatis dan garansi penggantian selama masa aktif.
             </p>
 
             {/* Action CTA Buttons */}
@@ -103,7 +103,7 @@ export default function HeroSection() {
                   <CheckCircle2 className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="font-bold text-white">100% Legal</div>
+                  <div className="font-bold text-white">Akun Terverifikasi</div>
                   <div className="text-[11px] text-gray-400">Kredensial Aman</div>
                 </div>
               </div>
@@ -122,7 +122,7 @@ export default function HeroSection() {
 
           {/* Right Column: Visual Showcase Card */}
           <div className="lg:col-span-5">
-            <div className="relative mx-auto max-w-md lg:max-w-none rounded-3xl bg-gradient-to-br from-white/10 to-white/5 p-6 border border-white/15 backdrop-blur-xl shadow-2xl">
+            <div className="relative mx-auto max-w-md lg:max-w-none rounded-2xl bg-[#181818] p-6 border border-[#2a2a2a] shadow-xl">
               {/* Card Banner Header */}
               <div className="relative h-48 w-full rounded-2xl overflow-hidden mb-5 border border-white/10 bg-[#0a0a0a]">
                 <Image

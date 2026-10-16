@@ -71,11 +71,31 @@ async function supplierRequest<T>(endpoint: string, options: RequestInit = {}): 
 }
 
 /**
- * Fetch available products catalogue from supplier
+ * Filter to exclude testing/sandbox products from supplier catalogue
+ */
+export function isTestProduct(product: { id?: string; name?: string; description?: string }): boolean {
+  const id = (product.id || '').toLowerCase();
+  const name = (product.name || '').toLowerCase();
+  const desc = (product.description || '').toLowerCase();
+  return (
+    id.startsWith('loc_test') ||
+    id.startsWith('test_') ||
+    id === 'test' ||
+    /\btest(?:ing)?\b/i.test(id) ||
+    /\btest\b/i.test(name) ||
+    /\btesting\b/i.test(name) ||
+    /\bsandbox\b/i.test(name) ||
+    /\btesting developer\b/i.test(desc)
+  );
+}
+
+/**
+ * Fetch available products catalogue from supplier (excluding testing/sandbox products)
  */
 export async function getSupplierProducts(): Promise<SupplierProduct[]> {
   const data = await supplierRequest<{ products: SupplierProduct[] }>('/v1/products');
-  return data.products || [];
+  const products = data.products || [];
+  return products.filter((p) => !isTestProduct(p));
 }
 
 /**
@@ -612,10 +632,12 @@ export async function getAllEnrichedProducts(): Promise<EnrichedProduct[]> {
       getCustomPrices().catch(() => new Map<string, number>()),
     ]);
     const productsToEnrich = !rawProducts || rawProducts.length === 0 ? FALLBACK_PRODUCTS : rawProducts;
-    return productsToEnrich.map((p) => enrichProduct(p, customPrices));
+    return productsToEnrich
+      .filter((p) => !isTestProduct(p))
+      .map((p) => enrichProduct(p, customPrices));
   } catch (err) {
     console.error('[Supplier] Error fetching products for catalogue, using fallbacks:', err);
-    return FALLBACK_PRODUCTS.map((p) => enrichProduct(p));
+    return FALLBACK_PRODUCTS.filter((p) => !isTestProduct(p)).map((p) => enrichProduct(p));
   }
 }
 

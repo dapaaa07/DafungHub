@@ -3,7 +3,7 @@ import path from 'path';
 import { Context } from 'node-telegram-bot-api';
 import { fromPath } from 'node-telegram-bot-api/node';
 import { ExtendedBot, sendSafeMessage, sendSafePhoto } from './handler';
-import { getSupplierProducts, getSupplierProfile, getSupplierBalance, SupplierProduct } from '../lib/supplier';
+import { getSupplierProducts, getSupplierProfile, getSupplierBalance, SupplierProduct, isTestProduct } from '../lib/supplier';
 import { query, Order, Product } from '../lib/db';
 import { handleBuy } from './commands/buy';
 import { isAdmin, calculateSellingPrice, ADMIN_TELEGRAM_ID, getEffectiveSellingPrice } from '../lib/pricing';
@@ -274,16 +274,17 @@ export function filterProductsByPlatform(
   products: SupplierProduct[],
   platformId: string = 'all'
 ): SupplierProduct[] {
-  if (!platformId || platformId === 'all') return products;
+  const cleanProducts = products.filter((p) => !isTestProduct(p));
+  if (!platformId || platformId === 'all') return cleanProducts;
 
   if (platformId === 'other') {
-    return products.filter((p) => matchProductPlatform(p.name) === null);
+    return cleanProducts.filter((p) => matchProductPlatform(p.name) === null);
   }
 
   const targetPlatform = PLATFORMS.find((p) => p.id === platformId);
-  if (!targetPlatform) return products;
+  if (!targetPlatform) return cleanProducts;
 
-  return products.filter((p) =>
+  return cleanProducts.filter((p) =>
     targetPlatform.keywords.some((k) => p.name.toLowerCase().includes(k))
   );
 }
@@ -291,10 +292,11 @@ export function filterProductsByPlatform(
 export function getPlatformsWithCounts(
   products: SupplierProduct[]
 ): Array<PlatformConfig & { count: number }> {
+  const cleanProducts = products.filter((p) => !isTestProduct(p));
   const result: Array<PlatformConfig & { count: number }> = [];
 
   for (const plat of PLATFORMS) {
-    const matched = products.filter((p) =>
+    const matched = cleanProducts.filter((p) =>
       plat.keywords.some((k) => p.name.toLowerCase().includes(k))
     );
     if (matched.length > 0) {
@@ -333,7 +335,8 @@ export async function sendPlatformsMenu(
   botInstance: ExtendedBot
 ): Promise<void> {
   try {
-    const products = await getSupplierProducts();
+    const rawProducts = await getSupplierProducts();
+    const products = rawProducts.filter((p) => !isTestProduct(p));
     const activePlatforms = getPlatformsWithCounts(products);
     const otherCount = products.filter((p) => matchProductPlatform(p.name) === null).length;
 
@@ -1168,10 +1171,11 @@ export async function sendAdminPricesMenu(
   if (!isAdmin(ctx.from?.id)) return;
 
   try {
-    const [products, customPrices] = await Promise.all([
+    const [rawProducts, customPrices] = await Promise.all([
       getSupplierProducts().catch(() => []),
       getCustomPrices().catch(() => new Map<string, number>()),
     ]);
+    const products = rawProducts.filter((p) => !isTestProduct(p));
 
     const pageSize = 5;
     const totalPages = Math.ceil(products.length / pageSize) || 1;

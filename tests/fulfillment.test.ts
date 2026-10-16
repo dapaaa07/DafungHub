@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import test, { after } from 'node:test';
+import test, { after, before } from 'node:test';
 import { Bot } from 'node-telegram-bot-api';
 import { ExtendedBot } from '../bot/handler';
 import { pool, query } from '../lib/db';
@@ -11,7 +11,12 @@ import {
 } from '../lib/fulfillment';
 import { decrypt } from '../lib/encrypt';
 
+before(async () => {
+  await query("DELETE FROM orders WHERE order_code LIKE 'TEST-%' OR order_code LIKE 'ORD-SAKU-HOOK-%'");
+});
+
 after(async () => {
+  await query("DELETE FROM orders WHERE order_code LIKE 'TEST-%' OR order_code LIKE 'ORD-SAKU-HOOK-%'");
   await pool.end();
 });
 

@@ -13,7 +13,7 @@ export default function GuaranteeSection() {
     {
       icon: RefreshCw,
       title: 'Penggantian Akun Cepat',
-      desc: 'Jika akun tiba-tiba logout atau bermasalah, cukup hubungi CS atau ketik komplain di bot. Penggantian diproses secepatnya tanpa drama.',
+      desc: 'Jika akun tiba-tiba logout atau bermasalah, cukup hubungi CS atau kirim laporan ke bot. Penggantian diproses setelah bukti kendala dikonfirmasi.',
     },
     {
       icon: Lock,
@@ -24,19 +24,16 @@ export default function GuaranteeSection() {
 
   return (
     <section id="garansi" className="py-16 sm:py-24 bg-[#121212] text-white relative overflow-hidden">
-      {/* Glow */}
-      <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-[#3AA8E8]/10 rounded-full blur-3xl pointer-events-none" />
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-12">
         <div className="text-center max-w-2xl mx-auto space-y-3">
           <span className="text-xs font-bold uppercase tracking-wider text-[#3AA8E8] bg-[#3AA8E8]/15 px-3 py-1 rounded-full border border-[#3AA8E8]/30">
-            Komitmen Kepuasan Pelanggan
+            Jaminan Layanan
           </span>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white">
-            Kebijakan Garansi & Transparansi
+            Kebijakan Garansi &amp; Transparansi
           </h2>
           <p className="text-sm text-gray-400">
-            Kepercayaan Anda adalah prioritas nomor satu bagi Dafung Hub. Kami memberikan jaminan penuh untuk setiap transaksi digital Anda.
+            Kami menjamin transparansi status akun, durasi langganan, dan prosedur klaim yang jelas tanpa biaya tambahan.
           </p>
         </div>
 
@@ -47,7 +44,7 @@ export default function GuaranteeSection() {
             return (
               <div
                 key={i}
-                className="bg-white/5 rounded-3xl p-8 border border-white/10 hover:border-white/20 transition-all space-y-4"
+                className="bg-[#181818] rounded-2xl p-6 sm:p-8 border border-[#262626] hover:border-[#383838] transition-all space-y-4"
               >
                 <div className="w-12 h-12 rounded-2xl bg-[#FFDE00] flex items-center justify-center text-[#121212]">
                   <Icon className="w-6 h-6" />
@@ -64,7 +61,7 @@ export default function GuaranteeSection() {
         </div>
 
         {/* Support Banner Callout */}
-        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-white/10 to-white/5 border border-white/15 flex flex-col sm:flex-row items-center justify-between gap-6">
+        <div className="p-6 sm:p-8 rounded-2xl bg-[#181818] border border-[#2a2a2a] flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="space-y-1 text-center sm:text-left">
             <h4 className="text-base sm:text-lg font-extrabold text-white">
               Punya Pertanyaan Seputar Garansi?

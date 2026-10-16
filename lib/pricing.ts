@@ -156,10 +156,6 @@ export function calculateOriginalPrice(sellingPrice: number): number {
   return Math.max(sellingPrice + 10000, raw);
 }
 
-// =========================================================================
-// UNIFIED PRODUCT PRICING RESOLUTION (CLIENT & SERVER SAFE)
-// =========================================================================
-
 /**
  * Get effective selling price: custom price override (if set) or calculated supplier price
  */

@@ -241,3 +241,24 @@ test('Fallback Navigation: invalid product provides interactive restart buttons 
   assert.ok(buttonTexts.some((t) => t.includes('Menu Utama')), 'Must offer restart button to main menu');
 });
 
+test('Testing Products Filter: test and sandbox products are excluded from catalog and bot', async () => {
+  const { isTestProduct, getAllEnrichedProducts } = await import('../lib/supplier');
+
+  // Verify test product identification logic
+  assert.strictEqual(isTestProduct({ id: 'loc_test1', name: 'Test Api product' }), true);
+  assert.strictEqual(isTestProduct({ id: 'test_product', name: 'Dummy Item' }), true);
+  assert.strictEqual(isTestProduct({ id: '123', name: 'Sandbox Netflix Account' }), true);
+  assert.strictEqual(isTestProduct({ id: '123', name: 'Valid Netflix Account', description: 'Testing developer sandbox' }), true);
+  assert.strictEqual(isTestProduct({ id: '6a2fda51035a6d898f2106fe', name: 'Capcut Pro 1 Month' }), false);
+  assert.strictEqual(isTestProduct({ id: '6a2fe23a1c8697b163aedcbd', name: 'Microsoft Office 365' }), false);
+
+  // Verify live supplier and enriched products contain NO test products
+  const liveProducts = await getSupplierProducts();
+  const testItemsInLive = liveProducts.filter((p) => isTestProduct(p));
+  assert.strictEqual(testItemsInLive.length, 0, 'Supplier products list must contain no test products');
+
+  const enriched = await getAllEnrichedProducts();
+  const testItemsInEnriched = enriched.filter((p) => isTestProduct(p));
+  assert.strictEqual(testItemsInEnriched.length, 0, 'Enriched catalogue must contain no test products');
+});
+

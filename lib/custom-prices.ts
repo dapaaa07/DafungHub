@@ -1,9 +1,5 @@
 import { query } from './db';
 
-// =========================================================================
-// CUSTOM PRODUCT PRICING ENGINE (DATABASE PERSISTENCE & TTL CACHING)
-// =========================================================================
-
 let cachedCustomPrices: Map<string, number> | null = null;
 let customPricesExpiry = 0;
 const PRICES_CACHE_TTL_MS = 5000;

@@ -5711,6 +5711,7 @@ __export(supplier_exports, {
   getSupplierBalance: () => getSupplierBalance,
   getSupplierProducts: () => getSupplierProducts,
   getSupplierProfile: () => getSupplierProfile,
+  isTestProduct: () => isTestProduct,
   matchProductPlatform: () => matchProductPlatform
 });
 async function supplierRequest(endpoint, options = {}) {
@@ -5730,9 +5731,16 @@ async function supplierRequest(endpoint, options = {}) {
   }
   return await response.json();
 }
+function isTestProduct(product) {
+  const id = (product.id || "").toLowerCase();
+  const name = (product.name || "").toLowerCase();
+  const desc = (product.description || "").toLowerCase();
+  return id.startsWith("loc_test") || id.startsWith("test_") || id === "test" || /\btest(?:ing)?\b/i.test(id) || /\btest\b/i.test(name) || /\btesting\b/i.test(name) || /\bsandbox\b/i.test(name) || /\btesting developer\b/i.test(desc);
+}
 async function getSupplierProducts() {
   const data = await supplierRequest("/v1/products");
-  return data.products || [];
+  const products = data.products || [];
+  return products.filter((p) => !isTestProduct(p));
 }
 async function getSupplierBalance() {
   return await supplierRequest("/v1/balance");
@@ -5864,10 +5872,10 @@ async function getAllEnrichedProducts() {
       getCustomPrices().catch(() => /* @__PURE__ */ new Map())
     ]);
     const productsToEnrich = !rawProducts || rawProducts.length === 0 ? FALLBACK_PRODUCTS : rawProducts;
-    return productsToEnrich.map((p) => enrichProduct(p, customPrices));
+    return productsToEnrich.filter((p) => !isTestProduct(p)).map((p) => enrichProduct(p, customPrices));
   } catch (err) {
     console.error("[Supplier] Error fetching products for catalogue, using fallbacks:", err);
-    return FALLBACK_PRODUCTS.map((p) => enrichProduct(p));
+    return FALLBACK_PRODUCTS.filter((p) => !isTestProduct(p)).map((p) => enrichProduct(p));
   }
 }
 var SUPPLIER_BASE_URL, SUPPLIER_API_KEY, PLATFORMS, FALLBACK_PRODUCTS;
@@ -13109,15 +13117,16 @@ async function adminRetrySupplierFulfill(orderCode, botInstance) {
 Silakan top up di supplier terlebih dahulu, lalu klik tombol ini lagi, atau gunakan perintah <code>/kirim ${orderCode} &lt;kredensial&gt;</code>.`
   };
 }
-async function getPendingQueueOrders() {
+async function getPendingQueueOrders(limit = 50) {
   const res = await query(
     `SELECT o.*, p.name as product_name, p.price as product_price, u.telegram_id
      FROM orders o
      JOIN products p ON o.product_id = p.id
      JOIN users u ON o.user_id = u.id
      WHERE o.fulfillment_status = 'processing'
-     ORDER BY o.created_at ASC
-     LIMIT 10`
+     ORDER BY o.created_at DESC
+     LIMIT $1`,
+    [limit]
   );
   return res.rows;
 }
@@ -13321,20 +13330,22 @@ function matchProductPlatform2(productName) {
   return null;
 }
 function filterProductsByPlatform(products, platformId = "all") {
-  if (!platformId || platformId === "all") return products;
+  const cleanProducts = products.filter((p) => !isTestProduct(p));
+  if (!platformId || platformId === "all") return cleanProducts;
   if (platformId === "other") {
-    return products.filter((p) => matchProductPlatform2(p.name) === null);
+    return cleanProducts.filter((p) => matchProductPlatform2(p.name) === null);
   }
   const targetPlatform = PLATFORMS2.find((p) => p.id === platformId);
-  if (!targetPlatform) return products;
-  return products.filter(
+  if (!targetPlatform) return cleanProducts;
+  return cleanProducts.filter(
     (p) => targetPlatform.keywords.some((k) => p.name.toLowerCase().includes(k))
   );
 }
 function getPlatformsWithCounts(products) {
+  const cleanProducts = products.filter((p) => !isTestProduct(p));
   const result = [];
   for (const plat of PLATFORMS2) {
-    const matched = products.filter(
+    const matched = cleanProducts.filter(
       (p) => plat.keywords.some((k) => p.name.toLowerCase().includes(k))
     );
     if (matched.length > 0) {
@@ -13362,7 +13373,8 @@ function getPlatformLogoPath(platformId) {
 }
 async function sendPlatformsMenu(ctx, botInstance) {
   try {
-    const products = await getSupplierProducts();
+    const rawProducts = await getSupplierProducts();
+    const products = rawProducts.filter((p) => !isTestProduct(p));
     const activePlatforms = getPlatformsWithCounts(products);
     const otherCount = products.filter((p) => matchProductPlatform2(p.name) === null).length;
     const keyboard = [];
@@ -13998,10 +14010,11 @@ async function sendAdminOrdersMenu(ctx, botInstance) {
 async function sendAdminPricesMenu(ctx, botInstance, page = 0) {
   if (!isAdmin(ctx.from?.id)) return;
   try {
-    const [products, customPrices] = await Promise.all([
+    const [rawProducts, customPrices] = await Promise.all([
       getSupplierProducts().catch(() => []),
       getCustomPrices().catch(() => /* @__PURE__ */ new Map())
     ]);
+    const products = rawProducts.filter((p) => !isTestProduct(p));
     const pageSize = 5;
     const totalPages = Math.ceil(products.length / pageSize) || 1;
     const safePage = Math.max(0, Math.min(page, totalPages - 1));

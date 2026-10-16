@@ -368,7 +368,7 @@ export async function adminRetrySupplierFulfill(
 /**
  * Get all active queued/processing orders for the Owner Panel
  */
-export async function getPendingQueueOrders(): Promise<
+export async function getPendingQueueOrders(limit: number = 50): Promise<
   Array<Order & { product_name: string; telegram_id: string; product_price: number }>
 > {
   const res = await query<
@@ -379,8 +379,9 @@ export async function getPendingQueueOrders(): Promise<
      JOIN products p ON o.product_id = p.id
      JOIN users u ON o.user_id = u.id
      WHERE o.fulfillment_status = 'processing'
-     ORDER BY o.created_at ASC
-     LIMIT 10`
+     ORDER BY o.created_at DESC
+     LIMIT $1`,
+    [limit]
   );
   return res.rows;
 }

@@ -7,26 +7,26 @@ export default function ValueProps() {
     {
       icon: Zap,
       color: 'bg-yellow-500/10 text-yellow-600',
-      title: 'Proses Instan & Otomatis',
-      description: 'Pengiriman akun diproses secepat kilat setelah order. Bot aktif 24 jam nonstop melayani Anda.',
+      title: 'Proses Otomatis 24 Jam',
+      description: 'Kredensial dikirim otomatis ke Telegram atau WhatsApp setelah pembayaran terverifikasi.',
     },
     {
       icon: ShieldCheck,
       color: 'bg-cyan-500/10 text-cyan-600',
       title: 'Garansi Full Durasi',
-      description: 'Garansi penggantian akun baru tanpa dipersulit jika terjadi kendala selama masa langganan aktif.',
+      description: 'Penggantian akun baru apabila akun mengalami kendala teknis selama masa langganan aktif.',
     },
     {
       icon: Layers,
       color: 'bg-indigo-500/10 text-indigo-600',
-      title: 'Katalog Super Lengkap',
-      description: 'Pilihan puluhan akun resmi: streaming film, AI produktivitas, editing, office, hingga tool bisnis.',
+      title: 'Katalog Akun Beragam',
+      description: 'Tersedia pilihan akun untuk streaming, alat desain, AI produktivitas, lisensi office, dan perkakas kerja.',
     },
     {
       icon: Headphones,
       color: 'bg-emerald-500/10 text-emerald-600',
-      title: 'Dukungan CS 24/7',
-      description: 'Tim support responsif siap membantu konsultasi dan kendala via WhatsApp dan Telegram kapan pun.',
+      title: 'Dukungan CS Siaga',
+      description: 'Bantuan konsultasi dan kendala langsung via WhatsApp dan Telegram.',
     },
   ];
 
