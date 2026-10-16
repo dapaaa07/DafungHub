@@ -89,9 +89,11 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Cache-Control, Pragma',
+          'Access-Control-Allow-Headers': 'Content-Type, Cache-Control, Pragma, Authorization',
         });
         res.end(
           JSON.stringify({
@@ -106,6 +108,41 @@ const server = http.createServer((req, res) => {
           'Access-Control-Allow-Origin': '*',
         });
         res.end(JSON.stringify({ status: 'online', fallback: true }));
+      }
+    })();
+    return;
+  }
+
+  // GET /api/products route
+  if (req.method === 'GET' && req.url?.includes('products')) {
+    (async () => {
+      try {
+        const { getAllEnrichedProducts } = await import('../lib/supplier');
+        const products = await getAllEnrichedProducts();
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Cache-Control, Pragma, Authorization',
+        });
+        res.end(
+          JSON.stringify({
+            success: true,
+            timestamp: new Date().toISOString(),
+            count: products.length,
+            products,
+          })
+        );
+      } catch (err) {
+        console.error('[HTTP Server] /api/products error:', err);
+        res.writeHead(500, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        });
+        res.end(JSON.stringify({ success: false, error: (err as Error).message }));
       }
     })();
     return;

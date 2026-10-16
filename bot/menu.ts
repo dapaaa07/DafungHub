@@ -228,8 +228,16 @@ export interface PlatformConfig {
 
 export const PLATFORMS: PlatformConfig[] = [
   { id: 'netflix', name: 'Netflix', icon: '🔴', keywords: ['netflix'], logoFile: 'netflix.png' },
+  { id: 'spotify', name: 'Spotify', icon: '🟢', keywords: ['spotify'], logoFile: 'spotify.png' },
   { id: 'canva', name: 'Canva', icon: '🎨', keywords: ['canva'], logoFile: 'canva.png' },
   { id: 'capcut', name: 'Capcut', icon: '✂️', keywords: ['capcut'], logoFile: 'capcut.png' },
+  { id: 'alight_motion', name: 'Alight Motion', icon: '🎬', keywords: ['alight motion', 'alightmotion'], logoFile: 'alight_motion.png' },
+  { id: 'picsart', name: 'Picsart', icon: '🎨', keywords: ['picsart'], logoFile: 'picsart.png' },
+  { id: 'meitu', name: 'Meitu', icon: '💄', keywords: ['meitu'], logoFile: 'meitu.png' },
+  { id: 'wink', name: 'Wink', icon: '✨', keywords: ['wink'], logoFile: 'wink.png' },
+  { id: 'elevenlabs', name: 'ElevenLabs', icon: '🎙️', keywords: ['elevenlabs', 'eleven labs', 'eleven'], logoFile: 'elevenlabs.png' },
+  { id: 'ilovepdf', name: 'iLovePDF', icon: '📑', keywords: ['ilovepdf', 'ilove pdf'], logoFile: 'ilovepdf.png' },
+  { id: 'jetbrains', name: 'JetBrains', icon: '💻', keywords: ['jetbrains', 'intellij', 'pycharm', 'webstorm'], logoFile: 'jetbrains.png' },
   { id: 'duolingo', name: 'Duolingo', icon: '🦉', keywords: ['duolingo'], logoFile: 'duolingo.png' },
   { id: 'claude', name: 'Claude AI', icon: '🤖', keywords: ['claude'], logoFile: 'claude.png' },
   { id: 'gemini', name: 'Gemini AI', icon: '✨', keywords: ['gemini'], logoFile: 'gemini.png' },
@@ -239,12 +247,17 @@ export const PLATFORMS: PlatformConfig[] = [
   { id: 'hbo', name: 'HBO Max', icon: '🍿', keywords: ['hbo'], logoFile: 'hbo.png' },
   { id: 'office', name: 'MS Office', icon: '📊', keywords: ['office', 'microsoft'], logoFile: 'office.png' },
   { id: 'zoom', name: 'Zoom', icon: '📹', keywords: ['zoom'], logoFile: 'zoom.png' },
-  { id: 'vpn', name: 'VPN', icon: '🛡️', keywords: ['vpn', 'nord', 'expressvpn', 'hma'], logoFile: 'vpn.png' },
+  { id: 'vpn', name: 'VPN', icon: '🛡️', keywords: ['vpn', 'nord', 'expressvpn', 'hma', 'surfshark', 'avira'], logoFile: 'vpn.png' },
   { id: 'notion', name: 'Notion', icon: '📓', keywords: ['notion'], logoFile: 'notion.png' },
   { id: 'adobe', name: 'Adobe', icon: '🖌️', keywords: ['adobe'], logoFile: 'adobe.png' },
   { id: 'figma', name: 'Figma', icon: '🎯', keywords: ['figma'], logoFile: 'figma.png' },
   { id: 'scribd', name: 'Scribd', icon: '📚', keywords: ['scribd'], logoFile: 'scribd.png' },
-  { id: 'email', name: 'Akun Email', icon: '📧', keywords: ['gmail', 'outlook', 'hotmail', 'email'], logoFile: 'office.png' },
+  { id: 'gmail', name: 'Gmail PVA', icon: '📧', keywords: ['gmail', 'google mail'], logoFile: 'gmail.png' },
+  { id: 'miro', name: 'Miro Board', icon: '📋', keywords: ['miro'], logoFile: 'miro.png' },
+  { id: 'framer', name: 'Framer AI', icon: '🌐', keywords: ['framer'], logoFile: 'framer.png' },
+  { id: 'telegram', name: 'Telegram Account', icon: '✈️', keywords: ['telegram'], logoFile: 'telegram.png' },
+  { id: 'autodesk', name: 'Autodesk', icon: '📐', keywords: ['autodesk', 'autocad', '3ds max', 'maya', 'revit'], logoFile: 'autodesk.png' },
+  { id: 'email', name: 'Akun Email', icon: '📧', keywords: ['outlook', 'hotmail', 'email'], logoFile: 'office.png' },
 ];
 
 export function matchProductPlatform(productName: string): PlatformConfig | null {
@@ -1184,12 +1197,19 @@ export async function sendAdminPricesMenu(
         `  💵 Jual: <b>Rp ${effectivePrice.toLocaleString('id-ID')}</b> ${hasCustom ? '<i>(Custom Override ✨)</i>' : '<i>(Auto Markup)</i>'}\n` +
         `  📦 Modal: Rp ${modalPrice.toLocaleString('id-ID')} | Margin: <b>+Rp ${profit.toLocaleString('id-ID')}</b>\n\n`;
 
-      buttons.push([
+      const actionRow = [
         {
-          text: `✏️ Ubah: ${prod.name.substring(0, 22)}...`,
+          text: `✏️ Ubah: ${prod.name.substring(0, 16)}...`,
           callback_data: `admin_editprice_${prod.id}`,
         },
-      ]);
+      ];
+      if (hasCustom) {
+        actionRow.push({
+          text: `🔄 Reset Default`,
+          callback_data: `admin_resetprice_${prod.id}`,
+        });
+      }
+      buttons.push(actionRow);
     }
 
     text +=
@@ -1297,12 +1317,37 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
           `✏️ <b>Ubah Harga Produk:</b> <code>${escapeHtml(prodId)}</code>\n\n` +
           `Silakan ketik di chat:\n` +
           `<code>/editprice ${escapeHtml(prodId)} &lt;harga_baru&gt;</code>\n\n` +
-          `Contoh: <code>/editprice ${escapeHtml(prodId)} 30000</code>`,
+          `Contoh: <code>/editprice ${escapeHtml(prodId)} 30000</code>\n\n` +
+          `Atau klik tombol <b>Reset ke Rumus Default</b> di bawah untuk mengembalikan harga ke rumus otomatis dari harga modal.`,
           {
             parse_mode: 'HTML',
             reply_markup: {
               inline_keyboard: [
+                [{ text: '🔄 Reset ke Rumus Default', callback_data: `admin_resetprice_${prodId}` }],
                 [{ text: '🔙 Kembali ke Daftar Harga', callback_data: 'admin_prices' }],
+                [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+              ],
+            },
+          }
+        );
+      } else if (data.startsWith('admin_resetprice_')) {
+        if (!isAdmin(ctx.from?.id)) return;
+        const prodId = data.replace('admin_resetprice_', '');
+        const { deleteCustomPrice, clearCustomPricesCache } = await import('../lib/custom-prices');
+        await deleteCustomPrice(prodId);
+        clearCustomPricesCache();
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `✅ <b>Harga Berhasil Direset ke Pengaturan Awal!</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━\n` +
+          `Produk <code>${escapeHtml(prodId)}</code> sekarang kembali otomatis dihitung dari harga modal supplier dengan rumus markup standar.\n\n` +
+          `⚡ <i>Tersinkronisasi otomatis ke Website & Bot Telegram.</i>`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '📋 Buka Daftar Harga Produk', callback_data: 'admin_prices' }],
                 [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
               ],
             },

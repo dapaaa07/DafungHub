@@ -138,17 +138,17 @@ export async function handleBuy(
       // Ignore supplier lookup failure
     }
   } else {
-    // If product was found by ID, ensure its price reflects custom price override if any
-    const effectivePrice = getEffectiveSellingPrice(
-      { id: product.id, name: product.name, price_idr: product.price },
-      customPrices
-    );
-    if (product.price !== effectivePrice) {
-      product.price = effectivePrice;
-      await query(
-        'UPDATE products SET price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        [effectivePrice, product.id]
-      ).catch(() => {});
+    // If product was found in local DB, check if custom price override is set
+    const hasOverride = customPrices.has(product.id) || (product.name && customPrices.has(product.name));
+    if (hasOverride) {
+      const customPrice = customPrices.get(product.id) ?? customPrices.get(product.name!);
+      if (customPrice && product.price !== customPrice) {
+        product.price = customPrice;
+        await query(
+          'UPDATE products SET price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+          [customPrice, product.id]
+        ).catch(() => {});
+      }
     }
   }
 

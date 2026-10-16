@@ -98,11 +98,12 @@ export async function deleteCustomPrice(productId: string): Promise<void> {
   const cleanId = productId.trim();
   if (cachedCustomPrices) {
     cachedCustomPrices.delete(cleanId);
-    customPricesExpiry = Date.now() + PRICES_CACHE_TTL_MS;
+    cachedCustomPrices = null;
+    customPricesExpiry = 0;
   }
 
   try {
-    await query('DELETE FROM product_prices WHERE product_id = $1', [cleanId]);
+    await query('DELETE FROM product_prices WHERE product_id = $1 OR product_name = $1', [cleanId]);
   } catch (err) {
     console.error('[CustomPrices] Failed to delete custom price from DB:', err);
   }

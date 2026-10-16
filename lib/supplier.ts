@@ -126,6 +126,16 @@ export const PLATFORMS: PlatformConfig[] = [
     defaultWarranty: 'Garansi Full Durasi',
   },
   {
+    id: 'spotify',
+    name: 'Spotify Premium',
+    icon: '🟢',
+    category: 'streaming',
+    keywords: ['spotify'],
+    logoFile: '/logos/spotify.png',
+    defaultFeatures: ['Bebas Iklan & Download Lagu Bebas', 'Kualitas Audio High Quality 320kbps', 'Bisa Semua Device (HP, PC, Smart TV)', 'Garansi Full Durasi'],
+    defaultWarranty: 'Garansi Full Durasi',
+  },
+  {
     id: 'canva',
     name: 'Canva Pro',
     icon: '🎨',
@@ -144,6 +154,76 @@ export const PLATFORMS: PlatformConfig[] = [
     logoFile: '/logos/capcut.png',
     defaultFeatures: ['Semua Efek & Filter VIP Terbuka', 'Export 4K 60fps Tanpa Watermark', 'AI Auto-Captions & Voiceover', 'Support Android, iOS & PC Desktop'],
     defaultWarranty: 'Garansi 30 Hari Penuh',
+  },
+  {
+    id: 'alight_motion',
+    name: 'Alight Motion Pro',
+    icon: '🎬',
+    category: 'creative',
+    keywords: ['alight motion', 'alightmotion'],
+    logoFile: '/logos/alight_motion.png',
+    defaultFeatures: ['Semua Preset & Efek VIP Terbuka', 'Export Video Tanpa Watermark', 'Multi-layer Grafik & Audio', 'Support Android & iOS'],
+    defaultWarranty: 'Garansi Full Durasi',
+  },
+  {
+    id: 'picsart',
+    name: 'Picsart Gold',
+    icon: '🎨',
+    category: 'creative',
+    keywords: ['picsart'],
+    logoFile: '/logos/picsart.png',
+    defaultFeatures: ['Semua Fitur VIP & Font Premium', 'Hapus Background AI & Object Remover', 'Akses Ribuan Stiker & Template', 'Garansi Akun Aktif'],
+    defaultWarranty: 'Garansi Full Durasi',
+  },
+  {
+    id: 'meitu',
+    name: 'Meitu VIP',
+    icon: '💄',
+    category: 'creative',
+    keywords: ['meitu'],
+    logoFile: '/logos/meitu.png',
+    defaultFeatures: ['Fitur AI Retouch & Beauty VIP', 'Filter Eksklusif Kualitas HD', 'Video Editing & Body Sculpting AI', 'Garansi Masa Aktif'],
+    defaultWarranty: 'Garansi Full Durasi',
+  },
+  {
+    id: 'wink',
+    name: 'Wink VIP+',
+    icon: '✨',
+    category: 'creative',
+    keywords: ['wink'],
+    logoFile: '/logos/wink.png',
+    defaultFeatures: ['AI Video Repair & Enhancement 4K', 'Portret AI & Face Retouching', 'Night View Restoration', 'Garansi Masa Aktif'],
+    defaultWarranty: 'Garansi Full Durasi',
+  },
+  {
+    id: 'elevenlabs',
+    name: 'ElevenLabs AI',
+    icon: '🎙️',
+    category: 'ai',
+    keywords: ['elevenlabs', 'eleven labs', 'eleven'],
+    logoFile: '/logos/elevenlabs.png',
+    defaultFeatures: ['Voice Cloning AI Realistis', 'Text-to-Speech Berkualitas Studio', 'Support Multi-bahasa Termasuk Indonesia', 'Akses Credit / Token Resmi'],
+    defaultWarranty: 'Garansi Saldo Token',
+  },
+  {
+    id: 'ilovepdf',
+    name: 'iLovePDF Premium',
+    icon: '📑',
+    category: 'office',
+    keywords: ['ilovepdf', 'ilove pdf'],
+    logoFile: '/logos/ilovepdf.png',
+    defaultFeatures: ['Kompres & Konversi PDF Tanpa Batas', 'OCR Teks Berkecepatan Tinggi', 'Edit, Gabung, & Split PDF Mudah', 'Garansi Akun Aktif'],
+    defaultWarranty: 'Garansi Full Durasi',
+  },
+  {
+    id: 'jetbrains',
+    name: 'JetBrains All Products',
+    icon: '💻',
+    category: 'office',
+    keywords: ['jetbrains', 'intellij', 'pycharm', 'webstorm'],
+    logoFile: '/logos/jetbrains.png',
+    defaultFeatures: ['Akses Semua IDE JetBrains (IntelliJ, PyCharm, dll)', 'Lisensi Resmi Developer / Edu', 'Coding Tools Kelas Industri', 'Garansi Masa Aktif'],
+    defaultWarranty: 'Garansi 1 Tahun',
   },
   {
     id: 'claude',
@@ -270,7 +350,7 @@ export const PLATFORMS: PlatformConfig[] = [
     name: 'Premium VPN',
     icon: '🛡️',
     category: 'security',
-    keywords: ['vpn', 'nord', 'expressvpn', 'hma', 'surfshark'],
+    keywords: ['vpn', 'nord', 'expressvpn', 'hma', 'surfshark', 'avira'],
     logoFile: '/logos/vpn.png',
     defaultFeatures: ['Bypass Blokir & Enkripsi Militer', 'Ribuan Server di 100+ Negara', 'Kecepatan Tinggi Anti Lemot', 'Proteksi Privasi & Bebas Log'],
     defaultWarranty: 'Garansi Full Masa Aktif',
@@ -286,11 +366,61 @@ export const PLATFORMS: PlatformConfig[] = [
     defaultWarranty: 'Garansi Durasi Penuh',
   },
   {
+    id: 'gmail',
+    name: 'Google & Gmail',
+    icon: '📧',
+    category: 'office',
+    keywords: ['gmail', 'google mail'],
+    logoFile: '/logos/gmail.png',
+    defaultFeatures: ['Akun Google / Gmail Baru & Bersih (PVA)', 'Bisa Ganti Password & Nomor Recovery', 'Cocok untuk Registrasi & Bisnis', 'Format Email : Password Siap Pakai'],
+    defaultWarranty: 'Garansi First Login',
+  },
+  {
+    id: 'miro',
+    name: 'Miro Board',
+    icon: '📋',
+    category: 'office',
+    keywords: ['miro'],
+    logoFile: '/logos/miro.png',
+    defaultFeatures: ['Unlimited Whiteboard & Kolaborasi Tim', 'Akses Template Presentasi & Diagram', 'Integrasi Tools Produktivitas', 'Garansi Masa Aktif'],
+    defaultWarranty: 'Garansi Penuh',
+  },
+  {
+    id: 'framer',
+    name: 'Framer AI Pro',
+    icon: '🌐',
+    category: 'creative',
+    keywords: ['framer'],
+    logoFile: '/logos/framer.png',
+    defaultFeatures: ['Website Builder AI Modern', 'Custom Domain & Unlimited CMS', 'Animasi & Interaksi Halus', 'Garansi Masa Aktif'],
+    defaultWarranty: 'Garansi 1 Tahun',
+  },
+  {
+    id: 'telegram',
+    name: 'Telegram Account',
+    icon: '✈️',
+    category: 'security',
+    keywords: ['telegram'],
+    logoFile: '/logos/telegram.png',
+    defaultFeatures: ['Akun Telegram Bersih & Terverifikasi', 'Siap Pakai untuk Bisnis & Bot', 'Format Session / Kredensial Aman', 'Garansi First Login'],
+    defaultWarranty: 'Garansi First Login',
+  },
+  {
+    id: 'autodesk',
+    name: 'Autodesk All Apps',
+    icon: '📐',
+    category: 'creative',
+    keywords: ['autodesk', 'autocad', '3ds max', 'maya', 'revit'],
+    logoFile: '/logos/autodesk.png',
+    defaultFeatures: ['AutoCAD, 3ds Max, Maya, Revit Terbaru', 'Lisensi Resmi Autodesk Cloud', 'Akses Penuh Semua Software Desain', 'Garansi 1 Tahun Penuh'],
+    defaultWarranty: 'Garansi 1 Tahun',
+  },
+  {
     id: 'email',
     name: 'Akun Email Fresh',
     icon: '📧',
     category: 'office',
-    keywords: ['gmail', 'outlook', 'hotmail', 'email'],
+    keywords: ['outlook', 'hotmail', 'email'],
     logoFile: '/logos/office.png',
     defaultFeatures: ['Akun Baru Bersih (PVA)', 'Bisa Ganti Password & Recovery', 'Cocok untuk Registrasi & Bisnis', 'Format Langsung Email : Password'],
     defaultWarranty: 'Garansi First Login',
@@ -374,7 +504,7 @@ export function enrichProduct(
   let category: ProductCategory = 'other';
   let platformName = product.name;
   let platformIcon = '💎';
-  let logoUrl = '/banner.png';
+  let logoUrl = '';
   let features = [
     'Garansi aktif selama masa langganan',
     'Pengiriman instan & otomatis 24/7',
@@ -392,23 +522,24 @@ export function enrichProduct(
     warrantyText = platform.defaultWarranty;
   } else {
     const lower = product.name.toLowerCase();
-    if (lower.includes('pdf') || lower.includes('vpn') || lower.includes('security')) {
+    if (/\b(?:vpn|security|antivirus)\b/i.test(lower)) {
       category = 'security';
       logoUrl = '/logos/vpn.png';
-    } else if (lower.includes('audio') || lower.includes('music') || lower.includes('stream') || lower.includes('video')) {
+    } else if (/\b(?:music|audio|stream|streaming|video)\b/i.test(lower)) {
       category = 'streaming';
-      logoUrl = '/logos/prime_video.png';
-    } else if (lower.includes('ai') || lower.includes('bot')) {
+      logoUrl = '';
+    } else if (/\b(?:ai|bot|gpt|llm)\b/i.test(lower)) {
       category = 'ai';
-      logoUrl = '/logos/claude.png';
+      logoUrl = '';
     } else {
-      category = 'office';
-      logoUrl = '/logos/office.png';
+      category = 'other';
+      logoUrl = '';
     }
   }
 
   const isPopular =
     product.name.toLowerCase().includes('netflix') ||
+    product.name.toLowerCase().includes('spotify') ||
     product.name.toLowerCase().includes('canva') ||
     product.name.toLowerCase().includes('capcut') ||
     product.name.toLowerCase().includes('claude') ||

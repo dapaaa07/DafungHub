@@ -5674,10 +5674,11 @@ async function deleteCustomPrice(productId) {
   const cleanId = productId.trim();
   if (cachedCustomPrices) {
     cachedCustomPrices.delete(cleanId);
-    customPricesExpiry = Date.now() + PRICES_CACHE_TTL_MS;
+    cachedCustomPrices = null;
+    customPricesExpiry = 0;
   }
   try {
-    await query("DELETE FROM product_prices WHERE product_id = $1", [cleanId]);
+    await query("DELETE FROM product_prices WHERE product_id = $1 OR product_name = $1", [cleanId]);
   } catch (err) {
     console.error("[CustomPrices] Failed to delete custom price from DB:", err);
   }
@@ -5809,7 +5810,7 @@ function enrichProduct(product, customPricesMap) {
   let category = "other";
   let platformName = product.name;
   let platformIcon = "\u{1F48E}";
-  let logoUrl = "/banner.png";
+  let logoUrl = "";
   let features = [
     "Garansi aktif selama masa langganan",
     "Pengiriman instan & otomatis 24/7",
@@ -5826,21 +5827,21 @@ function enrichProduct(product, customPricesMap) {
     warrantyText = platform.defaultWarranty;
   } else {
     const lower = product.name.toLowerCase();
-    if (lower.includes("pdf") || lower.includes("vpn") || lower.includes("security")) {
+    if (/\b(?:vpn|security|antivirus)\b/i.test(lower)) {
       category = "security";
       logoUrl = "/logos/vpn.png";
-    } else if (lower.includes("audio") || lower.includes("music") || lower.includes("stream") || lower.includes("video")) {
+    } else if (/\b(?:music|audio|stream|streaming|video)\b/i.test(lower)) {
       category = "streaming";
-      logoUrl = "/logos/prime_video.png";
-    } else if (lower.includes("ai") || lower.includes("bot")) {
+      logoUrl = "";
+    } else if (/\b(?:ai|bot|gpt|llm)\b/i.test(lower)) {
       category = "ai";
-      logoUrl = "/logos/claude.png";
+      logoUrl = "";
     } else {
-      category = "office";
-      logoUrl = "/logos/office.png";
+      category = "other";
+      logoUrl = "";
     }
   }
-  const isPopular = product.name.toLowerCase().includes("netflix") || product.name.toLowerCase().includes("canva") || product.name.toLowerCase().includes("capcut") || product.name.toLowerCase().includes("claude") || product.name.toLowerCase().includes("office") || product.name.toLowerCase().includes("gemini");
+  const isPopular = product.name.toLowerCase().includes("netflix") || product.name.toLowerCase().includes("spotify") || product.name.toLowerCase().includes("canva") || product.name.toLowerCase().includes("capcut") || product.name.toLowerCase().includes("claude") || product.name.toLowerCase().includes("office") || product.name.toLowerCase().includes("gemini");
   return {
     ...product,
     platformId: platform ? platform.id : "custom",
@@ -5895,6 +5896,16 @@ var init_supplier = __esm({
         defaultWarranty: "Garansi Full Durasi"
       },
       {
+        id: "spotify",
+        name: "Spotify Premium",
+        icon: "\u{1F7E2}",
+        category: "streaming",
+        keywords: ["spotify"],
+        logoFile: "/logos/spotify.png",
+        defaultFeatures: ["Bebas Iklan & Download Lagu Bebas", "Kualitas Audio High Quality 320kbps", "Bisa Semua Device (HP, PC, Smart TV)", "Garansi Full Durasi"],
+        defaultWarranty: "Garansi Full Durasi"
+      },
+      {
         id: "canva",
         name: "Canva Pro",
         icon: "\u{1F3A8}",
@@ -5913,6 +5924,76 @@ var init_supplier = __esm({
         logoFile: "/logos/capcut.png",
         defaultFeatures: ["Semua Efek & Filter VIP Terbuka", "Export 4K 60fps Tanpa Watermark", "AI Auto-Captions & Voiceover", "Support Android, iOS & PC Desktop"],
         defaultWarranty: "Garansi 30 Hari Penuh"
+      },
+      {
+        id: "alight_motion",
+        name: "Alight Motion Pro",
+        icon: "\u{1F3AC}",
+        category: "creative",
+        keywords: ["alight motion", "alightmotion"],
+        logoFile: "/logos/alight_motion.png",
+        defaultFeatures: ["Semua Preset & Efek VIP Terbuka", "Export Video Tanpa Watermark", "Multi-layer Grafik & Audio", "Support Android & iOS"],
+        defaultWarranty: "Garansi Full Durasi"
+      },
+      {
+        id: "picsart",
+        name: "Picsart Gold",
+        icon: "\u{1F3A8}",
+        category: "creative",
+        keywords: ["picsart"],
+        logoFile: "/logos/picsart.png",
+        defaultFeatures: ["Semua Fitur VIP & Font Premium", "Hapus Background AI & Object Remover", "Akses Ribuan Stiker & Template", "Garansi Akun Aktif"],
+        defaultWarranty: "Garansi Full Durasi"
+      },
+      {
+        id: "meitu",
+        name: "Meitu VIP",
+        icon: "\u{1F484}",
+        category: "creative",
+        keywords: ["meitu"],
+        logoFile: "/logos/meitu.png",
+        defaultFeatures: ["Fitur AI Retouch & Beauty VIP", "Filter Eksklusif Kualitas HD", "Video Editing & Body Sculpting AI", "Garansi Masa Aktif"],
+        defaultWarranty: "Garansi Full Durasi"
+      },
+      {
+        id: "wink",
+        name: "Wink VIP+",
+        icon: "\u2728",
+        category: "creative",
+        keywords: ["wink"],
+        logoFile: "/logos/wink.png",
+        defaultFeatures: ["AI Video Repair & Enhancement 4K", "Portret AI & Face Retouching", "Night View Restoration", "Garansi Masa Aktif"],
+        defaultWarranty: "Garansi Full Durasi"
+      },
+      {
+        id: "elevenlabs",
+        name: "ElevenLabs AI",
+        icon: "\u{1F399}\uFE0F",
+        category: "ai",
+        keywords: ["elevenlabs", "eleven labs", "eleven"],
+        logoFile: "/logos/elevenlabs.png",
+        defaultFeatures: ["Voice Cloning AI Realistis", "Text-to-Speech Berkualitas Studio", "Support Multi-bahasa Termasuk Indonesia", "Akses Credit / Token Resmi"],
+        defaultWarranty: "Garansi Saldo Token"
+      },
+      {
+        id: "ilovepdf",
+        name: "iLovePDF Premium",
+        icon: "\u{1F4D1}",
+        category: "office",
+        keywords: ["ilovepdf", "ilove pdf"],
+        logoFile: "/logos/ilovepdf.png",
+        defaultFeatures: ["Kompres & Konversi PDF Tanpa Batas", "OCR Teks Berkecepatan Tinggi", "Edit, Gabung, & Split PDF Mudah", "Garansi Akun Aktif"],
+        defaultWarranty: "Garansi Full Durasi"
+      },
+      {
+        id: "jetbrains",
+        name: "JetBrains All Products",
+        icon: "\u{1F4BB}",
+        category: "office",
+        keywords: ["jetbrains", "intellij", "pycharm", "webstorm"],
+        logoFile: "/logos/jetbrains.png",
+        defaultFeatures: ["Akses Semua IDE JetBrains (IntelliJ, PyCharm, dll)", "Lisensi Resmi Developer / Edu", "Coding Tools Kelas Industri", "Garansi Masa Aktif"],
+        defaultWarranty: "Garansi 1 Tahun"
       },
       {
         id: "claude",
@@ -6039,7 +6120,7 @@ var init_supplier = __esm({
         name: "Premium VPN",
         icon: "\u{1F6E1}\uFE0F",
         category: "security",
-        keywords: ["vpn", "nord", "expressvpn", "hma", "surfshark"],
+        keywords: ["vpn", "nord", "expressvpn", "hma", "surfshark", "avira"],
         logoFile: "/logos/vpn.png",
         defaultFeatures: ["Bypass Blokir & Enkripsi Militer", "Ribuan Server di 100+ Negara", "Kecepatan Tinggi Anti Lemot", "Proteksi Privasi & Bebas Log"],
         defaultWarranty: "Garansi Full Masa Aktif"
@@ -6055,11 +6136,61 @@ var init_supplier = __esm({
         defaultWarranty: "Garansi Durasi Penuh"
       },
       {
+        id: "gmail",
+        name: "Google & Gmail",
+        icon: "\u{1F4E7}",
+        category: "office",
+        keywords: ["gmail", "google mail"],
+        logoFile: "/logos/gmail.png",
+        defaultFeatures: ["Akun Google / Gmail Baru & Bersih (PVA)", "Bisa Ganti Password & Nomor Recovery", "Cocok untuk Registrasi & Bisnis", "Format Email : Password Siap Pakai"],
+        defaultWarranty: "Garansi First Login"
+      },
+      {
+        id: "miro",
+        name: "Miro Board",
+        icon: "\u{1F4CB}",
+        category: "office",
+        keywords: ["miro"],
+        logoFile: "/logos/miro.png",
+        defaultFeatures: ["Unlimited Whiteboard & Kolaborasi Tim", "Akses Template Presentasi & Diagram", "Integrasi Tools Produktivitas", "Garansi Masa Aktif"],
+        defaultWarranty: "Garansi Penuh"
+      },
+      {
+        id: "framer",
+        name: "Framer AI Pro",
+        icon: "\u{1F310}",
+        category: "creative",
+        keywords: ["framer"],
+        logoFile: "/logos/framer.png",
+        defaultFeatures: ["Website Builder AI Modern", "Custom Domain & Unlimited CMS", "Animasi & Interaksi Halus", "Garansi Masa Aktif"],
+        defaultWarranty: "Garansi 1 Tahun"
+      },
+      {
+        id: "telegram",
+        name: "Telegram Account",
+        icon: "\u2708\uFE0F",
+        category: "security",
+        keywords: ["telegram"],
+        logoFile: "/logos/telegram.png",
+        defaultFeatures: ["Akun Telegram Bersih & Terverifikasi", "Siap Pakai untuk Bisnis & Bot", "Format Session / Kredensial Aman", "Garansi First Login"],
+        defaultWarranty: "Garansi First Login"
+      },
+      {
+        id: "autodesk",
+        name: "Autodesk All Apps",
+        icon: "\u{1F4D0}",
+        category: "creative",
+        keywords: ["autodesk", "autocad", "3ds max", "maya", "revit"],
+        logoFile: "/logos/autodesk.png",
+        defaultFeatures: ["AutoCAD, 3ds Max, Maya, Revit Terbaru", "Lisensi Resmi Autodesk Cloud", "Akses Penuh Semua Software Desain", "Garansi 1 Tahun Penuh"],
+        defaultWarranty: "Garansi 1 Tahun"
+      },
+      {
         id: "email",
         name: "Akun Email Fresh",
         icon: "\u{1F4E7}",
         category: "office",
-        keywords: ["gmail", "outlook", "hotmail", "email"],
+        keywords: ["outlook", "hotmail", "email"],
         logoFile: "/logos/office.png",
         defaultFeatures: ["Akun Baru Bersih (PVA)", "Bisa Ganti Password & Recovery", "Cocok untuk Registrasi & Bisnis", "Format Langsung Email : Password"],
         defaultWarranty: "Garansi First Login"
@@ -13892,12 +14023,19 @@ Daftar harga aktif saat ini (Halaman ${safePage + 1}/${totalPages}):
   \u{1F4E6} Modal: Rp ${modalPrice.toLocaleString("id-ID")} | Margin: <b>+Rp ${profit.toLocaleString("id-ID")}</b>
 
 `;
-      buttons.push([
+      const actionRow = [
         {
-          text: `\u270F\uFE0F Ubah: ${prod.name.substring(0, 22)}...`,
+          text: `\u270F\uFE0F Ubah: ${prod.name.substring(0, 16)}...`,
           callback_data: `admin_editprice_${prod.id}`
         }
-      ]);
+      ];
+      if (hasCustom) {
+        actionRow.push({
+          text: `\u{1F504} Reset Default`,
+          callback_data: `admin_resetprice_${prod.id}`
+        });
+      }
+      buttons.push(actionRow);
     }
     text += `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u{1F4A1} <b>Cara Cepat Ubah Harga:</b>
@@ -13993,12 +14131,39 @@ function registerMenuHandlers(botInstance) {
 Silakan ketik di chat:
 <code>/editprice ${escapeHtml2(prodId)} &lt;harga_baru&gt;</code>
 
-Contoh: <code>/editprice ${escapeHtml2(prodId)} 30000</code>`,
+Contoh: <code>/editprice ${escapeHtml2(prodId)} 30000</code>
+
+Atau klik tombol <b>Reset ke Rumus Default</b> di bawah untuk mengembalikan harga ke rumus otomatis dari harga modal.`,
           {
             parse_mode: "HTML",
             reply_markup: {
               inline_keyboard: [
+                [{ text: "\u{1F504} Reset ke Rumus Default", callback_data: `admin_resetprice_${prodId}` }],
                 [{ text: "\u{1F519} Kembali ke Daftar Harga", callback_data: "admin_prices" }],
+                [{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]
+              ]
+            }
+          }
+        );
+      } else if (data.startsWith("admin_resetprice_")) {
+        if (!isAdmin(ctx.from?.id)) return;
+        const prodId = data.replace("admin_resetprice_", "");
+        const { deleteCustomPrice: deleteCustomPrice2, clearCustomPricesCache: clearCustomPricesCache2 } = await Promise.resolve().then(() => (init_custom_prices(), custom_prices_exports));
+        await deleteCustomPrice2(prodId);
+        clearCustomPricesCache2();
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `\u2705 <b>Harga Berhasil Direset ke Pengaturan Awal!</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Produk <code>${escapeHtml2(prodId)}</code> sekarang kembali otomatis dihitung dari harga modal supplier dengan rumus markup standar.
+
+\u26A1 <i>Tersinkronisasi otomatis ke Website & Bot Telegram.</i>`,
+          {
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "\u{1F4CB} Buka Daftar Harga Produk", callback_data: "admin_prices" }],
                 [{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]
               ]
             }
@@ -14149,8 +14314,16 @@ var init_menu = __esm({
     init_settings();
     PLATFORMS2 = [
       { id: "netflix", name: "Netflix", icon: "\u{1F534}", keywords: ["netflix"], logoFile: "netflix.png" },
+      { id: "spotify", name: "Spotify", icon: "\u{1F7E2}", keywords: ["spotify"], logoFile: "spotify.png" },
       { id: "canva", name: "Canva", icon: "\u{1F3A8}", keywords: ["canva"], logoFile: "canva.png" },
       { id: "capcut", name: "Capcut", icon: "\u2702\uFE0F", keywords: ["capcut"], logoFile: "capcut.png" },
+      { id: "alight_motion", name: "Alight Motion", icon: "\u{1F3AC}", keywords: ["alight motion", "alightmotion"], logoFile: "alight_motion.png" },
+      { id: "picsart", name: "Picsart", icon: "\u{1F3A8}", keywords: ["picsart"], logoFile: "picsart.png" },
+      { id: "meitu", name: "Meitu", icon: "\u{1F484}", keywords: ["meitu"], logoFile: "meitu.png" },
+      { id: "wink", name: "Wink", icon: "\u2728", keywords: ["wink"], logoFile: "wink.png" },
+      { id: "elevenlabs", name: "ElevenLabs", icon: "\u{1F399}\uFE0F", keywords: ["elevenlabs", "eleven labs", "eleven"], logoFile: "elevenlabs.png" },
+      { id: "ilovepdf", name: "iLovePDF", icon: "\u{1F4D1}", keywords: ["ilovepdf", "ilove pdf"], logoFile: "ilovepdf.png" },
+      { id: "jetbrains", name: "JetBrains", icon: "\u{1F4BB}", keywords: ["jetbrains", "intellij", "pycharm", "webstorm"], logoFile: "jetbrains.png" },
       { id: "duolingo", name: "Duolingo", icon: "\u{1F989}", keywords: ["duolingo"], logoFile: "duolingo.png" },
       { id: "claude", name: "Claude AI", icon: "\u{1F916}", keywords: ["claude"], logoFile: "claude.png" },
       { id: "gemini", name: "Gemini AI", icon: "\u2728", keywords: ["gemini"], logoFile: "gemini.png" },
@@ -14160,12 +14333,17 @@ var init_menu = __esm({
       { id: "hbo", name: "HBO Max", icon: "\u{1F37F}", keywords: ["hbo"], logoFile: "hbo.png" },
       { id: "office", name: "MS Office", icon: "\u{1F4CA}", keywords: ["office", "microsoft"], logoFile: "office.png" },
       { id: "zoom", name: "Zoom", icon: "\u{1F4F9}", keywords: ["zoom"], logoFile: "zoom.png" },
-      { id: "vpn", name: "VPN", icon: "\u{1F6E1}\uFE0F", keywords: ["vpn", "nord", "expressvpn", "hma"], logoFile: "vpn.png" },
+      { id: "vpn", name: "VPN", icon: "\u{1F6E1}\uFE0F", keywords: ["vpn", "nord", "expressvpn", "hma", "surfshark", "avira"], logoFile: "vpn.png" },
       { id: "notion", name: "Notion", icon: "\u{1F4D3}", keywords: ["notion"], logoFile: "notion.png" },
       { id: "adobe", name: "Adobe", icon: "\u{1F58C}\uFE0F", keywords: ["adobe"], logoFile: "adobe.png" },
       { id: "figma", name: "Figma", icon: "\u{1F3AF}", keywords: ["figma"], logoFile: "figma.png" },
       { id: "scribd", name: "Scribd", icon: "\u{1F4DA}", keywords: ["scribd"], logoFile: "scribd.png" },
-      { id: "email", name: "Akun Email", icon: "\u{1F4E7}", keywords: ["gmail", "outlook", "hotmail", "email"], logoFile: "office.png" }
+      { id: "gmail", name: "Gmail PVA", icon: "\u{1F4E7}", keywords: ["gmail", "google mail"], logoFile: "gmail.png" },
+      { id: "miro", name: "Miro Board", icon: "\u{1F4CB}", keywords: ["miro"], logoFile: "miro.png" },
+      { id: "framer", name: "Framer AI", icon: "\u{1F310}", keywords: ["framer"], logoFile: "framer.png" },
+      { id: "telegram", name: "Telegram Account", icon: "\u2708\uFE0F", keywords: ["telegram"], logoFile: "telegram.png" },
+      { id: "autodesk", name: "Autodesk", icon: "\u{1F4D0}", keywords: ["autodesk", "autocad", "3ds max", "maya", "revit"], logoFile: "autodesk.png" },
+      { id: "email", name: "Akun Email", icon: "\u{1F4E7}", keywords: ["outlook", "hotmail", "email"], logoFile: "office.png" }
     ];
   }
 });
@@ -38419,17 +38597,17 @@ async function handleBuy(ctx, productId, botInstance) {
     } catch {
     }
   } else {
-    const effectivePrice = getEffectiveSellingPrice2(
-      { id: product.id, name: product.name, price_idr: product.price },
-      customPrices
-    );
-    if (product.price !== effectivePrice) {
-      product.price = effectivePrice;
-      await query(
-        "UPDATE products SET price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
-        [effectivePrice, product.id]
-      ).catch(() => {
-      });
+    const hasOverride = customPrices.has(product.id) || product.name && customPrices.has(product.name);
+    if (hasOverride) {
+      const customPrice = customPrices.get(product.id) ?? customPrices.get(product.name);
+      if (customPrice && product.price !== customPrice) {
+        product.price = customPrice;
+        await query(
+          "UPDATE products SET price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+          [customPrice, product.id]
+        ).catch(() => {
+        });
+      }
     }
   }
   if (!product) {
@@ -39171,9 +39349,11 @@ var server = import_http.default.createServer((req, res) => {
         res.writeHead(200, {
           "Content-Type": "application/json",
           "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+          "Pragma": "no-cache",
+          "Expires": "0",
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Methods": "GET, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Cache-Control, Pragma"
+          "Access-Control-Allow-Headers": "Content-Type, Cache-Control, Pragma, Authorization"
         });
         res.end(
           JSON.stringify({
@@ -39188,6 +39368,39 @@ var server = import_http.default.createServer((req, res) => {
           "Access-Control-Allow-Origin": "*"
         });
         res.end(JSON.stringify({ status: "online", fallback: true }));
+      }
+    })();
+    return;
+  }
+  if (req.method === "GET" && req.url?.includes("products")) {
+    (async () => {
+      try {
+        const { getAllEnrichedProducts: getAllEnrichedProducts2 } = await Promise.resolve().then(() => (init_supplier(), supplier_exports));
+        const products = await getAllEnrichedProducts2();
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+          "Pragma": "no-cache",
+          "Expires": "0",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Cache-Control, Pragma, Authorization"
+        });
+        res.end(
+          JSON.stringify({
+            success: true,
+            timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+            count: products.length,
+            products
+          })
+        );
+      } catch (err) {
+        console.error("[HTTP Server] /api/products error:", err);
+        res.writeHead(500, {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*"
+        });
+        res.end(JSON.stringify({ success: false, error: err.message }));
       }
     })();
     return;
