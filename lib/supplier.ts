@@ -90,11 +90,12 @@ export function isTestProduct(product: { id?: string; name?: string; description
 }
 
 /**
- * Fetch available products catalogue from supplier (excluding testing/sandbox products)
+ * Fetch available products catalogue from supplier (excluding testing/sandbox products unless includeTest is true)
  */
-export async function getSupplierProducts(): Promise<SupplierProduct[]> {
+export async function getSupplierProducts(includeTest: boolean = false): Promise<SupplierProduct[]> {
   const data = await supplierRequest<{ products: SupplierProduct[] }>('/v1/products');
   const products = data.products || [];
+  if (includeTest) return products;
   return products.filter((p) => !isTestProduct(p));
 }
 
@@ -625,19 +626,19 @@ export const FALLBACK_PRODUCTS: SupplierProduct[] = [
   },
 ];
 
-export async function getAllEnrichedProducts(): Promise<EnrichedProduct[]> {
+export async function getAllEnrichedProducts(includeTest: boolean = false): Promise<EnrichedProduct[]> {
   try {
     const [rawProducts, customPrices] = await Promise.all([
-      getSupplierProducts().catch(() => FALLBACK_PRODUCTS),
+      getSupplierProducts(includeTest).catch(() => FALLBACK_PRODUCTS),
       getCustomPrices().catch(() => new Map<string, number>()),
     ]);
     const productsToEnrich = !rawProducts || rawProducts.length === 0 ? FALLBACK_PRODUCTS : rawProducts;
     return productsToEnrich
-      .filter((p) => !isTestProduct(p))
+      .filter((p) => includeTest || !isTestProduct(p))
       .map((p) => enrichProduct(p, customPrices));
   } catch (err) {
     console.error('[Supplier] Error fetching products for catalogue, using fallbacks:', err);
-    return FALLBACK_PRODUCTS.filter((p) => !isTestProduct(p)).map((p) => enrichProduct(p));
+    return FALLBACK_PRODUCTS.filter((p) => includeTest || !isTestProduct(p)).map((p) => enrichProduct(p));
   }
 }
 

@@ -104,12 +104,31 @@ export async function handleBuy(
   // If not found in local DB, check supplier API catalogue
   if (!product) {
     try {
-      const { getSupplierProducts } = await import('../../lib/supplier');
-      const supplierProducts = await getSupplierProducts().catch(() => []);
+      const isCallerAdmin = isAdmin(ctx.from?.id);
+      const { getSupplierProducts, isTestProduct } = await import('../../lib/supplier');
+      const supplierProducts = await getSupplierProducts(isCallerAdmin).catch(() => []);
       const supp = supplierProducts.find(
         (p) => p.id === trimmedId || p.name.toLowerCase() === trimmedId.toLowerCase()
       );
       if (supp) {
+        if (isTestProduct(supp) && !isCallerAdmin) {
+          await sendSafeMessage(
+            ctx,
+            botInstance,
+            '⚠️ <b>Akses Ditolak:</b> Produk ini adalah produk pengujian khusus untuk Administrator.',
+            {
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '🛍️ Buka Katalog Produk', callback_data: 'menu_products' }],
+                  [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+                ],
+              },
+            }
+          );
+          return;
+        }
+
         const effectivePrice = getEffectiveSellingPrice(supp, customPrices);
         const existingByName = await query<Product>(
           'SELECT * FROM products WHERE name = $1 LIMIT 1',
@@ -138,6 +157,28 @@ export async function handleBuy(
       // Ignore supplier lookup failure
     }
   } else {
+    // If product was found in local DB, check if it is the test API product & caller is not admin
+    const isTestApi =
+      product?.id?.startsWith('loc_test') ||
+      product?.id === 'test' ||
+      /\btest api\b/i.test(product?.name || '');
+    if (isTestApi && !isAdmin(ctx.from?.id)) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '⚠️ <b>Akses Ditolak:</b> Produk ini adalah produk pengujian khusus untuk Administrator.',
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🛍️ Buka Katalog Produk', callback_data: 'menu_products' }],
+              [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
     // If product was found in local DB, check if custom price override is set
     const hasOverride = customPrices.has(product.id) || (product.name && customPrices.has(product.name));
     if (hasOverride) {

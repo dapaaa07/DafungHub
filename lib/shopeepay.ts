@@ -176,9 +176,15 @@ export async function createShopeePayInvoice(
     const resJson = await response.json();
     if (response.ok && resJson.success && resJson.data) {
       const data = resJson.data;
-      const qrString = data.qris || data.qr_string || data.qr || '';
+      const qrString =
+        data.qris_string ||
+        data.qris ||
+        data.qr_string ||
+        data.qr ||
+        generateDynamicQrisFromStatic(SHOPEEPAY_STATIC_QRIS, roundedAmount);
       const token = data.token || data.qris_token || `shopee_${orderCode}`;
       const qrCodeUrl =
+        data.qris_url ||
         data.qr_image ||
         data.qr_code_url ||
         data.qr_url ||

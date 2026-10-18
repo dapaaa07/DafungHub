@@ -3,6 +3,7 @@ import { encrypt } from './encrypt';
 import { getSupplierBalance, createSupplierOrder, getSupplierProducts } from './supplier';
 import { ExtendedBot, sendSafeMessage } from '../bot/handler';
 import { ADMIN_TELEGRAM_ID } from './pricing';
+import { broadcastOrderSuccess } from './broadcast';
 
 function escapeHtml(str: string): string {
   if (!str) return '';
@@ -165,6 +166,11 @@ export async function processOrderPayment(
           { parse_mode: 'HTML' }
         );
 
+        // Broadcast successful order to Telegram channel
+        broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
+          console.warn('[Broadcast Warning] Failed to broadcast order success:', bErr);
+        });
+
         return {
           success: true,
           mode: 'instant',
@@ -321,6 +327,11 @@ export async function adminManualFulfill(
       },
     }
   );
+
+  // Broadcast successful order to Telegram channel
+  broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
+    console.warn('[Broadcast Warning] Failed to broadcast manual fulfillment:', bErr);
+  });
 
   return {
     success: true,

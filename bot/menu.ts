@@ -60,6 +60,31 @@ export function formatIndonesianDateTime(d: Date = new Date()): string {
   return `${dayName}, ${dateNum} ${monthName} ${year} • ${hours}:${minutes}:${seconds}`;
 }
 
+const adminBroadcastPending = new Map<string, string>();
+const adminWaitingBroadcast = new Map<string, boolean>();
+
+export function setAdminWaitingBroadcast(chatId: string | number, isWaiting: boolean): void {
+  adminWaitingBroadcast.set(String(chatId), isWaiting);
+}
+
+export function getAdminWaitingBroadcast(chatId: string | number): boolean {
+  return adminWaitingBroadcast.get(String(chatId)) || false;
+}
+
+export function setAdminPendingBroadcastText(chatId: string | number, text: string): void {
+  adminBroadcastPending.set(String(chatId), text);
+}
+
+export function getAdminPendingBroadcastText(chatId: string | number): string | undefined {
+  return adminBroadcastPending.get(String(chatId));
+}
+
+export function clearAdminBroadcastState(chatId: string | number): void {
+  const key = String(chatId);
+  adminWaitingBroadcast.delete(key);
+  adminBroadcastPending.delete(key);
+}
+
 /**
  * Main Menu Inline Keyboard matching exact visual design reference.
  * If user is Owner (7133868769), displays the prominent Owner Panel button.
@@ -274,6 +299,9 @@ export function filterProductsByPlatform(
   products: SupplierProduct[],
   platformId: string = 'all'
 ): SupplierProduct[] {
+  if (platformId === 'test') {
+    return products.filter((p) => isTestProduct(p));
+  }
   const cleanProducts = products.filter((p) => !isTestProduct(p));
   if (!platformId || platformId === 'all') return cleanProducts;
 
@@ -335,8 +363,10 @@ export async function sendPlatformsMenu(
   botInstance: ExtendedBot
 ): Promise<void> {
   try {
-    const rawProducts = await getSupplierProducts();
+    const userIsAdmin = isAdmin(ctx.from?.id);
+    const rawProducts = await getSupplierProducts(userIsAdmin);
     const products = rawProducts.filter((p) => !isTestProduct(p));
+    const testProducts = rawProducts.filter((p) => isTestProduct(p));
     const activePlatforms = getPlatformsWithCounts(products);
     const otherCount = products.filter((p) => matchProductPlatform(p.name) === null).length;
 
@@ -355,6 +385,10 @@ export async function sendPlatformsMenu(
 
     if (otherCount > 0) {
       keyboard.push([{ text: `📦 Platform Lainnya (${otherCount})`, callback_data: 'plat_other' }]);
+    }
+
+    if (userIsAdmin && testProducts.length > 0) {
+      keyboard.push([{ text: `🧪 Test API Produk (${testProducts.length}) [Khusus Admin]`, callback_data: 'plat_test' }]);
     }
 
     keyboard.push([{ text: `🌟 Semua Produk (${products.length})`, callback_data: 'plat_all' }]);
@@ -397,19 +431,37 @@ export async function sendProductsMenu(
   platformId: string = 'all'
 ): Promise<void> {
   try {
+    const userIsAdmin = isAdmin(ctx.from?.id);
+    if (platformId === 'test' && !userIsAdmin) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '⛔ <b>Akses Ditolak:</b> Kategori ini khusus untuk testing internal Administrator.',
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [[{ text: '🔙 Menu Utama', callback_data: 'menu_main' }]],
+          },
+        }
+      );
+      return;
+    }
+
     const [allProducts, customPrices] = await Promise.all([
-      getSupplierProducts().catch(() => []),
+      getSupplierProducts(userIsAdmin).catch(() => []),
       getCustomPrices().catch(() => new Map<string, number>()),
     ]);
     const products = filterProductsByPlatform(allProducts, platformId);
 
     const targetPlat = PLATFORMS.find((p) => p.id === platformId);
     const platformTitle =
-      platformId === 'all'
-        ? 'SEMUA PRODUK'
-        : platformId === 'other'
-          ? 'PLATFORM LAINNYA'
-          : targetPlat?.name.toUpperCase() || 'PRODUK';
+      platformId === 'test'
+        ? 'TEST API PRODUK (KHUSUS ADMIN)'
+        : platformId === 'all'
+          ? 'SEMUA PRODUK'
+          : platformId === 'other'
+            ? 'PLATFORM LAINNYA'
+            : targetPlat?.name.toUpperCase() || 'PRODUK';
 
     const pageSize = 6;
     const totalPages = Math.ceil(products.length / pageSize) || 1;
@@ -486,8 +538,35 @@ export async function sendProductDetail(
   platformId: string = 'all'
 ): Promise<void> {
   try {
-    const products = await getSupplierProducts();
+    const userIsAdmin = isAdmin(ctx.from?.id);
+    if (isTestProduct({ id: productId }) && !userIsAdmin) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '⛔ <b>Akses Ditolak:</b> Produk ini adalah produk pengujian khusus Administrator.',
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [[{ text: '🔙 Menu Utama', callback_data: 'menu_main' }]],
+          },
+        }
+      );
+      return;
+    }
+
+    const products = await getSupplierProducts(true).catch(() => []);
     let prod = products.find((p) => p.id === productId);
+
+    if (!prod && userIsAdmin && productId === 'loc_test1') {
+      prod = {
+        id: 'loc_test1',
+        name: 'Test Api product',
+        price_idr: 1,
+        availability: 'in_stock',
+        description: 'Produk pengujian sandbox/API untuk verifikasi pesanan admin (Rp 1).',
+        requires_email: false,
+      };
+    }
 
     if (!prod) {
       try {
@@ -506,6 +585,21 @@ export async function sendProductDetail(
       } catch {
         // Ignore fallback db lookup error
       }
+    }
+
+    if (prod && isTestProduct(prod) && !userIsAdmin) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '⛔ <b>Akses Ditolak:</b> Produk ini adalah produk pengujian khusus Administrator.',
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [[{ text: '🔙 Menu Utama', callback_data: 'menu_main' }]],
+          },
+        }
+      );
+      return;
     }
 
     if (!prod) {
@@ -1039,7 +1133,11 @@ export async function sendAdminPanel(ctx: Context, botInstance: ExtendedBot): Pr
           : { text: '🟢 Aktifkan Bot (Set ONLINE)', callback_data: 'admin_set_online' },
       ],
       [
-        { text: '💰 Atur & Kelola Harga Produk', callback_data: 'admin_prices' },
+        { text: '📢 Broadcast Channel (@DafungHub)', callback_data: 'admin_broadcast' },
+      ],
+      [
+        { text: '🧪 Test API Produk (Rp 1)', callback_data: 'admin_test_product' },
+        { text: '💰 Atur & Kelola Harga', callback_data: 'admin_prices' },
       ],
       [
         {
@@ -1199,6 +1297,90 @@ export async function sendAdminOrdersMenu(ctx: Context, botInstance: ExtendedBot
 }
 
 /**
+ * Send Admin Broadcast Management Menu
+ */
+export async function sendAdminBroadcastMenu(
+  ctx: Context,
+  botInstance: ExtendedBot
+): Promise<void> {
+  if (!isAdmin(ctx.from?.id)) return;
+
+  const { getBroadcastChannel, isAutoOrderBroadcastEnabled } = await import('../lib/broadcast');
+  const targetChannel = await getBroadcastChannel();
+  const autoOrderActive = await isAutoOrderBroadcastEnabled();
+
+  const text =
+    `📢 <b>MANAJEMEN BROADCAST KE CHANNEL</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `• <b>Target Channel:</b> <code>${escapeHtml(targetChannel)}</code>\n` +
+    `• <b>Link Channel:</b> https://t.me/${targetChannel.replace('@', '')}\n` +
+    `• <b>Auto-Broadcast Order:</b> ${autoOrderActive ? '🟢 AKTIF (Otomatis posting order sukses)' : '🔴 NONAKTIF'}\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `Pilih aksi di bawah untuk membuat siaran baru atau mengatur siaran otomatis:`;
+
+  const buttons = [
+    [
+      { text: '✍️ Buat Pesan Siaran Manual', callback_data: 'admin_create_broadcast' },
+    ],
+    [
+      {
+        text: autoOrderActive ? '🔴 Matikan Auto-Broadcast Order' : '🟢 Aktifkan Auto-Broadcast Order',
+        callback_data: 'admin_toggle_auto_broadcast',
+      },
+    ],
+    [
+      { text: '🔙 Kembali ke Panel Owner', callback_data: 'admin_panel' },
+    ],
+  ];
+
+  await sendSafeMessage(ctx, botInstance, text, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: buttons },
+  });
+}
+
+/**
+ * Send Broadcast Confirmation Preview to Admin
+ */
+export async function sendAdminBroadcastPreview(
+  ctx: Context,
+  botInstance: ExtendedBot,
+  broadcastText: string
+): Promise<void> {
+  if (!isAdmin(ctx.from?.id)) return;
+
+  const { getBroadcastChannel } = await import('../lib/broadcast');
+  const targetChannel = await getBroadcastChannel();
+  const chatId = ctx.chatId || ctx.message?.chat?.id || ctx.from?.id;
+  if (chatId) {
+    setAdminPendingBroadcastText(chatId, broadcastText);
+  }
+
+  const previewText =
+    `👁️ <b>PREVIEW PESAN SIARAN</b>\n` +
+    `<b>Target:</b> <code>${escapeHtml(targetChannel)}</code>\n` +
+    `━━━━━━━━━━━━━━━━━━━\n\n` +
+    `${broadcastText}\n\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `Apakah Anda ingin menyiarkan pesan ini ke channel sekarang?`;
+
+  const buttons = [
+    [
+      { text: '🚀 Kirim ke Channel Sekarang', callback_data: 'admin_send_broadcast' },
+    ],
+    [
+      { text: '✏️ Tulis Ulang', callback_data: 'admin_create_broadcast' },
+      { text: '❌ Batalkan', callback_data: 'admin_broadcast' },
+    ],
+  ];
+
+  await sendSafeMessage(ctx, botInstance, previewText, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: buttons },
+  });
+}
+
+/**
  * Send Admin Prices Menu (view & manage manual product prices)
  */
 export async function sendAdminPricesMenu(
@@ -1210,10 +1392,10 @@ export async function sendAdminPricesMenu(
 
   try {
     const [rawProducts, customPrices] = await Promise.all([
-      getSupplierProducts().catch(() => []),
+      getSupplierProducts(true).catch(() => []),
       getCustomPrices().catch(() => new Map<string, number>()),
     ]);
-    const products = rawProducts.filter((p) => !isTestProduct(p));
+    const products = rawProducts;
 
     const pageSize = 5;
     const totalPages = Math.ceil(products.length / pageSize) || 1;
@@ -1407,6 +1589,108 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
             ],
           },
         });
+      } else if (data === 'admin_broadcast') {
+        if (!isAdmin(ctx.from?.id)) return;
+        await sendAdminBroadcastMenu(ctx, botInstance);
+      } else if (data === 'admin_toggle_auto_broadcast') {
+        if (!isAdmin(ctx.from?.id)) return;
+        const { isAutoOrderBroadcastEnabled, setAutoOrderBroadcastEnabled } = await import('../lib/broadcast');
+        const current = await isAutoOrderBroadcastEnabled();
+        await setAutoOrderBroadcastEnabled(!current);
+        await sendAdminBroadcastMenu(ctx, botInstance);
+      } else if (data === 'admin_create_broadcast') {
+        if (!isAdmin(ctx.from?.id)) return;
+        const chatId = ctx.chatId || ctx.from?.id;
+        if (chatId) setAdminWaitingBroadcast(chatId, true);
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `✍️ <b>TULIS PESAN BROADCAST KE @DafungHub</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━\n` +
+          `Ketikkan pesan yang ingin Anda siarkan ke channel di chat ini.\n\n` +
+          `💡 <i>Format cepat: Anda juga bisa ketik perintah:\n` +
+          `<code>/broadcast &lt;pesan Anda&gt;</code></i>\n\n` +
+          `Mendukung format HTML standar (<b>tebal</b>, <i>miring</i>, <code>kode</code>, <a href="...">link</a>).`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [[{ text: '❌ Batalkan', callback_data: 'admin_broadcast' }]],
+            },
+          }
+        );
+      } else if (data === 'admin_send_broadcast') {
+        if (!isAdmin(ctx.from?.id)) return;
+        const chatId = ctx.chatId || ctx.from?.id;
+        const pendingText = chatId ? getAdminPendingBroadcastText(chatId) : undefined;
+        if (!pendingText) {
+          await sendSafeMessage(ctx, botInstance, '⚠️ Tidak ada draf siaran yang siap dikirim.', {
+            reply_markup: {
+              inline_keyboard: [[{ text: '🔙 Menu Broadcast', callback_data: 'admin_broadcast' }]],
+            },
+          });
+          return;
+        }
+        const { sendManualBroadcast } = await import('../lib/broadcast');
+        const result = await sendManualBroadcast(pendingText, botInstance);
+        if (chatId) clearAdminBroadcastState(chatId);
+
+        if (result.success) {
+          await sendSafeMessage(
+            ctx,
+            botInstance,
+            `✅ <b>Pesan Berhasil Disiarkan ke Channel!</b>\n` +
+            `━━━━━━━━━━━━━━━━━━━\n` +
+            `• <b>Target:</b> <code>${escapeHtml(result.channel || '@DafungHub')}</code>\n` +
+            `• <b>Message ID:</b> <code>#${result.messageId}</code>\n\n` +
+            `Pesan telah diposting live di https://t.me/DafungHub.`,
+            {
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '📢 Menu Broadcast', callback_data: 'admin_broadcast' }],
+                  [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+                ],
+              },
+            }
+          );
+        } else {
+          await sendSafeMessage(
+            ctx,
+            botInstance,
+            `⚠️ <b>Gagal Menyiarkan Pesan ke Channel</b>\n` +
+            `━━━━━━━━━━━━━━━━━━━\n` +
+            `<b>Error:</b> ${escapeHtml(result.error || 'Terjadi kesalahan')}\n\n` +
+            `📌 <b>Solusi:</b> Pastikan bot @dafung_hub_bot sudah ditambahkan ke channel <code>${escapeHtml(result.channel || '@DafungHub')}</code> sebagai <b>Administrator</b> dengan izin <b>Post Messages</b>.`,
+            {
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '🔄 Coba Lagi', callback_data: 'admin_create_broadcast' }],
+                  [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+                ],
+              },
+            }
+          );
+        }
+      } else if (data === 'admin_test_product') {
+        if (!isAdmin(ctx.from?.id)) return;
+        const { getSupplierProducts, isTestProduct } = await import('../lib/supplier');
+        const prods = await getSupplierProducts(true);
+        const testProd = prods.find(isTestProduct);
+        if (testProd) {
+          await sendProductDetail(ctx, botInstance, testProd.id, 'test');
+        } else {
+          await sendSafeMessage(
+            ctx,
+            botInstance,
+            '⚠️ Produk test API ("loc_test1") tidak ditemukan di supplier saat ini.',
+            {
+              reply_markup: {
+                inline_keyboard: [[{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }]],
+              },
+            }
+          );
+        }
       }
       // INTERCEPT ALL BUYER CALLBACKS DURING MAINTENANCE
       else if (!isAdmin(ctx.from?.id) && (await getBotStatus()) === 'maintenance') {

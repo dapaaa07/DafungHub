@@ -558,9 +558,57 @@ export function registerHandlers(botInstance: ExtendedBot): void {
     }
   });
 
+  const handleBroadcastCommand = async (ctx: Context) => {
+    if (!isAdmin(ctx.from?.id)) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '⛔ <b>Akses Ditolak:</b> Perintah broadcast khusus untuk Owner / Admin DaFung Hub.',
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [[{ text: '🔙 Menu Utama', callback_data: 'menu_main' }]],
+          },
+        }
+      );
+      return;
+    }
+
+    const text = ctx.message?.text || '';
+    const parts = text.trim().split(/\s+/);
+    const broadcastBody = parts.slice(1).join(' ').trim();
+
+    if (!broadcastBody) {
+      const { sendAdminBroadcastMenu } = await import('./menu');
+      await sendAdminBroadcastMenu(ctx, botInstance);
+      return;
+    }
+
+    const { sendAdminBroadcastPreview } = await import('./menu');
+    await sendAdminBroadcastPreview(ctx, botInstance, broadcastBody);
+  };
+
+  botInstance.command('broadcast', handleBroadcastCommand);
+  botInstance.command('bc', handleBroadcastCommand);
+
   // Fallback for general non-command text messages (interactive panel, no typing required)
   botInstance.on('message', async (ctx: Context) => {
     const text = ctx.message?.text?.trim();
+
+    // Check if admin is currently in waiting_broadcast_text state
+    const chatId = ctx.chatId || ctx.message?.chat?.id || ctx.from?.id;
+    if (chatId && text && isAdmin(ctx.from?.id)) {
+      const { getAdminWaitingBroadcast, clearAdminBroadcastState, sendAdminBroadcastPreview, sendAdminBroadcastMenu } = await import('./menu');
+      if (getAdminWaitingBroadcast(chatId)) {
+        clearAdminBroadcastState(chatId);
+        if (text === '/cancel' || text.toLowerCase() === 'batal') {
+          await sendAdminBroadcastMenu(ctx, botInstance);
+          return;
+        }
+        await sendAdminBroadcastPreview(ctx, botInstance, text);
+        return;
+      }
+    }
 
     // Ignore commands as they are handled by command handlers
     if (text && text.startsWith('/')) {

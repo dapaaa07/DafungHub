@@ -32,6 +32,7 @@ export interface Order {
   invoice_data: Record<string, unknown>;
   credential_encrypted: string | null;
   delivered_at: Date | null;
+  is_broadcasted?: boolean;
   created_at: Date;
 }
 

@@ -57,12 +57,13 @@ async function requestSupplier<T>(endpoint: string, options: RequestInit = {}): 
   return (await response.json()) as T;
 }
 
-export async function getSupplierProducts(): Promise<SupplierProduct[]> {
+export async function getSupplierProducts(includeTest: boolean = false): Promise<SupplierProduct[]> {
   if (!config.supplier.enabled || !config.supplier.baseUrl) {
     return [];
   }
   const data = await requestSupplier<{ products: SupplierProduct[] }>('/v1/products');
   const products = data.products || [];
+  if (includeTest) return products;
   return products.filter((p) => !isTestProduct(p));
 }
 
