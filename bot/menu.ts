@@ -198,12 +198,15 @@ export async function sendMainMenu(ctx: Context, botInstance: ExtendedBot): Prom
 
   const inlineMarkup = getMainMenuInlineKeyboard(isOwner);
 
-  // 1. Check for banner photo (banner.jpg or banner.png)
+  // 1. Resolve banner photo (Local file or Production CDN URL for Vercel serverless)
   const candidatePaths = [
     path.resolve(process.cwd(), 'banner.jpg'),
     path.resolve(process.cwd(), 'banner.png'),
+    path.resolve(process.cwd(), 'public/banner.jpg'),
+    path.resolve(process.cwd(), 'public/banner.png'),
     path.resolve(__dirname, '../banner.jpg'),
     path.resolve(__dirname, '../banner.png'),
+    path.resolve(__dirname, '../../public/banner.jpg'),
   ];
   const bannerPath = candidatePaths.find((p) => {
     try {
@@ -213,7 +216,28 @@ export async function sendMainMenu(ctx: Context, botInstance: ExtendedBot): Prom
     }
   });
 
-  // 2. Send banner photo with caption & inline buttons
+  const appBaseUrl = (
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    'https://dafung-hub.vercel.app'
+  ).replace(/\/+$/, '');
+  const productionBannerUrl = `${appBaseUrl}/banner.jpg`;
+
+  // On Vercel serverless production, use public CDN URL directly for fast and guaranteed delivery
+  if (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production') {
+    try {
+      const photoRes = await sendSafePhoto(ctx, botInstance, productionBannerUrl, {
+        caption: captionText,
+        parse_mode: 'HTML',
+        reply_markup: inlineMarkup,
+      });
+      if (photoRes) return;
+    } catch (err) {
+      console.warn('[Banner] Production URL banner send failed, trying local file fallback:', err);
+    }
+  }
+
+  // 2. Try sending local banner photo if available
   if (bannerPath) {
     try {
       const photo = await fromPath(bannerPath);
@@ -224,8 +248,20 @@ export async function sendMainMenu(ctx: Context, botInstance: ExtendedBot): Prom
       });
       if (photoRes) return;
     } catch (err) {
-      console.warn('sendPhoto with banner failed, falling back to message text:', err);
+      console.warn('[Banner] Local banner send failed, trying public URL fallback:', err);
     }
+  }
+
+  // 3. Fallback to public banner URL
+  try {
+    const photoRes = await sendSafePhoto(ctx, botInstance, productionBannerUrl, {
+      caption: captionText,
+      parse_mode: 'HTML',
+      reply_markup: inlineMarkup,
+    });
+    if (photoRes) return;
+  } catch (err) {
+    console.warn('[Banner] Public URL banner send failed, falling back to message text:', err);
   }
 
   // Fallback text if photo fails or in mock test environment
@@ -1113,12 +1149,15 @@ export async function sendAdminPanel(ctx: Context, botInstance: ExtendedBot): Pr
     pendingOrders = await getPendingQueueOrders();
   } catch {}
   const botStatus = await getBotStatus();
+  const { isForceChannelJoinEnabled } = await import('../lib/channel-gate');
+  const forceJoinEnabled = await isForceChannelJoinEnabled();
 
   const adminText =
     `👑 <b>PANEL OWNER & ADMIN DAFUNG HUB</b>\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
     `• <b>Owner:</b> @DappaSecc (<code>${ADMIN_TELEGRAM_ID}</code>)\n` +
     `• <b>Status Sistem:</b> ${botStatus === 'online' ? '🟢 ONLINE (Melayani Pembeli)' : '🔴 MAINTENANCE (Sedang Perbaikan)'}\n` +
+    `• <b>Wajib Join Channel:</b> ${forceJoinEnabled ? '🟢 AKTIF (@DafungHub)' : '⚪ NONAKTIF'}\n` +
     `• <b>Saldo Supplier Live:</b> <b>Rp ${balance.toLocaleString('id-ID')}</b>\n` +
     `• <b>Status Mode:</b> ${balance > 0 ? '🟢 H2H Auto-Fulfill' : '🟡 Mode Antrean (0 Modal)'}\n` +
     `• <b>Antrean Order:</b> <b>${pendingOrders.length} Pesanan Butuh Diproses</b>\n` +
@@ -1134,6 +1173,10 @@ export async function sendAdminPanel(ctx: Context, botInstance: ExtendedBot): Pr
       ],
       [
         { text: '📢 Broadcast Channel (@DafungHub)', callback_data: 'admin_broadcast' },
+        {
+          text: forceJoinEnabled ? '🔒 Wajib Join: 🟢 ON' : '🔓 Wajib Join: ⚪ OFF',
+          callback_data: 'admin_toggle_force_join',
+        },
       ],
       [
         { text: '🧪 Test API Produk (Rp 1)', callback_data: 'admin_test_product' },
@@ -1491,11 +1534,14 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
     const userId = ctx.from?.id;
     console.log(`[Telegram Callback] data: "${data}" from user: ${userId} (@${ctx.from?.username})`);
 
-    // Always immediately answer callback query so Telegram removes loading spinner
-    try {
-      await ctx.answerCallbackQuery?.();
-    } catch {
-      // Ignore answerCallbackQuery error
+    // For verify_channel_join, we answer callback with custom toast/alert inside its handler.
+    // For other callbacks, answer immediately to remove the Telegram button spinner.
+    if (data !== 'verify_channel_join') {
+      try {
+        await ctx.answerCallbackQuery?.();
+      } catch {
+        // Ignore answerCallbackQuery error
+      }
     }
 
     try {
@@ -1691,14 +1737,59 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
             }
           );
         }
-      }
-      // INTERCEPT ALL BUYER CALLBACKS DURING MAINTENANCE
-      else if (!isAdmin(ctx.from?.id) && (await getBotStatus()) === 'maintenance') {
-        await sendMaintenanceMessage(ctx, botInstance);
+      } else if (data === 'admin_toggle_force_join') {
+        if (!isAdmin(ctx.from?.id)) return;
+        const { isForceChannelJoinEnabled, setForceChannelJoinEnabled } = await import('../lib/channel-gate');
+        const current = await isForceChannelJoinEnabled();
+        await setForceChannelJoinEnabled(!current);
+        await sendAdminPanel(ctx, botInstance);
+        return;
+      } else if (data === 'verify_channel_join') {
+        const { checkUserChannelMembership, sendChannelJoinPrompt, clearMembershipCache } = await import('../lib/channel-gate');
+        if (userId) clearMembershipCache(userId);
+        const isMember = await checkUserChannelMembership(userId, botInstance);
+        if (isMember) {
+          try {
+            await ctx.answerCallbackQuery?.({
+              text: '✅ Keanggotaan terverifikasi! Selamat datang di DaFung Hub.',
+            });
+          } catch {}
+          await sendMainMenu(ctx, botInstance);
+        } else {
+          try {
+            await ctx.answerCallbackQuery?.({
+              text: '⚠️ Anda belum bergabung ke channel @DafungHub. Silakan klik tombol Gabung Channel terlebih dahulu.',
+              show_alert: true,
+            });
+          } catch {}
+          await sendChannelJoinPrompt(ctx, botInstance);
+        }
         return;
       }
+
+      // INTERCEPT ALL BUYER CALLBACKS DURING MAINTENANCE
+      if (!isAdmin(ctx.from?.id)) {
+        if ((await getBotStatus()) === 'maintenance') {
+          await sendMaintenanceMessage(ctx, botInstance);
+          return;
+        }
+
+        const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
+        const isMember = await checkUserChannelMembership(userId, botInstance);
+        if (!isMember) {
+          try {
+            await ctx.answerCallbackQuery?.({
+              text: '⚠️ Anda wajib bergabung ke channel @DafungHub terlebih dahulu.',
+              show_alert: true,
+            });
+          } catch {}
+          await sendChannelJoinPrompt(ctx, botInstance);
+          return;
+        }
+      }
+
       // BUYER CALLBACKS
-      else if (data === 'menu_main') {
+      if (data === 'menu_main') {
         await sendMainMenu(ctx, botInstance);
       } else if (data === 'menu_products' || data === 'menu_platforms') {
         await sendPlatformsMenu(ctx, botInstance);
@@ -1786,32 +1877,78 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
     if (isAdmin(ctx.from?.id)) {
       await sendAdminPanel(ctx, botInstance);
     } else {
+      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
+      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt(ctx, botInstance);
+        return;
+      }
       await sendMainMenu(ctx, botInstance);
     }
   });
 
   botInstance.hears(/^(?:🟢\s*)?produk$/i, async (ctx: Context) => {
     console.log(`[Telegram Text] Heard "Produk" from user ${ctx.from?.id}`);
+    if (!isAdmin(ctx.from?.id)) {
+      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
+      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt(ctx, botInstance);
+        return;
+      }
+    }
     await sendPlatformsMenu(ctx, botInstance);
   });
 
   botInstance.hears(/^(?:👤\s*|🥷\s*)?profil$/i, async (ctx: Context) => {
     console.log(`[Telegram Text] Heard "Profil" from user ${ctx.from?.id}`);
+    if (!isAdmin(ctx.from?.id)) {
+      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
+      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt(ctx, botInstance);
+        return;
+      }
+    }
     await sendProfileMenu(ctx, botInstance);
   });
 
   botInstance.hears(/^(?:💰\s*)?deposit$/i, async (ctx: Context) => {
     console.log(`[Telegram Text] Heard "Deposit" from user ${ctx.from?.id}`);
+    if (!isAdmin(ctx.from?.id)) {
+      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
+      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt(ctx, botInstance);
+        return;
+      }
+    }
     await sendDepositMenu(ctx, botInstance);
   });
 
   botInstance.hears(/^(?:📩\s*)?pesanan(?:\s*saya)?$/i, async (ctx: Context) => {
     console.log(`[Telegram Text] Heard "Pesanan" from user ${ctx.from?.id}`);
+    if (!isAdmin(ctx.from?.id)) {
+      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
+      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt(ctx, botInstance);
+        return;
+      }
+    }
     await sendOrdersMenu(ctx, botInstance);
   });
 
   botInstance.hears(/^(?:❓\s*)?(?:bantuan|help)$/i, async (ctx: Context) => {
     console.log(`[Telegram Text] Heard "Bantuan" from user ${ctx.from?.id}`);
+    if (!isAdmin(ctx.from?.id)) {
+      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
+      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt(ctx, botInstance);
+        return;
+      }
+    }
     const helpMessage =
       'ℹ️ <b>Panduan & Garansi DaFung Hub:</b>\n\n' +
       '1. Setelah pembayaran QRIS berhasil, kredensial akun akan dikirimkan otomatis.\n' +

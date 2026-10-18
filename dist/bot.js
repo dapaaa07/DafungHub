@@ -13674,12 +13674,211 @@ var init_shopeepay = __esm({
   }
 });
 
+// lib/channel-gate.ts
+var channel_gate_exports = {};
+__export(channel_gate_exports, {
+  checkUserChannelMembership: () => checkUserChannelMembership,
+  clearChannelGateCache: () => clearChannelGateCache,
+  clearMembershipCache: () => clearMembershipCache,
+  isForceChannelJoinEnabled: () => isForceChannelJoinEnabled,
+  sendChannelJoinPrompt: () => sendChannelJoinPrompt,
+  setForceChannelJoinEnabled: () => setForceChannelJoinEnabled
+});
+function escapeHtml3(str) {
+  if (!str) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+async function isForceChannelJoinEnabled() {
+  const now = Date.now();
+  if (cachedGateEnabled !== null && now < gateCacheExpiry) {
+    return cachedGateEnabled;
+  }
+  try {
+    const res = await query(
+      `SELECT value FROM bot_settings WHERE key = 'force_channel_join' LIMIT 1`
+    );
+    if (res.rows.length > 0) {
+      cachedGateEnabled = res.rows[0].value !== "false";
+    } else {
+      cachedGateEnabled = true;
+    }
+    gateCacheExpiry = now + GATE_CACHE_TTL_MS;
+    return cachedGateEnabled;
+  } catch {
+    return cachedGateEnabled ?? true;
+  }
+}
+async function setForceChannelJoinEnabled(enabled) {
+  try {
+    await query(
+      `INSERT INTO bot_settings (key, value, updated_at)
+       VALUES ('force_channel_join', $1, CURRENT_TIMESTAMP)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+      [enabled ? "true" : "false"]
+    );
+  } catch (err) {
+    console.error("[Channel Gate] Error updating setting in DB:", err);
+  }
+  cachedGateEnabled = enabled;
+  gateCacheExpiry = Date.now() + GATE_CACHE_TTL_MS;
+}
+function clearChannelGateCache() {
+  cachedGateEnabled = null;
+  gateCacheExpiry = 0;
+}
+function clearMembershipCache(userId) {
+  if (userId) {
+    membershipCache.delete(String(userId));
+  } else {
+    membershipCache.clear();
+  }
+}
+async function checkUserChannelMembership(userId, botInstance) {
+  if (!userId) return true;
+  if (isAdmin(userId)) {
+    return true;
+  }
+  const gateEnabled = await isForceChannelJoinEnabled();
+  if (!gateEnabled) {
+    return true;
+  }
+  const now = Date.now();
+  const cached = membershipCache.get(String(userId));
+  if (cached && cached.expiresAt > now) {
+    return cached.isMember;
+  }
+  const token = botInstance?.api?.transport?.token || process.env.TELEGRAM_BOT_TOKEN;
+  const targetChannel = await getBroadcastChannel();
+  if (typeof botInstance?.api?.getChatMember === "function") {
+    try {
+      const member = await botInstance.api.getChatMember(
+        targetChannel,
+        Number(userId)
+      );
+      if (member) {
+        const status = member.status;
+        if (status === "creator" || status === "administrator" || status === "member") {
+          membershipCache.set(String(userId), { isMember: true, expiresAt: now + 6e4 });
+          return true;
+        }
+        if (status === "restricted" && member.is_member !== false) {
+          membershipCache.set(String(userId), { isMember: true, expiresAt: now + 6e4 });
+          return true;
+        }
+        membershipCache.set(String(userId), { isMember: false, expiresAt: now + 2e3 });
+        return false;
+      }
+    } catch (mockErr) {
+      const desc = mockErr?.description || String(mockErr);
+      if (desc.includes("PARTICIPANT_ID_INVALID") || desc.includes("user not found")) {
+        membershipCache.set(String(userId), { isMember: false, expiresAt: now + 2e3 });
+        return false;
+      }
+    }
+  }
+  if (!token || token.startsWith("dummy_") || token === "dummy_token_for_build") {
+    return true;
+  }
+  try {
+    const url = `https://api.telegram.org/bot${token}/getChatMember?chat_id=${encodeURIComponent(targetChannel)}&user_id=${userId}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (data.ok && data.result) {
+      const status = data.result.status;
+      if (status === "creator" || status === "administrator" || status === "member") {
+        membershipCache.set(String(userId), { isMember: true, expiresAt: now + 6e4 });
+        return true;
+      }
+      if (status === "restricted" && data.result.is_member !== false) {
+        membershipCache.set(String(userId), { isMember: true, expiresAt: now + 6e4 });
+        return true;
+      }
+      membershipCache.set(String(userId), { isMember: false, expiresAt: now + 2e3 });
+      return false;
+    }
+    if (!data.ok) {
+      const desc = data.description || "";
+      if (desc.includes("PARTICIPANT_ID_INVALID") || desc.includes("user not found") || desc.includes("chat not found")) {
+        membershipCache.set(String(userId), { isMember: false, expiresAt: now + 2e3 });
+        return false;
+      }
+      if (desc.includes("member list is inaccessible") || desc.includes("rights")) {
+        console.warn(`[Channel Gate Warning] Bot lacks admin rights in ${targetChannel}: ${desc}`);
+        return true;
+      }
+    }
+    membershipCache.set(String(userId), { isMember: false, expiresAt: now + 2e3 });
+    return false;
+  } catch (err) {
+    console.error("[Channel Gate Error] Error checking membership:", err);
+    return true;
+  }
+}
+async function sendChannelJoinPrompt(ctx, botInstance) {
+  const targetChannel = await getBroadcastChannel();
+  const cleanUsername = targetChannel.replace(/^@/, "");
+  const channelLink = `https://t.me/${cleanUsername}`;
+  const promptText = `\u{1F4E2} <b>VERIFIKASI ANGGOTA CHANNEL DIPERLUKAN</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Halo! Untuk dapat mengakses katalog produk dan melakukan pemesanan otomatis di <b>DaFung Hub</b>, Anda diwajibkan untuk bergabung ke Channel resmi kami terlebih dahulu.
+
+\u{1F4CC} <b>Channel Resmi:</b> <code>@${escapeHtml3(cleanUsername)}</code>
+\u{1F517} <b>Link Channel:</b> ${escapeHtml3(channelLink)}
+
+<b>Keuntungan bergabung di Channel:</b>
+\u2022 Dapatkan update stok akun & diskon flash sale
+\u2022 Notifikasi rilis produk premium terbaru
+\u2022 Bukti transaksi sukses & garansi transparan
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+<i>Silakan klik tombol <b>Gabung Channel</b> di bawah, lalu sentuh <b>\u2705 Saya Sudah Join</b> untuk membuka akses bot.</i>`;
+  const buttons = {
+    inline_keyboard: [
+      [
+        {
+          text: `\u{1F4E2} Gabung Channel @${cleanUsername}`,
+          url: channelLink
+        }
+      ],
+      [
+        {
+          text: "\u2705 Saya Sudah Join (Cek Akses)",
+          callback_data: "verify_channel_join"
+        }
+      ]
+    ]
+  };
+  await sendSafeMessage(ctx, botInstance, promptText, {
+    parse_mode: "HTML",
+    reply_markup: buttons
+  });
+}
+var cachedGateEnabled, gateCacheExpiry, GATE_CACHE_TTL_MS, membershipCache;
+var init_channel_gate = __esm({
+  "lib/channel-gate.ts"() {
+    "use strict";
+    init_db();
+    init_handler();
+    init_pricing();
+    init_broadcast();
+    if (!process.env.TELEGRAM_BOT_TOKEN) {
+      try {
+        process.loadEnvFile?.();
+      } catch {
+      }
+    }
+    cachedGateEnabled = null;
+    gateCacheExpiry = 0;
+    GATE_CACHE_TTL_MS = 5e3;
+    membershipCache = /* @__PURE__ */ new Map();
+  }
+});
+
 // bot/menu.ts
 var menu_exports = {};
 __export(menu_exports, {
   PLATFORMS: () => PLATFORMS2,
   clearAdminBroadcastState: () => clearAdminBroadcastState,
-  escapeHtml: () => escapeHtml3,
+  escapeHtml: () => escapeHtml4,
   extractQrisFromInvoiceData: () => extractQrisFromInvoiceData,
   filterProductsByPlatform: () => filterProductsByPlatform,
   formatIndonesianDateTime: () => formatIndonesianDateTime,
@@ -13712,7 +13911,7 @@ __export(menu_exports, {
   setAdminPendingBroadcastText: () => setAdminPendingBroadcastText,
   setAdminWaitingBroadcast: () => setAdminWaitingBroadcast
 });
-function escapeHtml3(str) {
+function escapeHtml4(str) {
   if (!str) return "";
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
@@ -13831,8 +14030,8 @@ async function sendMainMenu(ctx, botInstance) {
   const rawName = ctx.from?.first_name || ctx.from?.username || "Kak";
   const userName = isOwner ? `${rawName} \u{1F451} (Owner)` : rawName;
   const dateTimeStr = formatIndonesianDateTime();
-  let captionText = `Hello, ${escapeHtml3(userName)}
-| ${escapeHtml3(dateTimeStr)} \u201D`;
+  let captionText = `Hello, ${escapeHtml4(userName)}
+| ${escapeHtml4(dateTimeStr)} \u201D`;
   if (isOwner && botStatus === "maintenance") {
     captionText += `
 
@@ -13842,8 +14041,11 @@ async function sendMainMenu(ctx, botInstance) {
   const candidatePaths = [
     import_path.default.resolve(process.cwd(), "banner.jpg"),
     import_path.default.resolve(process.cwd(), "banner.png"),
+    import_path.default.resolve(process.cwd(), "public/banner.jpg"),
+    import_path.default.resolve(process.cwd(), "public/banner.png"),
     import_path.default.resolve(__dirname, "../banner.jpg"),
-    import_path.default.resolve(__dirname, "../banner.png")
+    import_path.default.resolve(__dirname, "../banner.png"),
+    import_path.default.resolve(__dirname, "../../public/banner.jpg")
   ];
   const bannerPath = candidatePaths.find((p) => {
     try {
@@ -13852,6 +14054,20 @@ async function sendMainMenu(ctx, botInstance) {
       return false;
     }
   });
+  const appBaseUrl = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://dafung-hub.vercel.app").replace(/\/+$/, "");
+  const productionBannerUrl = `${appBaseUrl}/banner.jpg`;
+  if (process.env.VERCEL === "1" || process.env.NODE_ENV === "production") {
+    try {
+      const photoRes = await sendSafePhoto(ctx, botInstance, productionBannerUrl, {
+        caption: captionText,
+        parse_mode: "HTML",
+        reply_markup: inlineMarkup
+      });
+      if (photoRes) return;
+    } catch (err) {
+      console.warn("[Banner] Production URL banner send failed, trying local file fallback:", err);
+    }
+  }
   if (bannerPath) {
     try {
       const photo = await (0, import_node.fromPath)(bannerPath);
@@ -13862,8 +14078,18 @@ async function sendMainMenu(ctx, botInstance) {
       });
       if (photoRes) return;
     } catch (err) {
-      console.warn("sendPhoto with banner failed, falling back to message text:", err);
+      console.warn("[Banner] Local banner send failed, trying public URL fallback:", err);
     }
+  }
+  try {
+    const photoRes = await sendSafePhoto(ctx, botInstance, productionBannerUrl, {
+      caption: captionText,
+      parse_mode: "HTML",
+      reply_markup: inlineMarkup
+    });
+    if (photoRes) return;
+  } catch (err) {
+    console.warn("[Banner] Public URL banner send failed, falling back to message text:", err);
   }
   await sendSafeMessage(
     ctx,
@@ -14037,7 +14263,7 @@ async function sendProductsMenu(ctx, botInstance, page = 0, platformId = "all") 
       { text: "\u{1F4C2} Pilih Platform Lain", callback_data: "menu_platforms" },
       { text: "\u{1F519} Menu Utama", callback_data: "menu_main" }
     ]);
-    const caption = `\u{1F4E6} <b>KATALOG PRODUK: ${escapeHtml3(platformTitle)}</b>
+    const caption = `\u{1F4E6} <b>KATALOG PRODUK: ${escapeHtml4(platformTitle)}</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 Pilih paket akun digital yang Anda inginkan di bawah:`;
     await sendSafeMessage(ctx, botInstance, caption, {
@@ -14144,12 +14370,12 @@ async function sendProductDetail(ctx, botInstance, productId, platformId = "all"
     const statusStr = prod.availability === "in_stock" ? "\u{1F7E2} Stok Tersedia" : "\u{1F534} Stok Habis";
     const detailText = `\u{1F4E6} <b>DETAIL PRODUK</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 Nama: <b>${escapeHtml3(prod.name)}</b>
-\u2022 Harga: <b>${escapeHtml3(priceStr)}</b>
+\u2022 Nama: <b>${escapeHtml4(prod.name)}</b>
+\u2022 Harga: <b>${escapeHtml4(priceStr)}</b>
 \u2022 Status: <b>${statusStr}</b>
 ` + (prod.description ? `
 \u{1F4DD} <b>Deskripsi / Ketentuan:</b>
-${escapeHtml3(prod.description.substring(0, 300))}
+${escapeHtml4(prod.description.substring(0, 300))}
 ` : "") + `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 Sentuh tombol di bawah untuk langsung membuat invoice pembayaran QRIS:`;
     const buttons = [];
@@ -14201,9 +14427,9 @@ async function sendProfileMenu(ctx, botInstance) {
   }
   const profileText = `\u{1F464} <b>PROFIL PENGGUNA</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 Nama: <b>${escapeHtml3(firstName)}</b>
-\u2022 Username: <b>${escapeHtml3(username)}</b>
-\u2022 Telegram ID: <code>${escapeHtml3(telegramId)}</code>
+\u2022 Nama: <b>${escapeHtml4(firstName)}</b>
+\u2022 Username: <b>${escapeHtml4(username)}</b>
+\u2022 Telegram ID: <code>${escapeHtml4(telegramId)}</code>
 \u2022 Saldo Akun: <b>Rp ${balance.toLocaleString("id-ID")}</b>
 \u2022 Status: <b>Active Member</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
@@ -14277,7 +14503,7 @@ Silakan pilih menu <b>\u{1F7E2} Produk</b> untuk mulai membeli akun digital!
       const isUnpaid = ord.payment_status === "unpaid";
       const statusIcon = isUnpaid ? "\u23F3" : ord.fulfillment_status === "delivered" ? "\u{1F7E2}" : ord.fulfillment_status === "processing" ? "\u{1F7E1}" : "\u26AA";
       const statusLabel = isUnpaid ? "MENUNGGU PEMBAYARAN" : ord.fulfillment_status.toUpperCase();
-      text += `\u2022 ${statusIcon} <code>${escapeHtml3(ord.order_code)}</code> | Status: <b>${statusLabel}</b>
+      text += `\u2022 ${statusIcon} <code>${escapeHtml4(ord.order_code)}</code> | Status: <b>${statusLabel}</b>
 `;
       const btnText = isUnpaid ? `\u{1F4B3} Bayar / Buka QRIS: ${ord.order_code}` : `\u{1F50D} Cek Status: ${ord.order_code}`;
       buttons.push([
@@ -14327,9 +14553,9 @@ async function sendOrderInvoice(ctx, botInstance, order) {
   const priceStr = order.product_price ? `Rp ${order.product_price.toLocaleString("id-ID")}` : "-";
   const invoiceCaption = `\u{1F9FE} <b>INVOICE PEMBAYARAN QRIS</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u{1F4E6} <b>Produk:</b> ${escapeHtml3(prodName)}
-\u{1F4B0} <b>Total:</b> ${escapeHtml3(priceStr)}
-\u{1F194} <b>Kode Order:</b> <code>${escapeHtml3(order.order_code)}</code>
+\u{1F4E6} <b>Produk:</b> ${escapeHtml4(prodName)}
+\u{1F4B0} <b>Total:</b> ${escapeHtml4(priceStr)}
+\u{1F194} <b>Kode Order:</b> <code>${escapeHtml4(order.order_code)}</code>
 \u{1F4CA} <b>Status:</b> \u23F3 <b>MENUNGGU PEMBAYARAN</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
@@ -14367,9 +14593,9 @@ async function sendOrderInvoice(ctx, botInstance, order) {
   }
   const fallbackMessage = invoiceCaption + (qrCodeUrl ? `
 
-\u{1F517} <b>Link Gambar QRIS:</b> ${escapeHtml3(qrCodeUrl)}` : "") + (qrString ? `
+\u{1F517} <b>Link Gambar QRIS:</b> ${escapeHtml4(qrCodeUrl)}` : "") + (qrString ? `
 
-\u{1F4F1} <b>String QRIS:</b> <code>${escapeHtml3(qrString)}</code>` : "");
+\u{1F4F1} <b>String QRIS:</b> <code>${escapeHtml4(qrString)}</code>` : "");
   await sendSafeMessage(ctx, botInstance, fallbackMessage, {
     parse_mode: "HTML",
     reply_markup: invoiceButtons
@@ -14387,7 +14613,7 @@ async function sendOrderStatus(ctx, botInstance, orderCode) {
     await sendSafeMessage(
       ctx,
       botInstance,
-      `\u274C Order <code>${escapeHtml3(orderCode)}</code> tidak ditemukan.`,
+      `\u274C Order <code>${escapeHtml4(orderCode)}</code> tidak ditemukan.`,
       {
         parse_mode: "HTML",
         reply_markup: {
@@ -14437,12 +14663,12 @@ async function sendOrderStatus(ctx, botInstance, orderCode) {
       return;
     }
   }
-  const payStatusStr = o.payment_status === "paid" ? "\u{1F7E2} LUNAS (PAID)" : o.payment_status === "expired" ? "\u{1F534} KADALUWARSA (EXPIRED)" : escapeHtml3(String(o.payment_status).toUpperCase());
-  const fulStatusStr = o.fulfillment_status === "delivered" ? "\u{1F7E2} SELESAI (DELIVERED)" : o.fulfillment_status === "processing" ? "\u{1F7E1} DALAM PROSES (ANTREAN SISTEM)" : escapeHtml3(String(o.fulfillment_status).toUpperCase());
+  const payStatusStr = o.payment_status === "paid" ? "\u{1F7E2} LUNAS (PAID)" : o.payment_status === "expired" ? "\u{1F534} KADALUWARSA (EXPIRED)" : escapeHtml4(String(o.payment_status).toUpperCase());
+  const fulStatusStr = o.fulfillment_status === "delivered" ? "\u{1F7E2} SELESAI (DELIVERED)" : o.fulfillment_status === "processing" ? "\u{1F7E1} DALAM PROSES (ANTREAN SISTEM)" : escapeHtml4(String(o.fulfillment_status).toUpperCase());
   let statText = `\u{1F50D} <b>STATUS PESANAN</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 Kode Order: <code>${escapeHtml3(o.order_code)}</code>
-\u2022 Produk: <b>${escapeHtml3(o.product_name || "Akun Digital")}</b>
+\u2022 Kode Order: <code>${escapeHtml4(o.order_code)}</code>
+\u2022 Produk: <b>${escapeHtml4(o.product_name || "Akun Digital")}</b>
 \u2022 Pembayaran: <b>${payStatusStr}</b>
 \u2022 Pengiriman: <b>${fulStatusStr}</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
@@ -14512,10 +14738,13 @@ async function sendAdminPanel(ctx, botInstance) {
   } catch {
   }
   const botStatus = await getBotStatus();
+  const { isForceChannelJoinEnabled: isForceChannelJoinEnabled2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+  const forceJoinEnabled = await isForceChannelJoinEnabled2();
   const adminText = `\u{1F451} <b>PANEL OWNER & ADMIN DAFUNG HUB</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u2022 <b>Owner:</b> @DappaSecc (<code>${ADMIN_TELEGRAM_ID}</code>)
 \u2022 <b>Status Sistem:</b> ${botStatus === "online" ? "\u{1F7E2} ONLINE (Melayani Pembeli)" : "\u{1F534} MAINTENANCE (Sedang Perbaikan)"}
+\u2022 <b>Wajib Join Channel:</b> ${forceJoinEnabled ? "\u{1F7E2} AKTIF (@DafungHub)" : "\u26AA NONAKTIF"}
 \u2022 <b>Saldo Supplier Live:</b> <b>Rp ${balance.toLocaleString("id-ID")}</b>
 \u2022 <b>Status Mode:</b> ${balance > 0 ? "\u{1F7E2} H2H Auto-Fulfill" : "\u{1F7E1} Mode Antrean (0 Modal)"}
 \u2022 <b>Antrean Order:</b> <b>${pendingOrders.length} Pesanan Butuh Diproses</b>
@@ -14527,7 +14756,11 @@ Gunakan panel kontrol di bawah untuk mengelola bisnis:`;
         botStatus === "online" ? { text: "\u{1F534} Ubah ke Mode MAINTENANCE", callback_data: "admin_set_maintenance" } : { text: "\u{1F7E2} Aktifkan Bot (Set ONLINE)", callback_data: "admin_set_online" }
       ],
       [
-        { text: "\u{1F4E2} Broadcast Channel (@DafungHub)", callback_data: "admin_broadcast" }
+        { text: "\u{1F4E2} Broadcast Channel (@DafungHub)", callback_data: "admin_broadcast" },
+        {
+          text: forceJoinEnabled ? "\u{1F512} Wajib Join: \u{1F7E2} ON" : "\u{1F513} Wajib Join: \u26AA OFF",
+          callback_data: "admin_toggle_force_join"
+        }
       ],
       [
         { text: "\u{1F9EA} Test API Produk (Rp 1)", callback_data: "admin_test_product" },
@@ -14563,8 +14796,8 @@ async function sendAdminQueueMenu(ctx, botInstance) {
 `;
   } else {
     for (const ord of queueOrders) {
-      text += `\u2022 <b>${escapeHtml3(ord.order_code)}</b>
-  \u{1F4E6} ${escapeHtml3(ord.product_name)} (Rp ${ord.product_price.toLocaleString("id-ID")})
+      text += `\u2022 <b>${escapeHtml4(ord.order_code)}</b>
+  \u{1F4E6} ${escapeHtml4(ord.product_name)} (Rp ${ord.product_price.toLocaleString("id-ID")})
   \u{1F464} Buyer: <code>${ord.telegram_id}</code>
 
 `;
@@ -14602,7 +14835,7 @@ async function sendAdminBalanceMenu(ctx, botInstance) {
   }
   const text = `\u{1F4B3} <b>INFORMASI SALDO & AKUN SUPPLIER</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 <b>Username Supplier:</b> ${escapeHtml3(username)}
+\u2022 <b>Username Supplier:</b> ${escapeHtml4(username)}
 \u2022 <b>User ID Supplier:</b> <code>${userId}</code>
 \u2022 <b>Saldo Deposit:</b> <b>Rp ${balance.toLocaleString("id-ID")}</b>
 \u2022 <b>Status H2H:</b> ${balance > 0 ? "\u{1F7E2} Saldo Tersedia (Order Instan Aktif)" : "\u{1F7E1} Saldo Rp 0 (Mode Antrean Aktif)"}
@@ -14645,7 +14878,7 @@ async function sendAdminOrdersMenu(ctx, botInstance) {
     for (const o of recentOrders) {
       const statusIcon = o.fulfillment_status === "delivered" ? "\u{1F7E2}" : o.fulfillment_status === "processing" ? "\u{1F7E1}" : "\u26AA";
       text += `${statusIcon} <code>${o.order_code}</code>
-  \u{1F4E6} ${escapeHtml3(o.product_name)} (Rp ${o.product_price.toLocaleString("id-ID")})
+  \u{1F4E6} ${escapeHtml4(o.product_name)} (Rp ${o.product_price.toLocaleString("id-ID")})
   \u2022 Bayar: <b>${o.payment_status.toUpperCase()}</b> | Status: <b>${o.fulfillment_status.toUpperCase()}</b>
 
 `;
@@ -14669,7 +14902,7 @@ async function sendAdminBroadcastMenu(ctx, botInstance) {
   const autoOrderActive = await isAutoOrderBroadcastEnabled2();
   const text = `\u{1F4E2} <b>MANAJEMEN BROADCAST KE CHANNEL</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 <b>Target Channel:</b> <code>${escapeHtml3(targetChannel)}</code>
+\u2022 <b>Target Channel:</b> <code>${escapeHtml4(targetChannel)}</code>
 \u2022 <b>Link Channel:</b> https://t.me/${targetChannel.replace("@", "")}
 \u2022 <b>Auto-Broadcast Order:</b> ${autoOrderActive ? "\u{1F7E2} AKTIF (Otomatis posting order sukses)" : "\u{1F534} NONAKTIF"}
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
@@ -14702,7 +14935,7 @@ async function sendAdminBroadcastPreview(ctx, botInstance, broadcastText) {
     setAdminPendingBroadcastText(chatId, broadcastText);
   }
   const previewText = `\u{1F441}\uFE0F <b>PREVIEW PESAN SIARAN</b>
-<b>Target:</b> <code>${escapeHtml3(targetChannel)}</code>
+<b>Target:</b> <code>${escapeHtml4(targetChannel)}</code>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
 ${broadcastText}
@@ -14746,7 +14979,7 @@ Daftar harga aktif saat ini (Halaman ${safePage + 1}/${totalPages}):
       const effectivePrice = getEffectiveSellingPrice(prod, customPrices);
       const modalPrice = prod.price_idr;
       const profit = effectivePrice - modalPrice;
-      text += `\u2022 <b>${escapeHtml3(prod.name)}</b>
+      text += `\u2022 <b>${escapeHtml4(prod.name)}</b>
   \u{1F194} ID: <code>${prod.id}</code>
   \u{1F4B5} Jual: <b>Rp ${effectivePrice.toLocaleString("id-ID")}</b> ${hasCustom ? "<i>(Custom Override \u2728)</i>" : "<i>(Auto Markup)</i>"}
   \u{1F4E6} Modal: Rp ${modalPrice.toLocaleString("id-ID")} | Margin: <b>+Rp ${profit.toLocaleString("id-ID")}</b>
@@ -14812,9 +15045,11 @@ function registerMenuHandlers(botInstance) {
     const data = ctx.callbackQuery?.data || "";
     const userId = ctx.from?.id;
     console.log(`[Telegram Callback] data: "${data}" from user: ${userId} (@${ctx.from?.username})`);
-    try {
-      await ctx.answerCallbackQuery?.();
-    } catch {
+    if (data !== "verify_channel_join") {
+      try {
+        await ctx.answerCallbackQuery?.();
+      } catch {
+      }
     }
     try {
       if (data === "admin_panel") {
@@ -14855,12 +15090,12 @@ function registerMenuHandlers(botInstance) {
         await sendSafeMessage(
           ctx,
           botInstance,
-          `\u270F\uFE0F <b>Ubah Harga Produk:</b> <code>${escapeHtml3(prodId)}</code>
+          `\u270F\uFE0F <b>Ubah Harga Produk:</b> <code>${escapeHtml4(prodId)}</code>
 
 Silakan ketik di chat:
-<code>/editprice ${escapeHtml3(prodId)} &lt;harga_baru&gt;</code>
+<code>/editprice ${escapeHtml4(prodId)} &lt;harga_baru&gt;</code>
 
-Contoh: <code>/editprice ${escapeHtml3(prodId)} 30000</code>
+Contoh: <code>/editprice ${escapeHtml4(prodId)} 30000</code>
 
 Atau klik tombol <b>Reset ke Rumus Default</b> di bawah untuk mengembalikan harga ke rumus otomatis dari harga modal.`,
           {
@@ -14885,7 +15120,7 @@ Atau klik tombol <b>Reset ke Rumus Default</b> di bawah untuk mengembalikan harg
           botInstance,
           `\u2705 <b>Harga Berhasil Direset ke Pengaturan Awal!</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-Produk <code>${escapeHtml3(prodId)}</code> sekarang kembali otomatis dihitung dari harga modal supplier dengan rumus markup standar.
+Produk <code>${escapeHtml4(prodId)}</code> sekarang kembali otomatis dihitung dari harga modal supplier dengan rumus markup standar.
 
 \u26A1 <i>Tersinkronisasi otomatis ke Website & Bot Telegram.</i>`,
           {
@@ -14962,7 +15197,7 @@ Mendukung format HTML standar (<b>tebal</b>, <i>miring</i>, <code>kode</code>, <
             botInstance,
             `\u2705 <b>Pesan Berhasil Disiarkan ke Channel!</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 <b>Target:</b> <code>${escapeHtml3(result.channel || "@DafungHub")}</code>
+\u2022 <b>Target:</b> <code>${escapeHtml4(result.channel || "@DafungHub")}</code>
 \u2022 <b>Message ID:</b> <code>#${result.messageId}</code>
 
 Pesan telah diposting live di https://t.me/DafungHub.`,
@@ -14982,9 +15217,9 @@ Pesan telah diposting live di https://t.me/DafungHub.`,
             botInstance,
             `\u26A0\uFE0F <b>Gagal Menyiarkan Pesan ke Channel</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-<b>Error:</b> ${escapeHtml3(result.error || "Terjadi kesalahan")}
+<b>Error:</b> ${escapeHtml4(result.error || "Terjadi kesalahan")}
 
-\u{1F4CC} <b>Solusi:</b> Pastikan bot @dafung_hub_bot sudah ditambahkan ke channel <code>${escapeHtml3(result.channel || "@DafungHub")}</code> sebagai <b>Administrator</b> dengan izin <b>Post Messages</b>.`,
+\u{1F4CC} <b>Solusi:</b> Pastikan bot @dafung_hub_bot sudah ditambahkan ke channel <code>${escapeHtml4(result.channel || "@DafungHub")}</code> sebagai <b>Administrator</b> dengan izin <b>Post Messages</b>.`,
             {
               parse_mode: "HTML",
               reply_markup: {
@@ -15015,10 +15250,57 @@ Pesan telah diposting live di https://t.me/DafungHub.`,
             }
           );
         }
-      } else if (!isAdmin(ctx.from?.id) && await getBotStatus() === "maintenance") {
-        await sendMaintenanceMessage(ctx, botInstance);
+      } else if (data === "admin_toggle_force_join") {
+        if (!isAdmin(ctx.from?.id)) return;
+        const { isForceChannelJoinEnabled: isForceChannelJoinEnabled2, setForceChannelJoinEnabled: setForceChannelJoinEnabled2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+        const current = await isForceChannelJoinEnabled2();
+        await setForceChannelJoinEnabled2(!current);
+        await sendAdminPanel(ctx, botInstance);
         return;
-      } else if (data === "menu_main") {
+      } else if (data === "verify_channel_join") {
+        const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2, clearMembershipCache: clearMembershipCache2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+        if (userId) clearMembershipCache2(userId);
+        const isMember = await checkUserChannelMembership2(userId, botInstance);
+        if (isMember) {
+          try {
+            await ctx.answerCallbackQuery?.({
+              text: "\u2705 Keanggotaan terverifikasi! Selamat datang di DaFung Hub."
+            });
+          } catch {
+          }
+          await sendMainMenu(ctx, botInstance);
+        } else {
+          try {
+            await ctx.answerCallbackQuery?.({
+              text: "\u26A0\uFE0F Anda belum bergabung ke channel @DafungHub. Silakan klik tombol Gabung Channel terlebih dahulu.",
+              show_alert: true
+            });
+          } catch {
+          }
+          await sendChannelJoinPrompt2(ctx, botInstance);
+        }
+        return;
+      }
+      if (!isAdmin(ctx.from?.id)) {
+        if (await getBotStatus() === "maintenance") {
+          await sendMaintenanceMessage(ctx, botInstance);
+          return;
+        }
+        const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+        const isMember = await checkUserChannelMembership2(userId, botInstance);
+        if (!isMember) {
+          try {
+            await ctx.answerCallbackQuery?.({
+              text: "\u26A0\uFE0F Anda wajib bergabung ke channel @DafungHub terlebih dahulu.",
+              show_alert: true
+            });
+          } catch {
+          }
+          await sendChannelJoinPrompt2(ctx, botInstance);
+          return;
+        }
+      }
+      if (data === "menu_main") {
         await sendMainMenu(ctx, botInstance);
       } else if (data === "menu_products" || data === "menu_platforms") {
         await sendPlatformsMenu(ctx, botInstance);
@@ -15098,27 +15380,73 @@ Pesan telah diposting live di https://t.me/DafungHub.`,
     if (isAdmin(ctx.from?.id)) {
       await sendAdminPanel(ctx, botInstance);
     } else {
+      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt2(ctx, botInstance);
+        return;
+      }
       await sendMainMenu(ctx, botInstance);
     }
   });
   botInstance.hears(/^(?:🟢\s*)?produk$/i, async (ctx) => {
     console.log(`[Telegram Text] Heard "Produk" from user ${ctx.from?.id}`);
+    if (!isAdmin(ctx.from?.id)) {
+      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt2(ctx, botInstance);
+        return;
+      }
+    }
     await sendPlatformsMenu(ctx, botInstance);
   });
   botInstance.hears(/^(?:👤\s*|🥷\s*)?profil$/i, async (ctx) => {
     console.log(`[Telegram Text] Heard "Profil" from user ${ctx.from?.id}`);
+    if (!isAdmin(ctx.from?.id)) {
+      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt2(ctx, botInstance);
+        return;
+      }
+    }
     await sendProfileMenu(ctx, botInstance);
   });
   botInstance.hears(/^(?:💰\s*)?deposit$/i, async (ctx) => {
     console.log(`[Telegram Text] Heard "Deposit" from user ${ctx.from?.id}`);
+    if (!isAdmin(ctx.from?.id)) {
+      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt2(ctx, botInstance);
+        return;
+      }
+    }
     await sendDepositMenu(ctx, botInstance);
   });
   botInstance.hears(/^(?:📩\s*)?pesanan(?:\s*saya)?$/i, async (ctx) => {
     console.log(`[Telegram Text] Heard "Pesanan" from user ${ctx.from?.id}`);
+    if (!isAdmin(ctx.from?.id)) {
+      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt2(ctx, botInstance);
+        return;
+      }
+    }
     await sendOrdersMenu(ctx, botInstance);
   });
   botInstance.hears(/^(?:❓\s*)?(?:bantuan|help)$/i, async (ctx) => {
     console.log(`[Telegram Text] Heard "Bantuan" from user ${ctx.from?.id}`);
+    if (!isAdmin(ctx.from?.id)) {
+      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt2(ctx, botInstance);
+        return;
+      }
+    }
     const helpMessage = "\u2139\uFE0F <b>Panduan & Garansi DaFung Hub:</b>\n\n1. Setelah pembayaran QRIS berhasil, kredensial akun akan dikirimkan otomatis.\n2. Jika ada kendala pesanan, silakan sertakan kode order kamu.\n3. Admin akan meninjau komplain dan memproses penggantian atau refund.";
     await sendSafeMessage(ctx, botInstance, helpMessage, {
       parse_mode: "HTML",
@@ -39329,7 +39657,7 @@ var init_sakurupiah = __esm({
 });
 
 // bot/commands/buy.ts
-function escapeHtml4(str) {
+function escapeHtml5(str) {
   if (!str) return "";
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
@@ -39362,6 +39690,12 @@ async function handleBuy(ctx, productId, botInstance) {
   if (status === "maintenance" && !isAdmin2(ctx.from?.id)) {
     const { sendMaintenanceMessage: sendMaintenanceMessage2 } = await Promise.resolve().then(() => (init_menu(), menu_exports));
     await sendMaintenanceMessage2(ctx, botInstance);
+    return;
+  }
+  const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+  const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
+  if (!isMember) {
+    await sendChannelJoinPrompt2(ctx, botInstance);
     return;
   }
   const trimmedId = productId?.trim();
@@ -39486,7 +39820,7 @@ async function handleBuy(ctx, productId, botInstance) {
     await sendSafeMessage(
       ctx,
       botInstance,
-      `\u274C Produk dengan ID "<b>${escapeHtml4(trimmedId)}</b>" tidak ditemukan atau sudah tidak aktif.`,
+      `\u274C Produk dengan ID "<b>${escapeHtml5(trimmedId)}</b>" tidak ditemukan atau sudah tidak aktif.`,
       {
         parse_mode: "HTML",
         reply_markup: {
@@ -39503,7 +39837,7 @@ async function handleBuy(ctx, productId, botInstance) {
     await sendSafeMessage(
       ctx,
       botInstance,
-      `\u274C Maaf, stok untuk produk "<b>${escapeHtml4(product.name)}</b>" saat ini sedang habis.`,
+      `\u274C Maaf, stok untuk produk "<b>${escapeHtml5(product.name)}</b>" saat ini sedang habis.`,
       {
         parse_mode: "HTML",
         reply_markup: {
@@ -39582,9 +39916,9 @@ async function handleBuy(ctx, productId, botInstance) {
   const formattedPrice = `Rp ${product.price.toLocaleString("id-ID")}`;
   const invoiceCaption = `\u{1F9FE} <b>INVOICE PEMBAYARAN QRIS</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u{1F4E6} <b>Produk:</b> ${escapeHtml4(product.name)}
-\u{1F4B0} <b>Total:</b> ${escapeHtml4(formattedPrice)}
-\u{1F194} <b>Kode Order:</b> <code>${escapeHtml4(orderCode)}</code>
+\u{1F4E6} <b>Produk:</b> ${escapeHtml5(product.name)}
+\u{1F4B0} <b>Total:</b> ${escapeHtml5(formattedPrice)}
+\u{1F194} <b>Kode Order:</b> <code>${escapeHtml5(orderCode)}</code>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
 \u{1F4CC} <b>Instruksi Pembayaran:</b>
@@ -39621,9 +39955,9 @@ async function handleBuy(ctx, productId, botInstance) {
   }
   const fallbackMessage = invoiceCaption + (qrisResult.qrCodeUrl ? `
 
-\u{1F517} <b>Link Gambar QRIS:</b> ${escapeHtml4(qrisResult.qrCodeUrl)}` : "") + (qrisResult.qrString ? `
+\u{1F517} <b>Link Gambar QRIS:</b> ${escapeHtml5(qrisResult.qrCodeUrl)}` : "") + (qrisResult.qrString ? `
 
-\u{1F4F1} <b>String QRIS:</b> <code>${escapeHtml4(qrisResult.qrString)}</code>` : "");
+\u{1F4F1} <b>String QRIS:</b> <code>${escapeHtml5(qrisResult.qrString)}</code>` : "");
   await sendSafeMessage(ctx, botInstance, fallbackMessage, {
     parse_mode: "HTML",
     reply_markup: invoiceButtons
@@ -39740,6 +40074,27 @@ async function sendSafePhoto(ctx, botInstance, photo, options) {
     } catch {
     }
   }
+  if (!sentResult && typeof photo === "string" && chatId && process.env.TELEGRAM_BOT_TOKEN) {
+    try {
+      const resp = await fetch(
+        `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendPhoto`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            photo,
+            ...options || {}
+          })
+        }
+      );
+      const data = await resp.json();
+      if (data.ok && data.result) {
+        sentResult = data.result;
+      }
+    } catch {
+    }
+  }
   if (chatId) {
     const newMsgId = sentResult?.message_id;
     if (newMsgId) {
@@ -39754,6 +40109,12 @@ function registerHandlers(botInstance) {
     const status = await getBotStatus();
     if (status === "maintenance" && !isAdmin(ctx.from?.id)) {
       await sendMaintenanceMessage(ctx, botInstance);
+      return;
+    }
+    const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+    const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
+    if (!isMember) {
+      await sendChannelJoinPrompt2(ctx, botInstance);
       return;
     }
     await sendMainMenu(ctx, botInstance);
@@ -39779,6 +40140,12 @@ function registerHandlers(botInstance) {
     const status = await getBotStatus();
     if (status === "maintenance" && !isAdmin(ctx.from?.id)) {
       await sendMaintenanceMessage(ctx, botInstance);
+      return;
+    }
+    const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+    const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
+    if (!isMember) {
+      await sendChannelJoinPrompt2(ctx, botInstance);
       return;
     }
     const text = ctx.message?.text || "";
@@ -40093,6 +40460,12 @@ function registerHandlers(botInstance) {
       const status = await getBotStatus();
       if (status === "maintenance" && !isAdmin(ctx.from?.id)) {
         await sendMaintenanceMessage(ctx, botInstance);
+        return;
+      }
+      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt2(ctx, botInstance);
         return;
       }
       await sendSafeMessage(

@@ -62,6 +62,14 @@ export async function handleBuy(
     return;
   }
 
+  // Verify channel membership for non-admin buyers
+  const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../../lib/channel-gate');
+  const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
+  if (!isMember) {
+    await sendChannelJoinPrompt(ctx, botInstance);
+    return;
+  }
+
   const trimmedId = productId?.trim();
 
   if (!trimmedId) {

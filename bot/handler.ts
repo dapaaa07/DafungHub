@@ -190,6 +190,30 @@ export async function sendSafePhoto(
     }
   }
 
+  // Direct HTTP Telegram API fallback for image URLs (essential for serverless Vercel runtime)
+  if (!sentResult && typeof photo === 'string' && chatId && process.env.TELEGRAM_BOT_TOKEN) {
+    try {
+      const resp = await fetch(
+        `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendPhoto`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            photo,
+            ...(options || {}),
+          }),
+        }
+      );
+      const data = await resp.json();
+      if (data.ok && data.result) {
+        sentResult = data.result;
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
   // Auto-cleanup: remove previous messages so strictly 1 bot message remains
   if (chatId) {
     const newMsgId = (sentResult as { message_id?: number })?.message_id;
@@ -213,6 +237,14 @@ export function registerHandlers(botInstance: ExtendedBot): void {
       await sendMaintenanceMessage(ctx, botInstance);
       return;
     }
+
+    const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
+    const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
+    if (!isMember) {
+      await sendChannelJoinPrompt(ctx, botInstance);
+      return;
+    }
+
     await sendMainMenu(ctx, botInstance);
   });
 
@@ -246,6 +278,13 @@ export function registerHandlers(botInstance: ExtendedBot): void {
     const status = await getBotStatus();
     if (status === 'maintenance' && !isAdmin(ctx.from?.id)) {
       await sendMaintenanceMessage(ctx, botInstance);
+      return;
+    }
+
+    const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
+    const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
+    if (!isMember) {
+      await sendChannelJoinPrompt(ctx, botInstance);
       return;
     }
 
@@ -619,6 +658,13 @@ export function registerHandlers(botInstance: ExtendedBot): void {
       const status = await getBotStatus();
       if (status === 'maintenance' && !isAdmin(ctx.from?.id)) {
         await sendMaintenanceMessage(ctx, botInstance);
+        return;
+      }
+
+      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
+      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt(ctx, botInstance);
         return;
       }
 
