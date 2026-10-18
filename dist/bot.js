@@ -18856,47 +18856,6 @@ async function getShopeePayAccount() {
 }
 async function createShopeePayInvoice(orderCode, amount) {
   const roundedAmount = Math.round(amount);
-  const baseUrl = SHOPEEPAY_BASE_URL.replace(/\/+$/, "");
-  try {
-    const response = await fetch(`${baseUrl}/v1/qris/create`, {
-      method: "POST",
-      headers: {
-        "x-api-key": SHOPEEPAY_API_KEY,
-        "Content-Type": "application/json",
-        "Idempotency-Key": orderCode
-      },
-      body: JSON.stringify({ amount: roundedAmount })
-    });
-    const resJson = await response.json();
-    if (response.ok && resJson.success && resJson.data) {
-      const data = resJson.data;
-      const baseRaw = data.qris_string || data.qris || data.qr_string || data.qr || SHOPEEPAY_STATIC_QRIS;
-      const dynamicQris2 = generateDynamicQrisFromStatic(baseRaw, roundedAmount);
-      const token = data.token || data.qris_token || `shopee_${orderCode}`;
-      const qrCodeUrl2 = `https://api.qrserver.com/v1/create-qr-code/?size=450x450&data=${encodeURIComponent(dynamicQris2)}`;
-      return {
-        qrCodeUrl: qrCodeUrl2,
-        qrUrl: qrCodeUrl2,
-        qrString: dynamicQris2,
-        checkoutUrl: data.checkout_url,
-        token,
-        orderCode,
-        grossAmount: roundedAmount,
-        gateway: "shopeepay",
-        method: "api_qris",
-        raw: resJson
-      };
-    } else {
-      console.warn(
-        `[ShopeePay API] /v1/qris/create returned non-success (${resJson.code || response.status}): ${resJson.error || "Unknown error"}. Falling back to dynamic static QRIS generation.`
-      );
-    }
-  } catch (apiErr) {
-    console.warn(
-      "[ShopeePay API] Failed to reach /v1/qris/create, falling back to dynamic static QRIS generation:",
-      apiErr
-    );
-  }
   const dynamicQris = generateDynamicQrisFromStatic(SHOPEEPAY_STATIC_QRIS, roundedAmount);
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=450x450&data=${encodeURIComponent(dynamicQris)}`;
   return {

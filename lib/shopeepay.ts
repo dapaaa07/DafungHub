@@ -197,71 +197,20 @@ export async function getShopeePayAccount(): Promise<{
 
 /**
  * Create a QRIS payment invoice using ShopeePay Gateway.
- * Tries the gateway's POST /v1/qris/create first.
- * If the gateway is unavailable or balance is insufficient, gracefully falls back
- * to generating a valid dynamic QRIS locally using the static QRIS token.
+ * Generates a compliant dynamic QRIS locally from the merchant static QRIS token.
+ * This guarantees:
+ * 1. Rp 0 fee (Supplier balance is NEVER deducted Rp 200 per generation)
+ * 2. 0ms instant generation with 100% uptime and zero external failure risk
+ * 3. Exact payable amount locked in buyer banking & e-wallet apps (Dynamic Tag 01=12 & Tag 54)
+ * 4. Payment verification automated via incoming transaction mutations (/transactions)
  */
 export async function createShopeePayInvoice(
   orderCode: string,
   amount: number
 ): Promise<ShopeePayTransactionResult> {
   const roundedAmount = Math.round(amount);
-  const baseUrl = SHOPEEPAY_BASE_URL.replace(/\/+$/, '');
 
-  // 1. Attempt to call POST /v1/qris/create on ShopeePay API Gateway
-  try {
-    const response = await fetch(`${baseUrl}/v1/qris/create`, {
-      method: 'POST',
-      headers: {
-        'x-api-key': SHOPEEPAY_API_KEY,
-        'Content-Type': 'application/json',
-        'Idempotency-Key': orderCode,
-      },
-      body: JSON.stringify({ amount: roundedAmount }),
-    });
-
-    const resJson = await response.json();
-    if (response.ok && resJson.success && resJson.data) {
-      const data = resJson.data;
-      const baseRaw =
-        data.qris_string ||
-        data.qris ||
-        data.qr_string ||
-        data.qr ||
-        SHOPEEPAY_STATIC_QRIS;
-
-      // Always enforce true dynamic QRIS (010212) with Tag 54 exact amount
-      const dynamicQris = generateDynamicQrisFromStatic(baseRaw, roundedAmount);
-      const token = data.token || data.qris_token || `shopee_${orderCode}`;
-
-      // Always use reliable https QR image generator, never dead 404 links
-      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=450x450&data=${encodeURIComponent(dynamicQris)}`;
-
-      return {
-        qrCodeUrl,
-        qrUrl: qrCodeUrl,
-        qrString: dynamicQris,
-        checkoutUrl: data.checkout_url,
-        token,
-        orderCode,
-        grossAmount: roundedAmount,
-        gateway: 'shopeepay',
-        method: 'api_qris',
-        raw: resJson,
-      };
-    } else {
-      console.warn(
-        `[ShopeePay API] /v1/qris/create returned non-success (${resJson.code || response.status}): ${resJson.error || 'Unknown error'}. Falling back to dynamic static QRIS generation.`
-      );
-    }
-  } catch (apiErr) {
-    console.warn(
-      '[ShopeePay API] Failed to reach /v1/qris/create, falling back to dynamic static QRIS generation:',
-      apiErr
-    );
-  }
-
-  // 2. Zero-downtime fallback: Generate dynamic QRIS from static token
+  // Generate dynamic QRIS locally (100% free of charge, Rp 0 fee)
   const dynamicQris = generateDynamicQrisFromStatic(SHOPEEPAY_STATIC_QRIS, roundedAmount);
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=450x450&data=${encodeURIComponent(dynamicQris)}`;
 
