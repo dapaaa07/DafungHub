@@ -18442,9 +18442,29 @@ async function checkShopeePayPayment(params) {
       if (params.amount && transactions.length > 0) {
         const targetAmount = Math.round(params.amount);
         const orderTime = params.orderCreatedAt ? new Date(params.orderCreatedAt).getTime() : 0;
+        let claimedTxIds = /* @__PURE__ */ new Set();
+        try {
+          const { query: query2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+          const claimedRes = await query2(
+            `SELECT invoice_data->>'shopeepay_tx_id' as tx_id
+             FROM orders
+             WHERE payment_status = 'paid'
+               AND invoice_data->>'shopeepay_tx_id' IS NOT NULL
+               AND created_at >= NOW() - INTERVAL '48 hours'`
+          );
+          claimedTxIds = new Set(
+            claimedRes.rows.map((r) => String(r.tx_id).trim()).filter(Boolean)
+          );
+        } catch (dbErr) {
+          console.warn("[ShopeePay] Error querying claimed tx IDs:", dbErr);
+        }
         const match = transactions.find((t) => {
           const txAmt = Math.round(Number(t.amount || t.nominal || t.total || 0));
           if (txAmt !== targetAmount) return false;
+          const txId = String(t.transactionId || t.id || "").trim();
+          if (txId && claimedTxIds.has(txId)) {
+            return false;
+          }
           const rawDate = t.time || t.created_at || t.timestamp || t.date;
           if (orderTime > 0 && rawDate) {
             const dateStr = String(rawDate).trim();
@@ -18499,7 +18519,7 @@ function escapeHtml2(str) {
   if (!str) return "";
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
-async function processOrderPayment(orderCode, botInstance) {
+async function processOrderPayment(orderCode, botInstance, transactionMeta) {
   const orderRes = await query(
     `SELECT o.*, u.telegram_id, p.name as product_name, p.price as product_price
      FROM orders o
@@ -18524,10 +18544,27 @@ async function processOrderPayment(orderCode, botInstance) {
       orderCode
     };
   }
-  await query(
-    `UPDATE orders SET payment_status = 'paid' WHERE id = $1`,
-    [order.id]
-  );
+  if (transactionMeta?.transactionId) {
+    const txId = String(transactionMeta.transactionId).trim();
+    await query(
+      `UPDATE orders
+       SET payment_status = 'paid',
+           invoice_data = jsonb_set(
+             COALESCE(invoice_data::jsonb, '{}'::jsonb),
+             '{shopeepay_tx_id}',
+             to_jsonb($1::text)
+           )
+       WHERE id = $2`,
+      [txId, order.id]
+    ).catch(() => {
+      return query(`UPDATE orders SET payment_status = 'paid' WHERE id = $1`, [order.id]);
+    });
+  } else {
+    await query(
+      `UPDATE orders SET payment_status = 'paid' WHERE id = $1`,
+      [order.id]
+    );
+  }
   broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
     console.warn("[Broadcast Warning] Failed to broadcast order payment success:", bErr);
   });
@@ -18982,7 +19019,7 @@ async function checkAndProcessUnpaidShopeeOrders(botInstance) {
         });
         if (checkResult.paid) {
           console.log(`[Auto-Check] Payment confirmed for order: ${ord.order_code}`);
-          await processOrderPayment(ord.order_code, botInstance);
+          await processOrderPayment(ord.order_code, botInstance, checkResult.transaction);
           confirmedCount++;
         }
       }
@@ -19944,7 +19981,7 @@ Silakan pilih menu <b>\u{1F7E2} Produk</b> untuk mulai membeli akun digital!
             });
             if (checkResult.paid) {
               const { processOrderPayment: processOrderPayment2 } = await Promise.resolve().then(() => (init_fulfillment(), fulfillment_exports));
-              await processOrderPayment2(ord.order_code, botInstance);
+              await processOrderPayment2(ord.order_code, botInstance, checkResult.transaction);
               ord.payment_status = "paid";
               ord.fulfillment_status = "delivered";
             }
@@ -20106,7 +20143,7 @@ async function sendOrderStatus(ctx, botInstance, orderCode) {
         if (checkResult.paid) {
           console.log(`[ShopeePay] Payment confirmed upon manual status refresh for order: ${o.order_code}`);
           const { processOrderPayment: processOrderPayment2 } = await Promise.resolve().then(() => (init_fulfillment(), fulfillment_exports));
-          await processOrderPayment2(o.order_code, botInstance);
+          await processOrderPayment2(o.order_code, botInstance, checkResult.transaction);
           const updatedOrd = await query(
             `SELECT o.*, p.name as product_name, p.price as product_price
              FROM orders o
@@ -21338,6 +21375,54 @@ var init_menu = __esm({
       { id: "autodesk", name: "Autodesk", icon: "\u{1F4D0}", keywords: ["autodesk", "autocad", "3ds max", "maya", "revit"], logoFile: "autodesk.png" },
       { id: "email", name: "Akun Email", icon: "\u{1F4E7}", keywords: ["outlook", "hotmail", "email"], logoFile: "office.png" }
     ];
+  }
+});
+
+// lib/unique-code.ts
+var unique_code_exports = {};
+__export(unique_code_exports, {
+  generateUniqueCheckoutAmount: () => generateUniqueCheckoutAmount
+});
+async function generateUniqueCheckoutAmount(baseAmount) {
+  try {
+    const pendingOrders = await query(
+      `SELECT invoice_data FROM orders
+       WHERE payment_status = 'unpaid'
+         AND created_at >= NOW() - INTERVAL '60 minutes'`
+    );
+    const activeAmounts = /* @__PURE__ */ new Set();
+    for (const row of pendingOrders.rows) {
+      const inv = typeof row.invoice_data === "string" ? JSON.parse(row.invoice_data || "{}") : row.invoice_data || {};
+      const amt = Number(inv.payable_amount || inv.amount);
+      if (amt > 0) activeAmounts.add(amt);
+    }
+    let chosenCode = Math.floor(Math.random() * 89) + 11;
+    let candidate = baseAmount + chosenCode;
+    if (activeAmounts.has(candidate)) {
+      for (let c = 1; c <= 99; c++) {
+        if (!activeAmounts.has(baseAmount + c)) {
+          chosenCode = c;
+          candidate = baseAmount + c;
+          break;
+        }
+      }
+    }
+    return {
+      payableAmount: candidate,
+      uniqueCode: chosenCode
+    };
+  } catch {
+    const fallbackCode = Math.floor(Math.random() * 89) + 11;
+    return {
+      payableAmount: baseAmount + fallbackCode,
+      uniqueCode: fallbackCode
+    };
+  }
+}
+var init_unique_code = __esm({
+  "lib/unique-code.ts"() {
+    "use strict";
+    init_db();
   }
 });
 
@@ -45761,7 +45846,9 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
     }
   }
   const priceAfterDiscounts = Math.max(0, checkoutPricing.basePrice - checkoutPricing.discount - voucherDiscount);
-  const payableAmount = priceAfterDiscounts + checkoutPricing.fee;
+  const baseWithFee = priceAfterDiscounts + checkoutPricing.fee;
+  const { generateUniqueCheckoutAmount: generateUniqueCheckoutAmount2 } = await Promise.resolve().then(() => (init_unique_code(), unique_code_exports));
+  const { payableAmount, uniqueCode } = await generateUniqueCheckoutAmount2(baseWithFee);
   const orderCode = generateOrderCode();
   let qrisResult;
   try {
@@ -45824,6 +45911,7 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
         base_price: checkoutPricing.basePrice,
         discount: checkoutPricing.discount,
         fee: checkoutPricing.fee,
+        unique_code: uniqueCode,
         payable_amount: payableAmount,
         is_vip_discount: checkoutPricing.isVipDiscountApplied,
         voucher_id: appliedVoucher ? appliedVoucher.id : null,
@@ -46716,7 +46804,7 @@ setInterval(async () => {
         });
         if (checkResult.paid) {
           console.log(`[ShopeePay Poller] Auto-detected payment for order: ${ord.order_code}`);
-          await processOrderPayment(ord.order_code, bot);
+          await processOrderPayment(ord.order_code, bot, checkResult.transaction);
         }
       }
     }

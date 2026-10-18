@@ -219,7 +219,7 @@ setInterval(async () => {
 
         if (checkResult.paid) {
           console.log(`[ShopeePay Poller] Auto-detected payment for order: ${ord.order_code}`);
-          await processOrderPayment(ord.order_code, bot);
+          await processOrderPayment(ord.order_code, bot, checkResult.transaction as any);
         }
       }
     }

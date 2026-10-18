@@ -32,7 +32,8 @@ export interface FulfillmentResult {
  */
 export async function processOrderPayment(
   orderCode: string,
-  botInstance: ExtendedBot
+  botInstance: ExtendedBot,
+  transactionMeta?: { transactionId?: string | number; [key: string]: unknown }
 ): Promise<FulfillmentResult> {
   // 1. Fetch Order and Buyer details
   const orderRes = await query<Order & { telegram_id: string; product_name: string; product_price: number }>(
@@ -63,11 +64,28 @@ export async function processOrderPayment(
     };
   }
 
-  // 2. Mark order as PAID
-  await query(
-    `UPDATE orders SET payment_status = 'paid' WHERE id = $1`,
-    [order.id]
-  );
+  // 2. Mark order as PAID & lock transaction ID in invoice_data if provided
+  if (transactionMeta?.transactionId) {
+    const txId = String(transactionMeta.transactionId).trim();
+    await query(
+      `UPDATE orders
+       SET payment_status = 'paid',
+           invoice_data = jsonb_set(
+             COALESCE(invoice_data::jsonb, '{}'::jsonb),
+             '{shopeepay_tx_id}',
+             to_jsonb($1::text)
+           )
+       WHERE id = $2`,
+      [txId, order.id]
+    ).catch(() => {
+      return query(`UPDATE orders SET payment_status = 'paid' WHERE id = $1`, [order.id]);
+    });
+  } else {
+    await query(
+      `UPDATE orders SET payment_status = 'paid' WHERE id = $1`,
+      [order.id]
+    );
+  }
 
   // Broadcast payment confirmation to channel (@DafungHub) immediately upon payment
   broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
@@ -640,7 +658,7 @@ export async function checkAndProcessUnpaidShopeeOrders(
 
         if (checkResult.paid) {
           console.log(`[Auto-Check] Payment confirmed for order: ${ord.order_code}`);
-          await processOrderPayment(ord.order_code, botInstance);
+          await processOrderPayment(ord.order_code, botInstance, checkResult.transaction as any);
           confirmedCount++;
         }
       }

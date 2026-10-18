@@ -948,7 +948,7 @@ export async function sendOrdersMenu(ctx: Context, botInstance: ExtendedBot): Pr
             });
             if (checkResult.paid) {
               const { processOrderPayment } = await import('../lib/fulfillment');
-              await processOrderPayment(ord.order_code, botInstance);
+              await processOrderPayment(ord.order_code, botInstance, checkResult.transaction as any);
               ord.payment_status = 'paid';
               ord.fulfillment_status = 'delivered';
             }
@@ -1183,7 +1183,7 @@ export async function sendOrderStatus(
         if (checkResult.paid) {
           console.log(`[ShopeePay] Payment confirmed upon manual status refresh for order: ${o.order_code}`);
           const { processOrderPayment } = await import('../lib/fulfillment');
-          await processOrderPayment(o.order_code, botInstance);
+          await processOrderPayment(o.order_code, botInstance, checkResult.transaction as any);
 
           const updatedOrd = await query<Order & { product_name: string; product_price: number }>(
             `SELECT o.*, p.name as product_name, p.price as product_price

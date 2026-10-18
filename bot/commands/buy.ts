@@ -333,9 +333,12 @@ export async function handleBuy(
     }
   }
 
-  // Calculate final payable amount: (base - vipDiscount - voucherDiscount) + hidden fee
+  // Calculate final payable amount: (base - vipDiscount - voucherDiscount) + hidden fee + unique code
   const priceAfterDiscounts = Math.max(0, checkoutPricing.basePrice - checkoutPricing.discount - voucherDiscount);
-  const payableAmount = priceAfterDiscounts + checkoutPricing.fee;
+  const baseWithFee = priceAfterDiscounts + checkoutPricing.fee;
+
+  const { generateUniqueCheckoutAmount } = await import('../../lib/unique-code');
+  const { payableAmount, uniqueCode } = await generateUniqueCheckoutAmount(baseWithFee);
 
   // 5. Generate unique order_code
   const orderCode = generateOrderCode();
@@ -414,6 +417,7 @@ export async function handleBuy(
         base_price: checkoutPricing.basePrice,
         discount: checkoutPricing.discount,
         fee: checkoutPricing.fee,
+        unique_code: uniqueCode,
         payable_amount: payableAmount,
         is_vip_discount: checkoutPricing.isVipDiscountApplied,
         voucher_id: appliedVoucher ? appliedVoucher.id : null,

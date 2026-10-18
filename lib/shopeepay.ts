@@ -306,10 +306,34 @@ export async function checkShopeePayPayment(params: {
           ? new Date(params.orderCreatedAt).getTime()
           : 0;
 
+        // Fetch already claimed ShopeePay transaction IDs to ensure strict single-claim
+        let claimedTxIds = new Set<string>();
+        try {
+          const { query } = await import('./db');
+          const claimedRes = await query<{ tx_id: string }>(
+            `SELECT invoice_data->>'shopeepay_tx_id' as tx_id
+             FROM orders
+             WHERE payment_status = 'paid'
+               AND invoice_data->>'shopeepay_tx_id' IS NOT NULL
+               AND created_at >= NOW() - INTERVAL '48 hours'`
+          );
+          claimedTxIds = new Set(
+            claimedRes.rows.map((r) => String(r.tx_id).trim()).filter(Boolean)
+          );
+        } catch (dbErr) {
+          console.warn('[ShopeePay] Error querying claimed tx IDs:', dbErr);
+        }
+
         // Find matching incoming transaction
         const match = transactions.find((t) => {
           const txAmt = Math.round(Number(t.amount || t.nominal || t.total || 0));
           if (txAmt !== targetAmount) return false;
+
+          // Single-claim check: ensure this specific mutation hasn't been claimed by another order
+          const txId = String(t.transactionId || t.id || '').trim();
+          if (txId && claimedTxIds.has(txId)) {
+            return false;
+          }
 
           // If timestamp is available, verify it occurred around or after order creation
           const rawDate = t.time || t.created_at || t.timestamp || t.date;
