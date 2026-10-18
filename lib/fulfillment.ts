@@ -87,6 +87,19 @@ export async function processOrderPayment(
     );
   }
 
+  // 2a. Record voucher usage immediately upon payment confirmation for ALL order types (Membership, Deposit, Product)
+  const invData = (order.invoice_data as Record<string, unknown>) || {};
+  if (invData.voucher_id) {
+    const { applyVoucherUsage } = await import('./voucher');
+    const discountAmount = Number(invData.voucher_discount || invData.voucher_cashback || 0);
+    await applyVoucherUsage({
+      voucherId: String(invData.voucher_id),
+      userId: order.user_id,
+      orderId: order.id,
+      discountAmount,
+    });
+  }
+
   // Broadcast payment confirmation to channel (@DafungHub) immediately upon payment
   broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
     console.warn('[Broadcast Warning] Failed to broadcast order payment success:', bErr);
@@ -175,8 +188,6 @@ export async function processOrderPayment(
   }
 
   // 2c. Special Handling: Top-Up / Deposit Saldo
-  const invData = (order.invoice_data as Record<string, unknown>) || {};
-
   if (order.product_name.toLowerCase().includes('deposit saldo') || order.product_name.toLowerCase().startsWith('deposit')) {
     const depositAmount = order.product_price;
     const cashback = Number(invData.voucher_cashback || 0);
@@ -242,17 +253,6 @@ export async function processOrderPayment(
       { parse_mode: 'HTML' }
     );
 
-    // Record voucher usage if voucher was applied
-    if (invData.voucher_id) {
-      const { applyVoucherUsage } = await import('./voucher');
-      await applyVoucherUsage({
-        voucherId: invData.voucher_id as string,
-        userId: order.user_id,
-        orderId: order.id,
-        discountAmount: cashback,
-      });
-    }
-
     return {
       success: true,
       mode: 'deposit',
@@ -260,17 +260,6 @@ export async function processOrderPayment(
       orderCode,
       deliveredKey: confirmationMsg,
     };
-  }
-
-  // Record voucher usage for product or membership transactions
-  if (invData.voucher_id) {
-    const { applyVoucherUsage } = await import('./voucher');
-    await applyVoucherUsage({
-      voucherId: invData.voucher_id as string,
-      userId: order.user_id,
-      orderId: order.id,
-      discountAmount: Number(invData.voucher_discount || 0),
-    });
   }
 
   // 2d. Record VIP Discount usage if discount was applied on this order

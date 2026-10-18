@@ -155,7 +155,23 @@ export async function createVoucher(params: {
  */
 export async function getAllVouchers(): Promise<Voucher[]> {
   const res = await query<Voucher>(
-    `SELECT * FROM vouchers ORDER BY created_at DESC LIMIT 50`
+    `SELECT 
+       v.id,
+       v.code,
+       v.type,
+       v.discount_type,
+       v.discount_value,
+       v.product_target,
+       v.min_order_amount,
+       v.max_uses,
+       COALESCE((SELECT COUNT(*)::int FROM voucher_usages vu WHERE vu.voucher_id = v.id), v.used_count) as used_count,
+       v.is_active,
+       v.expires_at,
+       v.created_at,
+       v.updated_at
+     FROM vouchers v
+     ORDER BY v.created_at DESC
+     LIMIT 50`
   );
   return res.rows;
 }
@@ -167,7 +183,23 @@ export async function getVoucherByCode(code: string): Promise<Voucher | null> {
   if (!code) return null;
   const cleanCode = code.trim().toUpperCase();
   const res = await query<Voucher>(
-    `SELECT * FROM vouchers WHERE code = $1 LIMIT 1`,
+    `SELECT 
+       v.id,
+       v.code,
+       v.type,
+       v.discount_type,
+       v.discount_value,
+       v.product_target,
+       v.min_order_amount,
+       v.max_uses,
+       COALESCE((SELECT COUNT(*)::int FROM voucher_usages vu WHERE vu.voucher_id = v.id), v.used_count) as used_count,
+       v.is_active,
+       v.expires_at,
+       v.created_at,
+       v.updated_at
+     FROM vouchers v
+     WHERE v.code = $1
+     LIMIT 1`,
     [cleanCode]
   );
   return res.rows[0] || null;
@@ -415,7 +447,7 @@ export async function applyVoucherUsage(params: {
 
     await query(
       `UPDATE vouchers
-       SET used_count = used_count + 1,
+       SET used_count = (SELECT COUNT(*)::int FROM voucher_usages WHERE voucher_id = $1),
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1`,
       [params.voucherId]

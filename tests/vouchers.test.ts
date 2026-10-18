@@ -167,6 +167,12 @@ test('Vouchers: Quota limits and single-use per user protection', async () => {
     discountAmount: 1000,
   });
 
+  // Verify real-time used_count is updated in getVoucherByCode and getAllVouchers
+  const fetchedV = await getVoucherByCode(code);
+  assert.equal(fetchedV?.used_count, 1);
+  const allV = await getAllVouchers();
+  assert.equal(allV.find((x) => x.code === code)?.used_count, 1);
+
   // 2nd validation: Rejected because already used by this user
   const val2 = await validateVoucherForTransaction({
     code,
