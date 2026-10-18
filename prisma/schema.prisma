@@ -37,6 +37,8 @@ model User {
   telegramId  String   @unique @map("telegram_id") @db.VarChar(255)
   role        UserRole @default(buyer)
   balance     Int      @default(0)
+  username    String?  @db.VarChar(255)
+  firstName   String?  @map("first_name") @db.VarChar(255)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   orders      Order[]

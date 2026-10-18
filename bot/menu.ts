@@ -1238,18 +1238,22 @@ export async function sendAdminQueueMenu(ctx: Context, botInstance: ExtendedBot)
   } else {
     for (const ord of queueOrders) {
       text +=
-        `• <b>${escapeHtml(ord.order_code)}</b>\n` +
+        `• <b>Kode:</b> <code>${escapeHtml(ord.order_code)}</code> <i>(Sentuh untuk salin)</i>\n` +
         `  📦 ${escapeHtml(ord.product_name)} (Rp ${ord.product_price.toLocaleString('id-ID')})\n` +
         `  👤 Buyer: <code>${ord.telegram_id}</code>\n\n`;
 
       buttons.push([
         {
-          text: `🚀 Proses H2H: ${ord.order_code}`,
+          text: `📋 Salin ${ord.order_code}`,
+          copy_text: { text: ord.order_code },
+        },
+        {
+          text: `🚀 Proses H2H`,
           callback_data: `admin_process_${ord.order_code}`,
         },
       ]);
     }
-    text += `━━━━━━━━━━━━━━━━━━━\n💡 <i>Atau kirim manual: <code>/kirim &lt;order_code&gt; &lt;kredensial&gt;</code></i>\n`;
+    text += `━━━━━━━━━━━━━━━━━━━\n💡 <i>Format kirim manual: <code>/kirim &lt;order_code&gt; &lt;kredensial&gt;</code></i>\n`;
   }
 
   buttons.push([

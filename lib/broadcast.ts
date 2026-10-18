@@ -125,6 +125,30 @@ export async function setAutoOrderBroadcastEnabled(enabled: boolean): Promise<vo
 }
 
 /**
+ * Format initial username / masked username for privacy and social proof (e.g. @da***c or @Dap***)
+ */
+export function maskUsername(username?: string | null, firstName?: string | null): string {
+  const cleanUser = (username || '').replace(/^@/, '').trim();
+  if (cleanUser.length > 0) {
+    if (cleanUser.length <= 2) {
+      return `@${cleanUser[0]}***`;
+    }
+    const visibleChars = Math.min(3, Math.max(2, Math.floor(cleanUser.length / 3)));
+    return `@${cleanUser.slice(0, visibleChars)}***`;
+  }
+
+  const cleanName = (firstName || '').trim();
+  if (cleanName.length > 0) {
+    if (cleanName.length <= 2) {
+      return `${cleanName[0]}***`;
+    }
+    return `${cleanName.slice(0, 2)}***`;
+  }
+
+  return 'User-***';
+}
+
+/**
  * Build clean, anti-slop copy for successful order announcement
  */
 export function buildOrderBroadcastMessage(order: {
@@ -133,21 +157,25 @@ export function buildOrderBroadcastMessage(order: {
   product_price: number;
   delivered_at?: Date | string | null;
   created_at?: Date | string | null;
+  username?: string | null;
+  first_name?: string | null;
 }): string {
   const maskedCode = maskOrderCode(order.order_code);
+  const maskedUser = maskUsername(order.username, order.first_name);
   const timeStr = formatWibDateTime(order.delivered_at || order.created_at || new Date());
   const priceStr = `Rp ${Number(order.product_price || 0).toLocaleString('id-ID')}`;
 
   return (
-    `✨ <b>PESANAN BERHASIL DIPROSES</b>\n` +
+    `✨ <b>PESANAN BERHASIL TERVERIFIKASI</b>\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
+    `👤 <b>Pembeli:</b> <code>${escapeHtml(maskedUser)}</code>\n` +
     `📦 <b>Produk:</b> ${escapeHtml(order.product_name)}\n` +
     `🏷️ <b>Order ID:</b> <code>${escapeHtml(maskedCode)}</code>\n` +
     `💰 <b>Nominal:</b> ${escapeHtml(priceStr)}\n` +
-    `⚡ <b>Pengiriman:</b> Sukses Terkirim Otomatis\n` +
     `🕒 <b>Waktu:</b> ${escapeHtml(timeStr)}\n` +
+    `⚡ <b>Status:</b> Pembayaran Lunas (Sukses)\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
-    `🛒 <i>Transaksi aman, instan & bergaransi di DaFung Hub.</i>`
+    `🛒 <i>Pemesanan instan & otomatis 24 jam via bot @${escapeHtml(BOT_USERNAME)}</i>`
   );
 }
 
@@ -196,11 +224,16 @@ export async function broadcastOrderSuccess(
       is_broadcasted: boolean;
       delivered_at: Date | null;
       created_at: Date;
+      username?: string | null;
+      first_name?: string | null;
+      invoice_data?: Record<string, unknown> | null;
     }>(
-      `SELECT o.id, o.order_code, o.is_broadcasted, o.delivered_at, o.created_at,
-              p.name as product_name, p.price as product_price
+      `SELECT o.id, o.order_code, o.is_broadcasted, o.delivered_at, o.created_at, o.invoice_data,
+              p.name as product_name, p.price as product_price,
+              u.username, u.first_name
        FROM orders o
        JOIN products p ON o.product_id = p.id
+       JOIN users u ON o.user_id = u.id
        WHERE o.order_code = $1 LIMIT 1`,
       [orderCode]
     );
@@ -214,8 +247,19 @@ export async function broadcastOrderSuccess(
       return { success: true, error: 'Order already broadcasted' };
     }
 
+    const rawUsername =
+      ord.username ||
+      ((ord.invoice_data as Record<string, unknown>)?.customer_username as string | undefined);
+    const rawFirstName =
+      ord.first_name ||
+      ((ord.invoice_data as Record<string, unknown>)?.customer_first_name as string | undefined);
+
     const channel = await getBroadcastChannel();
-    const text = buildOrderBroadcastMessage(ord);
+    const text = buildOrderBroadcastMessage({
+      ...ord,
+      username: rawUsername,
+      first_name: rawFirstName,
+    });
     const replyMarkup = {
       inline_keyboard: [
         [

@@ -12872,6 +12872,7 @@ __export(broadcast_exports, {
   getBroadcastChannel: () => getBroadcastChannel,
   isAutoOrderBroadcastEnabled: () => isAutoOrderBroadcastEnabled,
   maskOrderCode: () => maskOrderCode,
+  maskUsername: () => maskUsername,
   sendManualBroadcast: () => sendManualBroadcast,
   setAutoOrderBroadcastEnabled: () => setAutoOrderBroadcastEnabled,
   setBroadcastChannel: () => setBroadcastChannel
@@ -12958,19 +12959,39 @@ async function setAutoOrderBroadcastEnabled(enabled) {
     [enabled ? "true" : "false"]
   );
 }
+function maskUsername(username, firstName) {
+  const cleanUser = (username || "").replace(/^@/, "").trim();
+  if (cleanUser.length > 0) {
+    if (cleanUser.length <= 2) {
+      return `@${cleanUser[0]}***`;
+    }
+    const visibleChars = Math.min(3, Math.max(2, Math.floor(cleanUser.length / 3)));
+    return `@${cleanUser.slice(0, visibleChars)}***`;
+  }
+  const cleanName = (firstName || "").trim();
+  if (cleanName.length > 0) {
+    if (cleanName.length <= 2) {
+      return `${cleanName[0]}***`;
+    }
+    return `${cleanName.slice(0, 2)}***`;
+  }
+  return "User-***";
+}
 function buildOrderBroadcastMessage(order) {
   const maskedCode = maskOrderCode(order.order_code);
+  const maskedUser = maskUsername(order.username, order.first_name);
   const timeStr = formatWibDateTime(order.delivered_at || order.created_at || /* @__PURE__ */ new Date());
   const priceStr = `Rp ${Number(order.product_price || 0).toLocaleString("id-ID")}`;
-  return `\u2728 <b>PESANAN BERHASIL DIPROSES</b>
+  return `\u2728 <b>PESANAN BERHASIL TERVERIFIKASI</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F464} <b>Pembeli:</b> <code>${escapeHtml(maskedUser)}</code>
 \u{1F4E6} <b>Produk:</b> ${escapeHtml(order.product_name)}
 \u{1F3F7}\uFE0F <b>Order ID:</b> <code>${escapeHtml(maskedCode)}</code>
 \u{1F4B0} <b>Nominal:</b> ${escapeHtml(priceStr)}
-\u26A1 <b>Pengiriman:</b> Sukses Terkirim Otomatis
 \u{1F552} <b>Waktu:</b> ${escapeHtml(timeStr)}
+\u26A1 <b>Status:</b> Pembayaran Lunas (Sukses)
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u{1F6D2} <i>Transaksi aman, instan & bergaransi di DaFung Hub.</i>`;
+\u{1F6D2} <i>Pemesanan instan & otomatis 24 jam via bot @${escapeHtml(BOT_USERNAME)}</i>`;
 }
 async function sendTelegramApi(method, payload) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -12993,10 +13014,12 @@ async function broadcastOrderSuccess(orderCode, botInstance) {
       return { success: true, error: "Auto-broadcast is disabled in settings" };
     }
     const orderRes = await query(
-      `SELECT o.id, o.order_code, o.is_broadcasted, o.delivered_at, o.created_at,
-              p.name as product_name, p.price as product_price
+      `SELECT o.id, o.order_code, o.is_broadcasted, o.delivered_at, o.created_at, o.invoice_data,
+              p.name as product_name, p.price as product_price,
+              u.username, u.first_name
        FROM orders o
        JOIN products p ON o.product_id = p.id
+       JOIN users u ON o.user_id = u.id
        WHERE o.order_code = $1 LIMIT 1`,
       [orderCode]
     );
@@ -13007,8 +13030,14 @@ async function broadcastOrderSuccess(orderCode, botInstance) {
     if (ord.is_broadcasted) {
       return { success: true, error: "Order already broadcasted" };
     }
+    const rawUsername = ord.username || ord.invoice_data?.customer_username;
+    const rawFirstName = ord.first_name || ord.invoice_data?.customer_first_name;
     const channel = await getBroadcastChannel();
-    const text = buildOrderBroadcastMessage(ord);
+    const text = buildOrderBroadcastMessage({
+      ...ord,
+      username: rawUsername,
+      first_name: rawFirstName
+    });
     const replyMarkup = {
       inline_keyboard: [
         [
@@ -13190,6 +13219,9 @@ async function processOrderPayment(orderCode, botInstance) {
     `UPDATE orders SET payment_status = 'paid' WHERE id = $1`,
     [order.id]
   );
+  broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
+    console.warn("[Broadcast Warning] Failed to broadcast order payment success:", bErr);
+  });
   if (order.product_name.toLowerCase().includes("deposit saldo") || order.product_name.toLowerCase().startsWith("deposit")) {
     const depositAmount = order.product_price;
     await query(
@@ -13369,7 +13401,7 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
   );
   const ownerQueueAlert = `\u{1F514} <b>PESANAN BARU MASUK (MODE ANTREAN)</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code> <i>(Sentuh untuk salin)</i>
 \u2022 <b>Produk:</b> ${escapeHtml2(order.product_name)}
 \u2022 <b>Pembeli:</b> <code>${escapeHtml2(buyerChatId)}</code>
 \u2022 <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
@@ -13379,11 +13411,18 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
 \u{1F449} <i>Pilihan eksekusi pengiriman:</i>
-1. Klik tombol di bawah setelah Anda top up di supplier.
-2. Atau kirim kredensial manual dengan perintah:
-   <code>/kirim ${escapeHtml2(order.order_code)} &lt;email:password&gt;</code>`;
+1. Klik tombol <b>\u{1F4CB} Salin Kode Order</b> di bawah (1-klik salin untuk desktop & mobile).
+2. Kirim manual ke pembeli dengan format:
+   <code>/kirim ${escapeHtml2(order.order_code)} &lt;email:password&gt;</code>
+3. Atau klik <b>\u{1F680} Proses via Supplier</b> setelah saldo supplier diisi.`;
   const ownerActionButtons = {
     inline_keyboard: [
+      [
+        {
+          text: `\u{1F4CB} Salin Kode: ${order.order_code}`,
+          copy_text: { text: order.order_code }
+        }
+      ],
       [
         {
           text: "\u{1F680} Proses via Supplier (1-Klik)",
@@ -14872,20 +14911,24 @@ async function sendAdminQueueMenu(ctx, botInstance) {
 `;
   } else {
     for (const ord of queueOrders) {
-      text += `\u2022 <b>${escapeHtml4(ord.order_code)}</b>
+      text += `\u2022 <b>Kode:</b> <code>${escapeHtml4(ord.order_code)}</code> <i>(Sentuh untuk salin)</i>
   \u{1F4E6} ${escapeHtml4(ord.product_name)} (Rp ${ord.product_price.toLocaleString("id-ID")})
   \u{1F464} Buyer: <code>${ord.telegram_id}</code>
 
 `;
       buttons.push([
         {
-          text: `\u{1F680} Proses H2H: ${ord.order_code}`,
+          text: `\u{1F4CB} Salin ${ord.order_code}`,
+          copy_text: { text: ord.order_code }
+        },
+        {
+          text: `\u{1F680} Proses H2H`,
           callback_data: `admin_process_${ord.order_code}`
         }
       ]);
     }
     text += `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u{1F4A1} <i>Atau kirim manual: <code>/kirim &lt;order_code&gt; &lt;kredensial&gt;</code></i>
+\u{1F4A1} <i>Format kirim manual: <code>/kirim &lt;order_code&gt; &lt;kredensial&gt;</code></i>
 `;
   }
   buttons.push([
@@ -39742,20 +39785,34 @@ function generateOrderCode() {
   const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
   return `ORD-${timestamp}-${randomSuffix}`;
 }
-async function ensureUser(telegramId) {
+async function ensureUser(telegramId, profile) {
+  const cleanUsername = profile?.username ? profile.username.replace(/^@/, "") : null;
+  const cleanFirstName = profile?.firstName || null;
   const existingUser = await query(
     "SELECT * FROM users WHERE telegram_id = $1",
     [telegramId]
   );
   if (existingUser.rows.length > 0) {
+    if (cleanUsername || cleanFirstName) {
+      await query(
+        `UPDATE users
+         SET username = COALESCE($1, username),
+             first_name = COALESCE($2, first_name)
+         WHERE telegram_id = $3`,
+        [cleanUsername, cleanFirstName, telegramId]
+      ).catch(() => {
+      });
+    }
     return existingUser.rows[0];
   }
   const insertUser = await query(
-    `INSERT INTO users (telegram_id, role)
-     VALUES ($1, 'buyer')
-     ON CONFLICT (telegram_id) DO UPDATE SET telegram_id = EXCLUDED.telegram_id
+    `INSERT INTO users (telegram_id, role, username, first_name)
+     VALUES ($1, 'buyer', $2, $3)
+     ON CONFLICT (telegram_id) DO UPDATE SET
+       username = COALESCE(EXCLUDED.username, users.username),
+       first_name = COALESCE(EXCLUDED.first_name, users.first_name)
      RETURNING *`,
-    [telegramId]
+    [telegramId, cleanUsername, cleanFirstName]
   );
   return insertUser.rows[0];
 }
@@ -39928,7 +39985,10 @@ async function handleBuy(ctx, productId, botInstance) {
   }
   const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
   const telegramId = ctx.from?.id ? String(ctx.from.id) : String(chatId);
-  const user = await ensureUser(telegramId);
+  const user = await ensureUser(telegramId, {
+    username: ctx.from?.username,
+    firstName: ctx.from?.first_name
+  });
   const orderCode = generateOrderCode();
   let qrisResult;
   try {
@@ -39983,6 +40043,8 @@ async function handleBuy(ctx, productId, botInstance) {
       orderCode,
       JSON.stringify({
         ...qrisResult.raw || {},
+        customer_username: ctx.from?.username || null,
+        customer_first_name: ctx.from?.first_name || null,
         qr_code_url: qrisResult.qrCodeUrl,
         qr_string: qrisResult.qrString,
         checkout_url: qrisResult.checkoutUrl

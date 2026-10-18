@@ -18,16 +18,15 @@ import {
 } from '../bot/menu';
 import {
   maskOrderCode,
+  maskUsername,
   buildOrderBroadcastMessage,
   getBroadcastChannel,
   isAutoOrderBroadcastEnabled,
   setAutoOrderBroadcastEnabled,
   broadcastOrderSuccess,
 } from '../lib/broadcast';
-import { handleBuy } from '../bot/commands/buy';
-import { query } from '../lib/db';
 import { ExtendedBot } from '../bot/handler';
-import { ADMIN_TELEGRAM_ID } from '../lib/pricing';
+import { query } from '../lib/db';
 
 test('Test Products: isTestProduct correctly identifies testing and sandbox products', () => {
   assert.equal(isTestProduct({ id: 'loc_test1', name: 'Test Api product' }), true);
@@ -43,7 +42,6 @@ test('Test Products: getSupplierProducts includes test products only when includ
   const hasTestInPublic = publicProducts.some(isTestProduct);
   assert.equal(hasTestInPublic, false, 'Public catalogue must NOT contain test products');
 
-  // When live supplier or mock is accessible, test products exist
   if (allProducts.some(isTestProduct)) {
     const hasTestInAdmin = allProducts.some(isTestProduct);
     assert.equal(hasTestInAdmin, true, 'Admin catalogue must include test products');
@@ -93,24 +91,35 @@ test('Test Products Access: sendProductDetail blocks non-admin from viewing test
   assert.match(sentText, /Akses Ditolak/i);
 });
 
+test('Broadcast: maskUsername anonymizes usernames and first names for privacy', () => {
+  assert.equal(maskUsername('DappaSecc'), '@Dap***');
+  assert.equal(maskUsername('@budi123'), '@bu***');
+  assert.equal(maskUsername('yo'), '@y***');
+  assert.equal(maskUsername(null, 'Budi Santoso'), 'Bu***');
+  assert.equal(maskUsername(null, 'Al'), 'A***');
+  assert.equal(maskUsername(null, null), 'User-***');
+});
+
 test('Broadcast: maskOrderCode anonymizes order ID cleanly', () => {
   assert.equal(maskOrderCode('ORD-179232-ABC12'), 'ORD-•••-ABC12');
   assert.equal(maskOrderCode('ORD-LONG-SECRET-CODE'), 'ORD-•••-CODE');
 });
 
-test('Broadcast: buildOrderBroadcastMessage formats clean anti-slop copy', () => {
+test('Broadcast: buildOrderBroadcastMessage formats clean anti-slop copy with buyer initials and product', () => {
   const msg = buildOrderBroadcastMessage({
     order_code: 'ORD-179232-XYZ78',
     product_name: 'Canva Pro 1 Bulan FW',
     product_price: 15000,
+    username: 'DappaSecc',
     delivered_at: new Date('2026-10-18T12:30:00Z'),
   });
 
-  assert.match(msg, /PESANAN BERHASIL DIPROSES/);
-  assert.match(msg, /Canva Pro 1 Bulan FW/);
+  assert.match(msg, /PESANAN BERHASIL TERVERIFIKASI/);
+  assert.match(msg, /👤 <b>Pembeli:<\/b> <code>@Dap\*\*\*<\/code>/);
+  assert.match(msg, /📦 <b>Produk:<\/b> Canva Pro 1 Bulan FW/);
   assert.match(msg, /ORD-•••-XYZ78/);
   assert.match(msg, /Rp 15\.000/);
-  assert.match(msg, /Sukses Terkirim Otomatis/);
+  assert.match(msg, /Pembayaran Lunas/);
   assert.match(msg, /WIB/);
 });
 

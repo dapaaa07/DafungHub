@@ -24,22 +24,39 @@ export function generateOrderCode(): string {
 /**
  * Ensure a Telegram user exists in the PostgreSQL `users` table
  */
-export async function ensureUser(telegramId: string): Promise<User> {
+export async function ensureUser(
+  telegramId: string,
+  profile?: { username?: string; firstName?: string }
+): Promise<User> {
+  const cleanUsername = profile?.username ? profile.username.replace(/^@/, '') : null;
+  const cleanFirstName = profile?.firstName || null;
+
   const existingUser = await query<User>(
     'SELECT * FROM users WHERE telegram_id = $1',
     [telegramId]
   );
 
   if (existingUser.rows.length > 0) {
+    if (cleanUsername || cleanFirstName) {
+      await query(
+        `UPDATE users
+         SET username = COALESCE($1, username),
+             first_name = COALESCE($2, first_name)
+         WHERE telegram_id = $3`,
+        [cleanUsername, cleanFirstName, telegramId]
+      ).catch(() => {});
+    }
     return existingUser.rows[0];
   }
 
   const insertUser = await query<User>(
-    `INSERT INTO users (telegram_id, role)
-     VALUES ($1, 'buyer')
-     ON CONFLICT (telegram_id) DO UPDATE SET telegram_id = EXCLUDED.telegram_id
+    `INSERT INTO users (telegram_id, role, username, first_name)
+     VALUES ($1, 'buyer', $2, $3)
+     ON CONFLICT (telegram_id) DO UPDATE SET
+       username = COALESCE(EXCLUDED.username, users.username),
+       first_name = COALESCE(EXCLUDED.first_name, users.first_name)
      RETURNING *`,
-    [telegramId]
+    [telegramId, cleanUsername, cleanFirstName]
   );
 
   return insertUser.rows[0];
@@ -241,7 +258,10 @@ export async function handleBuy(
   // 3. Ensure user exists in users table
   const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
   const telegramId = ctx.from?.id ? String(ctx.from.id) : String(chatId);
-  const user = await ensureUser(telegramId);
+  const user = await ensureUser(telegramId, {
+    username: ctx.from?.username,
+    firstName: ctx.from?.first_name,
+  });
 
   // 4. Generate unique order_code
   const orderCode = generateOrderCode();
@@ -312,6 +332,8 @@ export async function handleBuy(
       orderCode,
       JSON.stringify({
         ...(qrisResult.raw || {}),
+        customer_username: ctx.from?.username || null,
+        customer_first_name: ctx.from?.first_name || null,
         qr_code_url: qrisResult.qrCodeUrl,
         qr_string: qrisResult.qrString,
         checkout_url: qrisResult.checkoutUrl,

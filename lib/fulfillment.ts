@@ -69,6 +69,11 @@ export async function processOrderPayment(
     [order.id]
   );
 
+  // Broadcast payment confirmation to channel (@DafungHub) immediately upon payment
+  broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
+    console.warn('[Broadcast Warning] Failed to broadcast order payment success:', bErr);
+  });
+
   // 2b. Special Handling: Top-Up / Deposit Saldo
   if (order.product_name.toLowerCase().includes('deposit saldo') || order.product_name.toLowerCase().startsWith('deposit')) {
     const depositAmount = order.product_price;
@@ -288,7 +293,7 @@ export async function processOrderPayment(
   const ownerQueueAlert =
     `🔔 <b>PESANAN BARU MASUK (MODE ANTREAN)</b>\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
-    `• <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>\n` +
+    `• <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code> <i>(Sentuh untuk salin)</i>\n` +
     `• <b>Produk:</b> ${escapeHtml(order.product_name)}\n` +
     `• <b>Pembeli:</b> <code>${escapeHtml(buyerChatId)}</code>\n` +
     `• <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString('id-ID')}\n` +
@@ -297,12 +302,19 @@ export async function processOrderPayment(
     `• <b>Saldo Supplier:</b> Rp ${currentBalance.toLocaleString('id-ID')} (Kurang)\n` +
     `━━━━━━━━━━━━━━━━━━━\n\n` +
     `👉 <i>Pilihan eksekusi pengiriman:</i>\n` +
-    `1. Klik tombol di bawah setelah Anda top up di supplier.\n` +
-    `2. Atau kirim kredensial manual dengan perintah:\n` +
-    `   <code>/kirim ${escapeHtml(order.order_code)} &lt;email:password&gt;</code>`;
+    `1. Klik tombol <b>📋 Salin Kode Order</b> di bawah (1-klik salin untuk desktop & mobile).\n` +
+    `2. Kirim manual ke pembeli dengan format:\n` +
+    `   <code>/kirim ${escapeHtml(order.order_code)} &lt;email:password&gt;</code>\n` +
+    `3. Atau klik <b>🚀 Proses via Supplier</b> setelah saldo supplier diisi.`;
 
   const ownerActionButtons = {
     inline_keyboard: [
+      [
+        {
+          text: `📋 Salin Kode: ${order.order_code}`,
+          copy_text: { text: order.order_code },
+        },
+      ],
       [
         {
           text: '🚀 Proses via Supplier (1-Klik)',
