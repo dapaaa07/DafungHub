@@ -991,6 +991,11 @@ export function extractQrisFromInvoiceData(rawInvoiceData: unknown): {
     (data.qrCodeUrl as string) ||
     '';
 
+  // Ignore dead/404 gateway image links
+  if (qrCodeUrl && qrCodeUrl.includes('shopee.prastyaaneki.biz.id/qr/')) {
+    qrCodeUrl = '';
+  }
+
   const qrString = (data.qr_string as string) || (data.qrString as string) || (data.qr as string) || '';
   const checkoutUrl = (data.checkout_url as string) || (data.checkoutUrl as string) || undefined;
 
@@ -998,7 +1003,7 @@ export function extractQrisFromInvoiceData(rawInvoiceData: unknown): {
   if (!qrCodeUrl && qrString && (qrString.startsWith('http://') || qrString.startsWith('https://'))) {
     qrCodeUrl = qrString;
   } else if (!qrCodeUrl && qrString) {
-    qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrString)}`;
+    qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=450x450&data=${encodeURIComponent(qrString)}`;
   }
 
   return { qrCodeUrl, qrString, checkoutUrl };
@@ -1051,9 +1056,23 @@ export async function sendOrderInvoice(
     inline_keyboard: invoiceButtonsRows,
   };
 
-  if (qrCodeUrl) {
+  // Generate local high-resolution QR PNG buffer for guaranteed instant delivery
+  let qrPhotoPayload: unknown = qrCodeUrl;
+  if (qrString) {
     try {
-      const photoSent = await sendSafePhoto(ctx, botInstance, qrCodeUrl, {
+      const { generateQrPngBuffer } = await import('../lib/shopeepay');
+      const buf = await generateQrPngBuffer(qrString);
+      if (buf && buf.length > 0) {
+        qrPhotoPayload = buf;
+      }
+    } catch (qrErr) {
+      console.warn('[Order Invoice] Failed to generate local QR PNG buffer, using URL:', qrErr);
+    }
+  }
+
+  if (qrPhotoPayload) {
+    try {
+      const photoSent = await sendSafePhoto(ctx, botInstance, qrPhotoPayload, {
         caption: invoiceCaption,
         parse_mode: 'HTML',
         reply_markup: invoiceButtons,
@@ -1064,13 +1083,8 @@ export async function sendOrderInvoice(
     }
   }
 
-  // Fallback if sendSafePhoto fails or photo URL is not available
-  const fallbackMessage =
-    invoiceCaption +
-    (qrCodeUrl ? `\n\n🔗 <b>Link Gambar QRIS:</b> ${escapeHtml(qrCodeUrl)}` : '') +
-    (qrString ? `\n\n📱 <b>String QRIS:</b> <code>${escapeHtml(qrString)}</code>` : '');
-
-  await sendSafeMessage(ctx, botInstance, fallbackMessage, {
+  // Clean fallback without exposing raw QR strings or static decoded links
+  await sendSafeMessage(ctx, botInstance, invoiceCaption, {
     parse_mode: 'HTML',
     reply_markup: invoiceButtons,
   });

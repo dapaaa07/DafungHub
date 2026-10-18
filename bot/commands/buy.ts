@@ -469,9 +469,23 @@ export async function handleBuy(
     inline_keyboard: inlineKeyboardRows,
   };
 
-  if (qrisResult.qrCodeUrl) {
+  // Generate local high-resolution QR PNG buffer for guaranteed instant delivery
+  let qrPhotoPayload: unknown = qrisResult.qrCodeUrl;
+  if (qrisResult.qrString) {
     try {
-      const photoSent = await sendSafePhoto(ctx, botInstance, qrisResult.qrCodeUrl, {
+      const { generateQrPngBuffer } = await import('../../lib/shopeepay');
+      const buf = await generateQrPngBuffer(qrisResult.qrString);
+      if (buf && buf.length > 0) {
+        qrPhotoPayload = buf;
+      }
+    } catch (qrErr) {
+      console.warn('[Buy Command] Failed to generate local QR PNG buffer, using URL:', qrErr);
+    }
+  }
+
+  if (qrPhotoPayload) {
+    try {
+      const photoSent = await sendSafePhoto(ctx, botInstance, qrPhotoPayload, {
         caption: invoiceCaption,
         parse_mode: 'HTML',
         reply_markup: invoiceButtons,
@@ -482,13 +496,8 @@ export async function handleBuy(
     }
   }
 
-  // Fallback if sendSafePhoto is not supported or fails
-  const fallbackMessage =
-    invoiceCaption +
-    (qrisResult.qrCodeUrl ? `\n\n🔗 <b>Link Gambar QRIS:</b> ${escapeHtml(qrisResult.qrCodeUrl)}` : '') +
-    (qrisResult.qrString ? `\n\n📱 <b>String QRIS:</b> <code>${escapeHtml(qrisResult.qrString)}</code>` : '');
-
-  await sendSafeMessage(ctx, botInstance, fallbackMessage, {
+  // Clean fallback without exposing raw QR strings or static decoded links
+  await sendSafeMessage(ctx, botInstance, invoiceCaption, {
     parse_mode: 'HTML',
     reply_markup: invoiceButtons,
   });

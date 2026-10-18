@@ -170,7 +170,46 @@ export async function sendSafePhoto(
 
   let sentResult: unknown;
 
-  if (typeof botInstance?.sendPhoto === 'function' && chatId) {
+  // 1. If photo is a Buffer or Uint8Array, upload via multipart FormData to Telegram API
+  if (
+    (Buffer.isBuffer(photo) || photo instanceof Uint8Array) &&
+    chatId &&
+    process.env.TELEGRAM_BOT_TOKEN
+  ) {
+    try {
+      const formData = new FormData();
+      formData.append('chat_id', String(chatId));
+      formData.append('photo', new Blob([photo as any], { type: 'image/png' }), 'qris.png');
+      if (options?.caption) formData.append('caption', String(options.caption));
+      if (options?.parse_mode) formData.append('parse_mode', String(options.parse_mode));
+      if (options?.reply_markup) {
+        formData.append(
+          'reply_markup',
+          typeof options.reply_markup === 'string'
+            ? options.reply_markup
+            : JSON.stringify(options.reply_markup)
+        );
+      }
+      const resp = await fetch(
+        `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendPhoto`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+      const data = await resp.json();
+      if (data.ok && data.result) {
+        sentResult = data.result;
+      } else {
+        console.warn('[sendSafePhoto] FormData buffer sendPhoto returned:', data);
+      }
+    } catch (err) {
+      console.warn('[sendSafePhoto] Buffer FormData sendPhoto error:', err);
+    }
+  }
+
+  // 2. Try botInstance.sendPhoto (for string URL or standard bot clients)
+  if (!sentResult && typeof botInstance?.sendPhoto === 'function' && chatId) {
     try {
       sentResult = await botInstance.sendPhoto(chatId, photo, options);
     } catch {
@@ -178,6 +217,7 @@ export async function sendSafePhoto(
     }
   }
 
+  // 3. Try botInstance.api.sendPhoto
   if (!sentResult && typeof botInstance?.api?.sendPhoto === 'function' && chatId) {
     try {
       sentResult = await botInstance.api.sendPhoto({
@@ -190,7 +230,7 @@ export async function sendSafePhoto(
     }
   }
 
-  // Direct HTTP Telegram API fallback for image URLs (essential for serverless Vercel runtime)
+  // 4. Direct HTTP Telegram API fallback for image URLs (essential for serverless Vercel runtime)
   if (!sentResult && typeof photo === 'string' && chatId && process.env.TELEGRAM_BOT_TOKEN) {
     try {
       const resp = await fetch(

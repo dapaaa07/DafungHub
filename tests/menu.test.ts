@@ -41,13 +41,14 @@ test('Interactive Menu: getMainMenuInlineKeyboard matches required layout', () =
   assert.strictEqual(kb.inline_keyboard[0][0].text, '🟢 Produk');
   assert.strictEqual(kb.inline_keyboard[0][1].text, '👤 Profil');
 
-  // Row 2: Deposit & Pesanan Saya
+  // Row 2: Deposit & Membership
   assert.strictEqual(kb.inline_keyboard[1][0].text, '💰 Deposit');
-  assert.strictEqual(kb.inline_keyboard[1][1].text, '📩 Pesanan Saya');
+  assert.strictEqual(kb.inline_keyboard[1][1].text, '💎 Membership');
 
-  // Row 3: Channel
-  assert.ok(kb.inline_keyboard[2][0].text.includes('Gabung Channel'));
-  const channelBtn = kb.inline_keyboard[2][0] as { text: string; url?: string };
+  // Row 3: Pesanan Saya & Channel
+  assert.strictEqual(kb.inline_keyboard[2][0].text, '📩 Pesanan Saya');
+  assert.ok(kb.inline_keyboard[2][1].text.includes('Gabung Channel'));
+  const channelBtn = kb.inline_keyboard[2][1] as { text: string; url?: string };
   assert.strictEqual(channelBtn.url, 'https://t.me/DafungHub');
 
   // Ensure Developer API and Payment Gateway are NOT present
@@ -62,9 +63,10 @@ test('Interactive Menu: getPersistentKeyboard contains bottom action buttons', (
   assert.strictEqual(pkb.resize_keyboard, true);
   assert.strictEqual(pkb.keyboard[0][0].text, '🟢 Produk');
   assert.strictEqual(pkb.keyboard[0][1].text, '👤 Profil');
-  assert.strictEqual(pkb.keyboard[1][0].text, '💰 Deposit');
-  assert.strictEqual(pkb.keyboard[1][1].text, '📩 Pesanan Saya');
-  assert.strictEqual(pkb.keyboard[2][0].text, '❓ Bantuan');
+  assert.strictEqual(pkb.keyboard[1][0].text, '💎 Membership');
+  assert.strictEqual(pkb.keyboard[1][1].text, '💰 Deposit');
+  assert.strictEqual(pkb.keyboard[2][0].text, '📩 Pesanan Saya');
+  assert.strictEqual(pkb.keyboard[2][1].text, '❓ Bantuan');
 
   const allKeyTexts = pkb.keyboard.flat().map((b) => b.text);
   assert.ok(!allKeyTexts.some((t) => t.includes('Developer API')), 'Developer API must not be in keyboard');
@@ -296,7 +298,10 @@ test('QRIS Redisplay: sendOrderStatus re-displays QRIS for UNPAID order on refre
 
     await sendOrderStatus(mockCtx, botInstance, testOrderCode);
 
-    assert.strictEqual(sentPhotoUrl, qrUrl, 'QRIS photo must be redisplayed');
+    assert.ok(
+      sentPhotoUrl === qrUrl || Buffer.isBuffer(sentPhotoUrl),
+      'QRIS photo must be redisplayed as URL or PNG buffer'
+    );
     assert.ok(sentCaption.includes('INVOICE PEMBAYARAN QRIS'), 'Must show invoice header');
     assert.ok(sentCaption.includes('MENUNGGU PEMBAYARAN'), 'Must show pending payment status');
     assert.ok(sentCaption.includes(testOrderCode), 'Must show order code');

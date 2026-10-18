@@ -83,41 +83,88 @@ export function crc16Ccitt(data: string): string {
 }
 
 /**
- * Converts a static QRIS string (Point of Initiation = 11)
- * into a dynamic QRIS string with the exact transaction amount (Tag 54)
- * and recalculates the Tag 63 CRC16-CCITT checksum.
+ * Parse an EMVCo / ASPI QRIS string into an array of TLV (Tag-Length-Value) tokens
+ */
+export function parseEmvco(qris: string): Array<{ tag: string; value: string }> {
+  const items: Array<{ tag: string; value: string }> = [];
+  let i = 0;
+  while (i < qris.length) {
+    if (i + 4 > qris.length) break;
+    const tag = qris.slice(i, i + 2);
+    const len = parseInt(qris.slice(i + 2, i + 4), 10);
+    if (isNaN(len) || i + 4 + len > qris.length) break;
+    const value = qris.slice(i + 4, i + 4 + len);
+    items.push({ tag, value });
+    i += 4 + len;
+  }
+  return items;
+}
+
+/**
+ * Converts a static or semi-dynamic QRIS string into a 100% compliant dynamic QRIS string
+ * by enforcing Point of Initiation Method = 12 (Dynamic), setting the exact Tag 54 transaction amount,
+ * removing any duplicate amount tags, and recomputing the Tag 63 CRC16-CCITT checksum.
  */
 export function generateDynamicQrisFromStatic(
-  staticQris: string,
+  baseQris: string,
   amount: number
 ): string {
-  // 1. Convert Point of Initiation Method: 11 (Static) -> 12 (Dynamic)
-  let qris = staticQris.replace('010211', '010212');
-
-  // 2. Strip existing CRC Tag 63 if present
-  const crcIndex = qris.lastIndexOf('6304');
-  if (crcIndex !== -1) {
-    qris = qris.slice(0, crcIndex);
-  }
-
-  // 3. Format Tag 54 (Transaction Amount)
+  const items = parseEmvco(baseQris);
   const roundedAmount = Math.round(amount);
   const amtStr = String(roundedAmount);
-  const tag54 = '54' + String(amtStr.length).padStart(2, '0') + amtStr;
 
-  // Insert Tag 54 right after Tag 53 (Currency Code IDR: 5303360)
-  const idx53 = qris.indexOf('5303360');
-  if (idx53 !== -1) {
-    const after53 = idx53 + '5303360'.length;
-    qris = qris.slice(0, after53) + tag54 + qris.slice(after53);
-  } else {
-    qris += tag54;
+  let has01 = false;
+  let has54 = false;
+
+  for (const item of items) {
+    if (item.tag === '01') {
+      item.value = '12'; // 12 = Dynamic initiation method
+      has01 = true;
+    } else if (item.tag === '54') {
+      item.value = amtStr;
+      has54 = true;
+    }
   }
 
-  // 4. Append Tag 63 header and recompute CRC16
-  qris += '6304';
-  const crc = crc16Ccitt(qris);
-  return qris + crc;
+  if (!has01) {
+    items.splice(1, 0, { tag: '01', value: '12' });
+  }
+
+  if (!has54) {
+    // Insert Tag 54 right after Tag 53 (Currency Code IDR: 360)
+    const idx53 = items.findIndex((it) => it.tag === '53');
+    if (idx53 !== -1) {
+      items.splice(idx53 + 1, 0, { tag: '54', value: amtStr });
+    } else {
+      items.push({ tag: '54', value: amtStr });
+    }
+  }
+
+  // Remove Tag 63 (checksum) so we can recalculate it fresh
+  const filtered = items.filter((it) => it.tag !== '63');
+
+  let payload = '';
+  for (const it of filtered) {
+    const lenStr = String(it.value.length).padStart(2, '0');
+    payload += it.tag + lenStr + it.value;
+  }
+
+  payload += '6304';
+  const crc = crc16Ccitt(payload);
+  return payload + crc;
+}
+
+/**
+ * Generate a local high-resolution PNG Buffer for a QRIS string
+ * completely in-memory without any external network dependency.
+ */
+export async function generateQrPngBuffer(qrString: string): Promise<Buffer> {
+  const QRCode = (await import('qrcode')).default;
+  return QRCode.toBuffer(qrString, {
+    width: 450,
+    margin: 2,
+    errorCorrectionLevel: 'M',
+  });
 }
 
 /**
@@ -176,24 +223,24 @@ export async function createShopeePayInvoice(
     const resJson = await response.json();
     if (response.ok && resJson.success && resJson.data) {
       const data = resJson.data;
-      const qrString =
+      const baseRaw =
         data.qris_string ||
         data.qris ||
         data.qr_string ||
         data.qr ||
-        generateDynamicQrisFromStatic(SHOPEEPAY_STATIC_QRIS, roundedAmount);
+        SHOPEEPAY_STATIC_QRIS;
+
+      // Always enforce true dynamic QRIS (010212) with Tag 54 exact amount
+      const dynamicQris = generateDynamicQrisFromStatic(baseRaw, roundedAmount);
       const token = data.token || data.qris_token || `shopee_${orderCode}`;
-      const qrCodeUrl =
-        data.qris_url ||
-        data.qr_image ||
-        data.qr_code_url ||
-        data.qr_url ||
-        `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrString)}`;
+
+      // Always use reliable https QR image generator, never dead 404 links
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=450x450&data=${encodeURIComponent(dynamicQris)}`;
 
       return {
         qrCodeUrl,
         qrUrl: qrCodeUrl,
-        qrString,
+        qrString: dynamicQris,
         checkoutUrl: data.checkout_url,
         token,
         orderCode,
@@ -216,7 +263,7 @@ export async function createShopeePayInvoice(
 
   // 2. Zero-downtime fallback: Generate dynamic QRIS from static token
   const dynamicQris = generateDynamicQrisFromStatic(SHOPEEPAY_STATIC_QRIS, roundedAmount);
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(dynamicQris)}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=450x450&data=${encodeURIComponent(dynamicQris)}`;
 
   return {
     qrCodeUrl,
