@@ -157,14 +157,20 @@ export async function processOrderPayment(
   }
 
   // 2c. Special Handling: Top-Up / Deposit Saldo
+  const invData = (order.invoice_data as Record<string, unknown>) || {};
+
   if (order.product_name.toLowerCase().includes('deposit saldo') || order.product_name.toLowerCase().startsWith('deposit')) {
     const depositAmount = order.product_price;
+    const cashback = Number(invData.voucher_cashback || 0);
+    const totalCredit = depositAmount + cashback;
+
     await query(
       `UPDATE users SET balance = balance + $1 WHERE id = $2`,
-      [depositAmount, order.user_id]
+      [totalCredit, order.user_id]
     );
 
-    const confirmationMsg = `Top-up saldo akun sebesar Rp ${depositAmount.toLocaleString('id-ID')} berhasil.`;
+    const cashbackNote = cashback > 0 ? ` (+Bonus Cashback Voucher Rp ${cashback.toLocaleString('id-ID')})` : '';
+    const confirmationMsg = `Top-up saldo akun sebesar Rp ${depositAmount.toLocaleString('id-ID')}${cashbackNote} berhasil.`;
     const encryptedNote = encrypt(confirmationMsg);
     await query(
       `UPDATE orders
@@ -178,7 +184,9 @@ export async function processOrderPayment(
     const buyerDepositMessage =
       `🎉 <b>DEPOSIT SALDO BERHASIL DITAMBAHKAN!</b>\n` +
       `━━━━━━━━━━━━━━━━━━━\n` +
-      `💰 <b>Nominal:</b> <b>Rp ${depositAmount.toLocaleString('id-ID')}</b>\n` +
+      `💰 <b>Nominal Pokok:</b> Rp ${depositAmount.toLocaleString('id-ID')}\n` +
+      (cashback > 0 ? `🎁 <b>Bonus Cashback Voucher:</b> +Rp ${cashback.toLocaleString('id-ID')} (<code>${escapeHtml(String(invData.voucher_code || 'VOUCHER'))}</code>)\n` : '') +
+      `💳 <b>Total Saldo Masuk:</b> <b>Rp ${totalCredit.toLocaleString('id-ID')}</b>\n` +
       `🆔 <b>Kode Transaksi:</b> <code>${escapeHtml(order.order_code)}</code>\n` +
       `━━━━━━━━━━━━━━━━━━━\n\n` +
       `Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>👤 Profil</b> untuk melihat total saldo Anda.`;
@@ -206,6 +214,7 @@ export async function processOrderPayment(
       `• <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>\n` +
       `• <b>Pembeli:</b> <code>${escapeHtml(order.telegram_id)}</code>\n` +
       `• <b>Nominal Deposit:</b> <b>Rp ${depositAmount.toLocaleString('id-ID')}</b>\n` +
+      (cashback > 0 ? `• <b>Cashback Voucher:</b> +Rp ${cashback.toLocaleString('id-ID')} (${escapeHtml(String(invData.voucher_code))})\n` : '') +
       `━━━━━━━━━━━━━━━━━━━`;
 
     await sendSafeMessage(
@@ -215,6 +224,17 @@ export async function processOrderPayment(
       { parse_mode: 'HTML' }
     );
 
+    // Record voucher usage if voucher was applied
+    if (invData.voucher_id) {
+      const { applyVoucherUsage } = await import('./voucher');
+      await applyVoucherUsage({
+        voucherId: invData.voucher_id as string,
+        userId: order.user_id,
+        orderId: order.id,
+        discountAmount: cashback,
+      });
+    }
+
     return {
       success: true,
       mode: 'deposit',
@@ -222,6 +242,17 @@ export async function processOrderPayment(
       orderCode,
       deliveredKey: confirmationMsg,
     };
+  }
+
+  // Record voucher usage for product or membership transactions
+  if (invData.voucher_id) {
+    const { applyVoucherUsage } = await import('./voucher');
+    await applyVoucherUsage({
+      voucherId: invData.voucher_id as string,
+      userId: order.user_id,
+      orderId: order.id,
+      discountAmount: Number(invData.voucher_discount || 0),
+    });
   }
 
   // 2d. Record VIP Discount usage if discount was applied on this order

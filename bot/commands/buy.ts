@@ -68,7 +68,8 @@ export async function ensureUser(
 export async function handleBuy(
   ctx: Context,
   productId: string,
-  botInstance: ExtendedBot
+  botInstance: ExtendedBot,
+  explicitVoucherCode?: string
 ): Promise<void> {
   const { getBotStatus } = await import('../../lib/settings');
   const { isAdmin } = await import('../../lib/pricing');
@@ -296,12 +297,45 @@ export async function handleBuy(
   });
 
   // 4. Calculate checkout pricing (VIP discount + hidden fee Rp 100)
-  const { calculateCheckoutPrice } = await import('../../lib/membership');
+  const { calculateCheckoutPrice, isMembershipProduct, isDepositProduct } = await import('../../lib/membership');
   const checkoutPricing = await calculateCheckoutPrice(telegramId, {
     name: product.name,
     price: product.price,
   });
-  const payableAmount = checkoutPricing.finalPayableAmount;
+
+  // Check for applied voucher (explicit parameter or active session)
+  const { getPendingUserVoucher, clearPendingUserVoucher, validateVoucherForTransaction } = await import('../../lib/voucher');
+  const voucherCode = explicitVoucherCode || getPendingUserVoucher(telegramId);
+  let appliedVoucher: any = null;
+  let voucherDiscount = 0;
+  let voucherCashback = 0;
+
+  if (voucherCode) {
+    const isMembership = isMembershipProduct(product.name);
+    const isDeposit = isDepositProduct(product.name);
+    const txnType = isDeposit ? 'deposit' : (isMembership ? 'membership' : 'product');
+
+    const vResult = await validateVoucherForTransaction({
+      code: voucherCode,
+      userId: user.id,
+      telegramId,
+      transactionType: txnType,
+      productName: product.name,
+      productId: product.id,
+      amount: checkoutPricing.basePrice,
+    });
+
+    if (vResult.valid && vResult.voucher) {
+      appliedVoucher = vResult.voucher;
+      voucherDiscount = vResult.discountAmount;
+      voucherCashback = vResult.cashbackAmount;
+      clearPendingUserVoucher(telegramId);
+    }
+  }
+
+  // Calculate final payable amount: (base - vipDiscount - voucherDiscount) + hidden fee
+  const priceAfterDiscounts = Math.max(0, checkoutPricing.basePrice - checkoutPricing.discount - voucherDiscount);
+  const payableAmount = priceAfterDiscounts + checkoutPricing.fee;
 
   // 5. Generate unique order_code
   const orderCode = generateOrderCode();
@@ -380,23 +414,34 @@ export async function handleBuy(
         base_price: checkoutPricing.basePrice,
         discount: checkoutPricing.discount,
         fee: checkoutPricing.fee,
-        payable_amount: checkoutPricing.finalPayableAmount,
+        payable_amount: payableAmount,
         is_vip_discount: checkoutPricing.isVipDiscountApplied,
+        voucher_id: appliedVoucher ? appliedVoucher.id : null,
+        voucher_code: appliedVoucher ? appliedVoucher.code : null,
+        voucher_discount: voucherDiscount,
+        voucher_cashback: voucherCashback,
       }),
     ]
   );
 
   // 8. Format invoice message & send QRIS
   const formattedPrice = `Rp ${payableAmount.toLocaleString('id-ID')}`;
-  const vipDiscountNotice = checkoutPricing.isVipDiscountApplied
-    ? ` <i>(Hemat Rp 1.000 via VIP Member! 🌟)</i>`
-    : '';
+  let discountLabels = '';
+  if (checkoutPricing.isVipDiscountApplied) {
+    discountLabels += ` <i>(Hemat Rp 1.000 via VIP Member! 🌟)</i>`;
+  }
+  if (voucherDiscount > 0 && appliedVoucher) {
+    discountLabels += ` <i>(Diskon Voucher ${escapeHtml(appliedVoucher.code)}: -Rp ${voucherDiscount.toLocaleString('id-ID')}! 🎟️)</i>`;
+  }
+  if (voucherCashback > 0 && appliedVoucher) {
+    discountLabels += ` <i>(Bonus Cashback ${escapeHtml(appliedVoucher.code)}: +Rp ${voucherCashback.toLocaleString('id-ID')}! 🎁)</i>`;
+  }
 
   const invoiceCaption =
     '🧾 <b>INVOICE PEMBAYARAN QRIS</b>\n' +
     '━━━━━━━━━━━━━━━━━━━\n' +
     `📦 <b>Produk:</b> ${escapeHtml(product.name)}\n` +
-    `💰 <b>Total:</b> ${escapeHtml(formattedPrice)}${vipDiscountNotice}\n` +
+    `💰 <b>Total:</b> ${escapeHtml(formattedPrice)}${discountLabels}\n` +
     `🆔 <b>Kode Order:</b> <code>${escapeHtml(orderCode)}</code>\n` +
     '━━━━━━━━━━━━━━━━━━━\n\n' +
     '📌 <b>Instruksi Pembayaran:</b>\n' +
@@ -453,11 +498,12 @@ export async function handleBuy(
  * Register the /buy command into the bot
  */
 export function registerBuyHandler(botInstance: ExtendedBot): void {
-  // Command: /buy <product_id>
+  // Command: /buy <product_id> [voucher_code]
   botInstance.command('buy', async (ctx: Context) => {
     const text = ctx.message?.text || '';
     const parts = text.trim().split(/\s+/);
     const productId = parts[1] || '';
-    await handleBuy(ctx, productId, botInstance);
+    const voucherCode = parts[2] || undefined;
+    await handleBuy(ctx, productId, botInstance, voucherCode);
   });
 }

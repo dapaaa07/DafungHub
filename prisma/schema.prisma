@@ -45,7 +45,8 @@ model User {
   weeklyDiscountResetAt  DateTime? @map("weekly_discount_reset_at") @db.Timestamptz(6)
   createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  orders      Order[]
+  orders         Order[]
+  voucherUsages  VoucherUsage[]
 
   @@index([telegramId])
   @@map("users")
@@ -81,10 +82,50 @@ model Order {
 
   user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   product             Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  voucherUsages       VoucherUsage[]
 
   @@index([userId])
   @@index([orderCode])
   @@index([paymentStatus])
   @@index([fulfillmentStatus])
   @@map("orders")
+}
+
+model Voucher {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code            String         @unique @db.VarChar(50)
+  type            String         @db.VarChar(50)
+  discountType    String         @default("nominal") @map("discount_type") @db.VarChar(20)
+  discountValue   Int            @map("discount_value")
+  productTarget   String?        @map("product_target") @db.VarChar(255)
+  minOrderAmount  Int            @default(0) @map("min_order_amount")
+  maxUses         Int            @default(10) @map("max_uses")
+  usedCount       Int            @default(0) @map("used_count")
+  isActive        Boolean        @default(true) @map("is_active")
+  expiresAt       DateTime?      @map("expires_at") @db.Timestamptz(6)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  usages          VoucherUsage[]
+
+  @@index([code])
+  @@index([isActive])
+  @@map("vouchers")
+}
+
+model VoucherUsage {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  voucherId      String    @map("voucher_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  orderId        String?   @map("order_id") @db.Uuid
+  discountAmount Int       @default(0) @map("discount_amount")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  voucher        Voucher   @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order          Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([voucherId, userId], name: "uq_voucher_user")
+  @@index([userId])
+  @@map("voucher_usages")
 }

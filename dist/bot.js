@@ -13420,6 +13420,321 @@ var init_membership = __esm({
   }
 });
 
+// lib/voucher.ts
+var voucher_exports = {};
+__export(voucher_exports, {
+  applyVoucherUsage: () => applyVoucherUsage,
+  clearPendingUserVoucher: () => clearPendingUserVoucher,
+  createVoucher: () => createVoucher,
+  deleteVoucher: () => deleteVoucher,
+  formatVoucherBenefit: () => formatVoucherBenefit,
+  getAllVouchers: () => getAllVouchers,
+  getPendingUserVoucher: () => getPendingUserVoucher,
+  getVoucherByCode: () => getVoucherByCode,
+  getVoucherTypeLabel: () => getVoucherTypeLabel,
+  hasUserUsedVoucher: () => hasUserUsedVoucher,
+  setPendingUserVoucher: () => setPendingUserVoucher,
+  toggleVoucherStatus: () => toggleVoucherStatus,
+  validateVoucherForTransaction: () => validateVoucherForTransaction
+});
+function setPendingUserVoucher(telegramId, code) {
+  pendingUserVouchers.set(String(telegramId), {
+    code: code.trim().toUpperCase(),
+    appliedAt: Date.now()
+  });
+}
+function getPendingUserVoucher(telegramId) {
+  const session = pendingUserVouchers.get(String(telegramId));
+  if (!session) return null;
+  if (Date.now() - session.appliedAt > 30 * 60 * 1e3) {
+    pendingUserVouchers.delete(String(telegramId));
+    return null;
+  }
+  return session.code;
+}
+function clearPendingUserVoucher(telegramId) {
+  pendingUserVouchers.delete(String(telegramId));
+}
+function getVoucherTypeLabel(type) {
+  switch (type) {
+    case "all_products":
+      return "Semua Produk";
+    case "product":
+      return "Produk Khusus";
+    case "membership":
+      return "Paket Membership";
+    case "deposit_cashback":
+      return "Cashback Deposit";
+    default:
+      return type;
+  }
+}
+function formatVoucherBenefit(v) {
+  const valueStr = v.discount_type === "percent" ? `${v.discount_value}%` : `Rp ${Number(v.discount_value).toLocaleString("id-ID")}`;
+  switch (v.type) {
+    case "all_products":
+      return `Potongan ${valueStr} untuk seluruh produk`;
+    case "product":
+      return `Potongan ${valueStr} khusus produk "${v.product_target || "Pilihan"}"`;
+    case "membership":
+      return `Diskon ${valueStr} pembelian paket Membership VIP`;
+    case "deposit_cashback":
+      return `Bonus Saldo Cashback ${valueStr} saat deposit`;
+    default:
+      return `Potongan ${valueStr}`;
+  }
+}
+async function createVoucher(params) {
+  const cleanCode = params.code.trim().toUpperCase();
+  const discountType = params.discountType || "nominal";
+  const minOrder = Math.max(0, params.minOrderAmount || 0);
+  const maxUses = Math.max(1, params.maxUses || 10);
+  const res = await query(
+    `INSERT INTO vouchers (
+       code,
+       type,
+       discount_type,
+       discount_value,
+       product_target,
+       min_order_amount,
+       max_uses,
+       used_count,
+       is_active,
+       expires_at,
+       created_at,
+       updated_at
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, true, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+     RETURNING *`,
+    [
+      cleanCode,
+      params.type,
+      discountType,
+      params.discountValue,
+      params.productTarget ? params.productTarget.trim() : null,
+      minOrder,
+      maxUses,
+      params.expiresAt || null
+    ]
+  );
+  return res.rows[0];
+}
+async function getAllVouchers() {
+  const res = await query(
+    `SELECT * FROM vouchers ORDER BY created_at DESC LIMIT 50`
+  );
+  return res.rows;
+}
+async function getVoucherByCode(code) {
+  if (!code) return null;
+  const cleanCode = code.trim().toUpperCase();
+  const res = await query(
+    `SELECT * FROM vouchers WHERE code = $1 LIMIT 1`,
+    [cleanCode]
+  );
+  return res.rows[0] || null;
+}
+async function deleteVoucher(voucherId) {
+  const res = await query(`DELETE FROM vouchers WHERE id = $1 RETURNING id`, [voucherId]);
+  return res.rowCount !== null && res.rowCount > 0;
+}
+async function toggleVoucherStatus(voucherId, isActive) {
+  const res = await query(
+    `UPDATE vouchers SET is_active = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id`,
+    [isActive, voucherId]
+  );
+  return res.rowCount !== null && res.rowCount > 0;
+}
+async function hasUserUsedVoucher(voucherId, userId) {
+  const res = await query(
+    `SELECT id FROM voucher_usages WHERE voucher_id = $1 AND user_id = $2 LIMIT 1`,
+    [voucherId, userId]
+  );
+  return res.rows.length > 0;
+}
+async function validateVoucherForTransaction(params) {
+  const code = (params.code || "").trim().toUpperCase();
+  if (!code) {
+    return { valid: false, discountAmount: 0, cashbackAmount: 0, message: "Kode voucher tidak boleh kosong." };
+  }
+  const voucher = await getVoucherByCode(code);
+  if (!voucher) {
+    return { valid: false, discountAmount: 0, cashbackAmount: 0, message: `Voucher "${code}" tidak ditemukan.` };
+  }
+  if (!voucher.is_active) {
+    return { valid: false, voucher, discountAmount: 0, cashbackAmount: 0, message: `Voucher "${code}" sedang dinonaktifkan.` };
+  }
+  if (voucher.expires_at && (/* @__PURE__ */ new Date()).getTime() > new Date(voucher.expires_at).getTime()) {
+    return { valid: false, voucher, discountAmount: 0, cashbackAmount: 0, message: `Voucher "${code}" telah kedaluwarsa.` };
+  }
+  let resolvedUserId = params.userId;
+  if (!resolvedUserId && params.telegramId) {
+    const userRes = await query(
+      `SELECT id FROM users WHERE telegram_id = $1 LIMIT 1`,
+      [params.telegramId]
+    );
+    if (userRes.rows.length > 0) {
+      resolvedUserId = userRes.rows[0].id;
+    }
+  }
+  if (resolvedUserId) {
+    const alreadyUsed = await hasUserUsedVoucher(voucher.id, resolvedUserId);
+    if (alreadyUsed) {
+      return {
+        valid: false,
+        voucher,
+        discountAmount: 0,
+        cashbackAmount: 0,
+        message: `Anda sudah pernah menggunakan voucher "${code}" sebelumnya. (1 voucher berlaku 1 kali per akun).`
+      };
+    }
+  }
+  if (voucher.used_count >= voucher.max_uses) {
+    return {
+      valid: false,
+      voucher,
+      discountAmount: 0,
+      cashbackAmount: 0,
+      message: `Kuota voucher "${code}" telah habis (${voucher.used_count}/${voucher.max_uses} pengguna).`
+    };
+  }
+  if (voucher.min_order_amount > 0 && params.amount < voucher.min_order_amount) {
+    return {
+      valid: false,
+      voucher,
+      discountAmount: 0,
+      cashbackAmount: 0,
+      message: `Minimum transaksi untuk voucher ini adalah Rp ${voucher.min_order_amount.toLocaleString("id-ID")}.`
+    };
+  }
+  const txnType = params.transactionType;
+  if (txnType === "deposit") {
+    if (voucher.type !== "deposit_cashback") {
+      return {
+        valid: false,
+        voucher,
+        discountAmount: 0,
+        cashbackAmount: 0,
+        message: `Voucher "${code}" hanya berlaku untuk pembelian produk, bukan deposit saldo.`
+      };
+    }
+    let cashback = 0;
+    if (voucher.discount_type === "percent") {
+      cashback = Math.round(params.amount * voucher.discount_value / 100);
+    } else {
+      cashback = voucher.discount_value;
+    }
+    return {
+      valid: true,
+      voucher,
+      discountAmount: 0,
+      cashbackAmount: cashback,
+      message: `Voucher valid! Anda akan mendapatkan bonus saldo cashback Rp ${cashback.toLocaleString("id-ID")}.`
+    };
+  }
+  if (txnType === "membership") {
+    if (voucher.type !== "membership" && voucher.type !== "all_products") {
+      return {
+        valid: false,
+        voucher,
+        discountAmount: 0,
+        cashbackAmount: 0,
+        message: `Voucher "${code}" tidak berlaku untuk paket Membership VIP.`
+      };
+    }
+    let discount2 = 0;
+    if (voucher.discount_type === "percent") {
+      discount2 = Math.round(params.amount * voucher.discount_value / 100);
+    } else {
+      discount2 = voucher.discount_value;
+    }
+    discount2 = Math.min(discount2, params.amount);
+    return {
+      valid: true,
+      voucher,
+      discountAmount: discount2,
+      cashbackAmount: 0,
+      message: `Voucher valid! Potongan harga Rp ${discount2.toLocaleString("id-ID")} berhasil diterapkan.`
+    };
+  }
+  if (voucher.type === "deposit_cashback") {
+    return {
+      valid: false,
+      voucher,
+      discountAmount: 0,
+      cashbackAmount: 0,
+      message: `Voucher "${code}" khusus untuk deposit saldo akun, bukan pembelian produk.`
+    };
+  }
+  if (voucher.type === "membership") {
+    return {
+      valid: false,
+      voucher,
+      discountAmount: 0,
+      cashbackAmount: 0,
+      message: `Voucher "${code}" khusus untuk pembelian paket Membership VIP.`
+    };
+  }
+  if (voucher.type === "product") {
+    const target = (voucher.product_target || "").toLowerCase().trim();
+    const prodName = (params.productName || "").toLowerCase();
+    const prodId = (params.productId || "").toLowerCase();
+    const matches = target.length > 0 && (prodName.includes(target) || prodId === target || prodId.includes(target));
+    if (!matches) {
+      return {
+        valid: false,
+        voucher,
+        discountAmount: 0,
+        cashbackAmount: 0,
+        message: `Voucher "${code}" hanya berlaku untuk produk bertarget "${voucher.product_target}".`
+      };
+    }
+  }
+  let discount = 0;
+  if (voucher.discount_type === "percent") {
+    discount = Math.round(params.amount * voucher.discount_value / 100);
+  } else {
+    discount = voucher.discount_value;
+  }
+  discount = Math.min(discount, params.amount);
+  return {
+    valid: true,
+    voucher,
+    discountAmount: discount,
+    cashbackAmount: 0,
+    message: `Voucher valid! Potongan harga Rp ${discount.toLocaleString("id-ID")} berhasil diterapkan.`
+  };
+}
+async function applyVoucherUsage(params) {
+  try {
+    await query(
+      `INSERT INTO voucher_usages (voucher_id, user_id, order_id, discount_amount, created_at)
+       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+       ON CONFLICT (voucher_id, user_id) DO NOTHING`,
+      [params.voucherId, params.userId, params.orderId || null, params.discountAmount]
+    );
+    await query(
+      `UPDATE vouchers
+       SET used_count = used_count + 1,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [params.voucherId]
+    );
+    console.log(
+      `[Voucher] Successfully recorded usage of voucher ${params.voucherId} by user ${params.userId}`
+    );
+  } catch (err) {
+    console.error("[Voucher] Error recording voucher usage:", err);
+  }
+}
+var pendingUserVouchers;
+var init_voucher = __esm({
+  "lib/voucher.ts"() {
+    "use strict";
+    init_db();
+    pendingUserVouchers = /* @__PURE__ */ new Map();
+  }
+});
+
 // lib/fulfillment.ts
 var fulfillment_exports = {};
 __export(fulfillment_exports, {
@@ -13536,13 +13851,17 @@ async function processOrderPayment(orderCode, botInstance) {
       deliveredKey: note
     };
   }
+  const invData = order.invoice_data || {};
   if (order.product_name.toLowerCase().includes("deposit saldo") || order.product_name.toLowerCase().startsWith("deposit")) {
     const depositAmount = order.product_price;
+    const cashback = Number(invData.voucher_cashback || 0);
+    const totalCredit = depositAmount + cashback;
     await query(
       `UPDATE users SET balance = balance + $1 WHERE id = $2`,
-      [depositAmount, order.user_id]
+      [totalCredit, order.user_id]
     );
-    const confirmationMsg = `Top-up saldo akun sebesar Rp ${depositAmount.toLocaleString("id-ID")} berhasil.`;
+    const cashbackNote = cashback > 0 ? ` (+Bonus Cashback Voucher Rp ${cashback.toLocaleString("id-ID")})` : "";
+    const confirmationMsg = `Top-up saldo akun sebesar Rp ${depositAmount.toLocaleString("id-ID")}${cashbackNote} berhasil.`;
     const encryptedNote = encrypt(confirmationMsg);
     await query(
       `UPDATE orders
@@ -13554,7 +13873,9 @@ async function processOrderPayment(orderCode, botInstance) {
     );
     const buyerDepositMessage = `\u{1F389} <b>DEPOSIT SALDO BERHASIL DITAMBAHKAN!</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u{1F4B0} <b>Nominal:</b> <b>Rp ${depositAmount.toLocaleString("id-ID")}</b>
+\u{1F4B0} <b>Nominal Pokok:</b> Rp ${depositAmount.toLocaleString("id-ID")}
+` + (cashback > 0 ? `\u{1F381} <b>Bonus Cashback Voucher:</b> +Rp ${cashback.toLocaleString("id-ID")} (<code>${escapeHtml2(String(invData.voucher_code || "VOUCHER"))}</code>)
+` : "") + `\u{1F4B3} <b>Total Saldo Masuk:</b> <b>Rp ${totalCredit.toLocaleString("id-ID")}</b>
 \u{1F194} <b>Kode Transaksi:</b> <code>${escapeHtml2(order.order_code)}</code>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
@@ -13579,13 +13900,23 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
 \u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
 \u2022 <b>Pembeli:</b> <code>${escapeHtml2(order.telegram_id)}</code>
 \u2022 <b>Nominal Deposit:</b> <b>Rp ${depositAmount.toLocaleString("id-ID")}</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`;
+` + (cashback > 0 ? `\u2022 <b>Cashback Voucher:</b> +Rp ${cashback.toLocaleString("id-ID")} (${escapeHtml2(String(invData.voucher_code))})
+` : "") + `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`;
     await sendSafeMessage(
       { chatId: ADMIN_TELEGRAM_ID },
       botInstance,
       ownerDepositAlert,
       { parse_mode: "HTML" }
     );
+    if (invData.voucher_id) {
+      const { applyVoucherUsage: applyVoucherUsage2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+      await applyVoucherUsage2({
+        voucherId: invData.voucher_id,
+        userId: order.user_id,
+        orderId: order.id,
+        discountAmount: cashback
+      });
+    }
     return {
       success: true,
       mode: "deposit",
@@ -13593,6 +13924,15 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
       orderCode,
       deliveredKey: confirmationMsg
     };
+  }
+  if (invData.voucher_id) {
+    const { applyVoucherUsage: applyVoucherUsage2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+    await applyVoucherUsage2({
+      voucherId: invData.voucher_id,
+      userId: order.user_id,
+      orderId: order.id,
+      discountAmount: Number(invData.voucher_discount || 0)
+    });
   }
   if (order.invoice_data?.is_vip_discount) {
     await recordDiscountUsage2(order.user_id, 1e3);
@@ -14306,6 +14646,7 @@ __export(menu_exports, {
   getPlatformsWithCounts: () => getPlatformsWithCounts,
   matchProductPlatform: () => matchProductPlatform2,
   registerMenuHandlers: () => registerMenuHandlers,
+  sendAdminAddVoucherMenu: () => sendAdminAddVoucherMenu,
   sendAdminBalanceMenu: () => sendAdminBalanceMenu,
   sendAdminBroadcastMenu: () => sendAdminBroadcastMenu,
   sendAdminBroadcastPreview: () => sendAdminBroadcastPreview,
@@ -14313,6 +14654,8 @@ __export(menu_exports, {
   sendAdminPanel: () => sendAdminPanel,
   sendAdminPricesMenu: () => sendAdminPricesMenu,
   sendAdminQueueMenu: () => sendAdminQueueMenu,
+  sendAdminVoucherDetail: () => sendAdminVoucherDetail,
+  sendAdminVouchersMenu: () => sendAdminVouchersMenu,
   sendApiMenu: () => sendApiMenu,
   sendDepositMenu: () => sendDepositMenu,
   sendMainMenu: () => sendMainMenu,
@@ -14820,6 +15163,12 @@ Sentuh tombol di bawah untuk langsung membuat invoice pembayaran QRIS:`;
           callback_data: `buy_${prod.id}`
         }
       ]);
+      buttons.push([
+        {
+          text: "\u{1F39F}\uFE0F Gunakan Kode Voucher",
+          callback_data: `input_voucher_${prod.id}`
+        }
+      ]);
     }
     const backPlat = platformId || matchProductPlatform2(prod.name)?.id || "all";
     buttons.push([
@@ -15273,14 +15622,17 @@ Gunakan panel kontrol di bawah untuk mengelola bisnis:`;
         { text: "\u{1F4B0} Atur & Kelola Harga", callback_data: "admin_prices" }
       ],
       [
+        { text: "\u{1F39F}\uFE0F Kelola Voucher Promo", callback_data: "admin_vouchers" },
+        { text: "\u{1F4B3} Cek Saldo Supplier", callback_data: "admin_balance" }
+      ],
+      [
         {
           text: `\u{1F4E6} Antrean Pesanan (${pendingOrders.length})`,
           callback_data: "admin_queue"
         },
-        { text: "\u{1F4B3} Cek Saldo Supplier", callback_data: "admin_balance" }
+        { text: "\u{1F4CA} Riwayat Penjualan", callback_data: "admin_orders" }
       ],
       [
-        { text: "\u{1F4CA} Riwayat Penjualan", callback_data: "admin_orders" },
         { text: "\u{1F465} Tampilan Pembeli (Preview)", callback_data: "menu_main" }
       ]
     ]
@@ -15550,6 +15902,138 @@ Contoh: <code>/editprice capcut 28000</code>
     );
   }
 }
+async function sendAdminVouchersMenu(ctx, botInstance) {
+  if (!isAdmin(ctx.from?.id)) return;
+  const { getAllVouchers: getAllVouchers2, formatVoucherBenefit: formatVoucherBenefit2, getVoucherTypeLabel: getVoucherTypeLabel2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+  const vouchers = await getAllVouchers2();
+  let text = `\u{1F39F}\uFE0F <b>PENGELOLAAN VOUCHER & KODE PROMO</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Kelola voucher diskon dan kuota pemakaian per user untuk toko Anda:
+
+`;
+  const buttons = [];
+  if (vouchers.length === 0) {
+    text += `<i>Belum ada voucher aktif saat ini. Klik tombol di bawah untuk membuat voucher pertama Anda!</i>
+
+`;
+  } else {
+    for (const v of vouchers) {
+      const statusIcon = v.is_active ? "\u{1F7E2}" : "\u{1F534}";
+      const quotaStr = `${v.used_count}/${v.max_uses} Terpakai`;
+      const typeLabel = getVoucherTypeLabel2(v.type);
+      text += `\u2022 ${statusIcon} <b><code>${escapeHtml4(v.code)}</code></b> [${escapeHtml4(typeLabel)}]
+  \u251C Keuntungan: <i>${escapeHtml4(formatVoucherBenefit2(v))}</i>
+  \u2514 Jatah Kuota: <b>${quotaStr}</b>
+
+`;
+      buttons.push([
+        {
+          text: `\u2699\uFE0F ${v.code} (${v.used_count}/${v.max_uses})`,
+          callback_data: `admin_v_view_${v.id}`
+        }
+      ]);
+    }
+  }
+  buttons.push([
+    { text: "\u2795 Buat Voucher Baru", callback_data: "admin_voucher_add" },
+    { text: "\u{1F504} Refresh", callback_data: "admin_vouchers" }
+  ]);
+  buttons.push([{ text: "\u{1F519} Kembali ke Panel Owner", callback_data: "admin_panel" }]);
+  await sendSafeMessage(ctx, botInstance, text, {
+    parse_mode: "HTML",
+    reply_markup: { inline_keyboard: buttons }
+  });
+}
+async function sendAdminVoucherDetail(ctx, botInstance, voucherId) {
+  if (!isAdmin(ctx.from?.id)) return;
+  const { getAllVouchers: getAllVouchers2, formatVoucherBenefit: formatVoucherBenefit2, getVoucherTypeLabel: getVoucherTypeLabel2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+  const vouchers = await getAllVouchers2();
+  const v = vouchers.find((item) => item.id === voucherId);
+  if (!v) {
+    await sendSafeMessage(ctx, botInstance, "\u274C Voucher tidak ditemukan.", {
+      reply_markup: { inline_keyboard: [[{ text: "\u{1F519} Daftar Voucher", callback_data: "admin_vouchers" }]] }
+    });
+    return;
+  }
+  const { formatWibDate: formatWibDate2 } = await Promise.resolve().then(() => (init_membership(), membership_exports));
+  const typeLabel = getVoucherTypeLabel2(v.type);
+  const statusStr = v.is_active ? "\u{1F7E2} Aktif (Bisa Digunakan)" : "\u{1F534} Nonaktif";
+  const remainingQuota = Math.max(0, v.max_uses - v.used_count);
+  const text = `\u{1F39F}\uFE0F <b>DETAIL VOUCHER: <code>${escapeHtml4(v.code)}</code></b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u2022 <b>Kode Unik:</b> <code>${escapeHtml4(v.code)}</code>
+\u2022 <b>Tipe Voucher:</b> ${escapeHtml4(typeLabel)}
+` + (v.product_target ? `\u2022 <b>Target Produk:</b> ${escapeHtml4(v.product_target)}
+` : "") + `\u2022 <b>Keuntungan:</b> ${escapeHtml4(formatVoucherBenefit2(v))}
+\u2022 <b>Status:</b> ${statusStr}
+\u2022 <b>Jatah Total Pengguna:</b> <b>${v.max_uses} User</b>
+\u2022 <b>Sudah Digunakan:</b> <b>${v.used_count} User</b> (Sisa Kuota: <b>${remainingQuota} User</b>)
+\u2022 <b>Dibuat Pada:</b> ${formatWibDate2(v.created_at)}
+` + (v.expires_at ? `\u2022 <b>Kadaluarsa:</b> ${formatWibDate2(v.expires_at)}
+` : "") + `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Pilih tindakan pengelolaan di bawah:`;
+  const buttons = [
+    [
+      {
+        text: v.is_active ? "\u{1F534} Nonaktifkan Voucher" : "\u{1F7E2} Aktifkan Voucher",
+        callback_data: `admin_v_toggle_${v.id}_${v.is_active ? "off" : "on"}`
+      },
+      {
+        text: "\u{1F5D1}\uFE0F Hapus Voucher",
+        callback_data: `admin_v_del_${v.id}`
+      }
+    ],
+    [{ text: "\u{1F519} Kembali ke Daftar Voucher", callback_data: "admin_vouchers" }]
+  ];
+  await sendSafeMessage(ctx, botInstance, text, {
+    parse_mode: "HTML",
+    reply_markup: { inline_keyboard: buttons }
+  });
+}
+async function sendAdminAddVoucherMenu(ctx, botInstance) {
+  if (!isAdmin(ctx.from?.id)) return;
+  const text = `\u2795 <b>BUAT VOUCHER PROMO BARU</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Anda dapat membuat voucher secara <b>instan 1-klik via Preset</b> di bawah, atau menggunakan perintah custom:
+
+\u{1F4DD} <b>Format Perintah Custom:</b>
+<code>/voucher_buat &lt;KODE&gt; &lt;TIPE&gt; &lt;NILAI&gt; &lt;KUOTA_USER&gt; [TARGET_PRODUK]</code>
+
+<b>Pilihan Tipe:</b>
+\u2022 <code>all</code> : Diskon untuk SELURUH produk akun digital
+\u2022 <code>product</code> : Diskon KHUSUS produk tertentu
+\u2022 <code>membership</code> : Diskon pembelian paket VIP Membership
+\u2022 <code>deposit</code> : Bonus SALDO CASHBACK saat user deposit
+
+\u{1F4A1} <b>Contoh Penggunaan:</b>
+\u2022 <code>/voucher_buat SEMUA5K all 5000 20</code>
+\u2022 <code>/voucher_buat CANVA2K product 2000 10 canva</code>
+\u2022 <code>/voucher_buat VIPHEMAT membership 2000 15</code>
+\u2022 <code>/voucher_buat CASHBACK5K deposit 5000 25</code>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Atau klik salah satu <b>Preset Siap Pakai</b> di bawah untuk langsung generate:`;
+  const buttons = [
+    [
+      { text: "\u26A1 Preset: Diskon Semua Produk (Rp 3.000 / 10 User)", callback_data: "admin_v_preset_all" }
+    ],
+    [
+      { text: "\u26A1 Preset: Diskon Khusus Canva (Rp 2.000 / 10 User)", callback_data: "admin_v_preset_canva" }
+    ],
+    [
+      { text: "\u26A1 Preset: Diskon Membership (Rp 2.000 / 15 User)", callback_data: "admin_v_preset_mem" }
+    ],
+    [
+      { text: "\u26A1 Preset: Bonus Cashback Deposit (Rp 5.000 / 10 User)", callback_data: "admin_v_preset_dep" }
+    ],
+    [
+      { text: "\u{1F519} Kembali ke Daftar Voucher", callback_data: "admin_vouchers" }
+    ]
+  ];
+  await sendSafeMessage(ctx, botInstance, text, {
+    parse_mode: "HTML",
+    reply_markup: { inline_keyboard: buttons }
+  });
+}
 function registerMenuHandlers(botInstance) {
   botInstance.on("callback_query", async (ctx) => {
     const data = ctx.callbackQuery?.data || "";
@@ -15590,6 +16074,88 @@ function registerMenuHandlers(botInstance) {
         await sendAdminBalanceMenu(ctx, botInstance);
       } else if (data === "admin_orders") {
         await sendAdminOrdersMenu(ctx, botInstance);
+      } else if (data === "admin_vouchers") {
+        await sendAdminVouchersMenu(ctx, botInstance);
+      } else if (data === "admin_voucher_add") {
+        await sendAdminAddVoucherMenu(ctx, botInstance);
+      } else if (data.startsWith("admin_v_view_")) {
+        const vId = data.replace("admin_v_view_", "");
+        await sendAdminVoucherDetail(ctx, botInstance, vId);
+      } else if (data.startsWith("admin_v_toggle_")) {
+        if (!isAdmin(ctx.from?.id)) return;
+        const rest = data.replace("admin_v_toggle_", "");
+        const lastUnderscore = rest.lastIndexOf("_");
+        const vId = rest.substring(0, lastUnderscore);
+        const state = rest.substring(lastUnderscore + 1);
+        const { toggleVoucherStatus: toggleVoucherStatus2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+        await toggleVoucherStatus2(vId, state === "on");
+        await sendAdminVoucherDetail(ctx, botInstance, vId);
+      } else if (data.startsWith("admin_v_del_")) {
+        if (!isAdmin(ctx.from?.id)) return;
+        const vId = data.replace("admin_v_del_", "");
+        const { deleteVoucher: deleteVoucher2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+        await deleteVoucher2(vId);
+        await sendAdminVouchersMenu(ctx, botInstance);
+      } else if (data === "admin_v_preset_all") {
+        if (!isAdmin(ctx.from?.id)) return;
+        const { createVoucher: createVoucher2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+        const rand = Math.floor(100 + Math.random() * 900);
+        await createVoucher2({
+          code: `SEMUA${rand}`,
+          type: "all_products",
+          discountValue: 3e3,
+          maxUses: 10
+        });
+        await sendAdminVouchersMenu(ctx, botInstance);
+      } else if (data === "admin_v_preset_canva") {
+        if (!isAdmin(ctx.from?.id)) return;
+        const { createVoucher: createVoucher2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+        const rand = Math.floor(100 + Math.random() * 900);
+        await createVoucher2({
+          code: `CANVA${rand}`,
+          type: "product",
+          productTarget: "canva",
+          discountValue: 2e3,
+          maxUses: 10
+        });
+        await sendAdminVouchersMenu(ctx, botInstance);
+      } else if (data === "admin_v_preset_mem") {
+        if (!isAdmin(ctx.from?.id)) return;
+        const { createVoucher: createVoucher2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+        const rand = Math.floor(100 + Math.random() * 900);
+        await createVoucher2({
+          code: `VIP${rand}`,
+          type: "membership",
+          discountValue: 2e3,
+          maxUses: 15
+        });
+        await sendAdminVouchersMenu(ctx, botInstance);
+      } else if (data === "admin_v_preset_dep") {
+        if (!isAdmin(ctx.from?.id)) return;
+        const { createVoucher: createVoucher2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+        const rand = Math.floor(100 + Math.random() * 900);
+        await createVoucher2({
+          code: `CB${rand}`,
+          type: "deposit_cashback",
+          discountValue: 5e3,
+          maxUses: 10
+        });
+        await sendAdminVouchersMenu(ctx, botInstance);
+      } else if (data.startsWith("input_voucher_")) {
+        const prodId = data.replace("input_voucher_", "");
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `\u{1F39F}\uFE0F <b>KLAIM VOUCHER PROMO</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Silakan ketik kode voucher Anda dengan format:
+<code>/voucher &lt;KODE&gt;</code>
+
+Contoh: <code>/voucher HEMAT5K</code>
+
+Setelah voucher aktif, potongan harga akan otomatis teraplikasikan pada produk <code>${escapeHtml4(prodId)}</code> saat Anda checkout!`,
+          { parse_mode: "HTML" }
+        );
       } else if (data === "admin_prices") {
         await sendAdminPricesMenu(ctx, botInstance, 0);
       } else if (data.startsWith("admin_prices_page_")) {
@@ -15991,6 +16557,125 @@ Pesan telah diposting live di https://t.me/DafungHub.`,
           [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
         ]
       }
+    });
+  });
+  botInstance.command(["voucher_buat", "add_voucher"], async (ctx) => {
+    if (!isAdmin(ctx.from?.id)) return;
+    const text = ctx.message?.text || "";
+    const parts = text.trim().split(/\s+/);
+    if (parts.length < 5) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        `\u26A0\uFE0F <b>Format Tidak Lengkap:</b>
+<code>/voucher_buat &lt;KODE&gt; &lt;TIPE&gt; &lt;NILAI&gt; &lt;KUOTA_USER&gt; [TARGET_PRODUK]</code>
+
+<b>Pilihan Tipe:</b>
+\u2022 <code>all</code> : Diskon semua produk
+\u2022 <code>product</code> : Diskon produk khusus
+\u2022 <code>membership</code> : Diskon paket VIP Membership
+\u2022 <code>deposit</code> : Bonus Saldo Cashback Deposit
+
+Contoh:
+<code>/voucher_buat PROMO5K all 5000 20</code>`,
+        { parse_mode: "HTML" }
+      );
+      return;
+    }
+    const rawCode = parts[1];
+    const rawType = parts[2].toLowerCase();
+    const value = parseInt(parts[3], 10);
+    const maxUses = parseInt(parts[4], 10);
+    const target = parts[5] || null;
+    let type = "all_products";
+    if (rawType === "product") type = "product";
+    else if (rawType === "membership") type = "membership";
+    else if (rawType === "deposit" || rawType === "cashback") type = "deposit_cashback";
+    const { createVoucher: createVoucher2, formatVoucherBenefit: formatVoucherBenefit2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+    const v = await createVoucher2({
+      code: rawCode,
+      type,
+      discountValue: value,
+      maxUses,
+      productTarget: target
+    });
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      `\u2705 <b>Voucher Berhasil Dibuat!</b>
+\u2022 Kode: <code>${escapeHtml4(v.code)}</code>
+\u2022 Keuntungan: ${escapeHtml4(formatVoucherBenefit2(v))}
+\u2022 Jatah Kuota: ${v.max_uses} Pengguna`,
+      {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "\u{1F39F}\uFE0F Kelola Voucher", callback_data: "admin_vouchers" }]] }
+      }
+    );
+  });
+  botInstance.command(["voucher", "klaim"], async (ctx) => {
+    if (!isAdmin(ctx.from?.id)) {
+      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt2(ctx, botInstance);
+        return;
+      }
+    }
+    const text = ctx.message?.text || "";
+    const parts = text.trim().split(/\s+/);
+    const code = parts[1];
+    if (!code) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        `\u{1F39F}\uFE0F <b>Klaim Kode Voucher Promo</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Ketik: <code>/voucher &lt;KODE_VOUCHER&gt;</code>
+
+Contoh: <code>/voucher HEMAT5K</code>`,
+        { parse_mode: "HTML" }
+      );
+      return;
+    }
+    const { getVoucherByCode: getVoucherByCode2, formatVoucherBenefit: formatVoucherBenefit2, setPendingUserVoucher: setPendingUserVoucher2, hasUserUsedVoucher: hasUserUsedVoucher2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+    const v = await getVoucherByCode2(code);
+    if (!v || !v.is_active) {
+      await sendSafeMessage(ctx, botInstance, `\u274C Voucher "<b>${escapeHtml4(code)}</b>" tidak valid atau sedang dinonaktifkan.`, { parse_mode: "HTML" });
+      return;
+    }
+    if (v.used_count >= v.max_uses) {
+      await sendSafeMessage(ctx, botInstance, `\u274C Kuota voucher "<b>${escapeHtml4(code)}</b>" telah habis (${v.used_count}/${v.max_uses} pengguna).`, { parse_mode: "HTML" });
+      return;
+    }
+    const userRes = await query("SELECT id FROM users WHERE telegram_id = $1 LIMIT 1", [String(ctx.from?.id)]);
+    if (userRes.rows.length > 0) {
+      const used = await hasUserUsedVoucher2(v.id, userRes.rows[0].id);
+      if (used) {
+        await sendSafeMessage(ctx, botInstance, `\u274C Anda sudah pernah menggunakan voucher "<b>${escapeHtml4(code)}</b>" sebelumnya. (1 voucher berlaku 1 kali per akun).`, { parse_mode: "HTML" });
+        return;
+      }
+    }
+    setPendingUserVoucher2(String(ctx.from?.id), v.code);
+    const replyText = `\u{1F389} <b>VOUCHER BERHASIL DITERAPKAN!</b> \u{1F39F}\uFE0F
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u2022 Kode: <code>${escapeHtml4(v.code)}</code>
+\u2022 Keuntungan: <b>${escapeHtml4(formatVoucherBenefit2(v))}</b>
+\u2022 Sisa Jatah Kuota: <b>${v.max_uses - v.used_count} / ${v.max_uses} pengguna</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+
+Potongan harga atau bonus saldo akan otomatis aktif saat Anda checkout pesanan! Silakan pilih menu di bawah:`;
+    const buttons = [];
+    if (v.type === "deposit_cashback") {
+      buttons.push([{ text: "\u{1F4B0} Deposit Saldo Sekarang", callback_data: "menu_deposit" }]);
+    } else if (v.type === "membership") {
+      buttons.push([{ text: "\u{1F48E} Beli Paket Membership", callback_data: "menu_membership" }]);
+    } else {
+      buttons.push([{ text: "\u{1F6CD}\uFE0F Buka Katalog Produk", callback_data: "menu_products" }]);
+    }
+    buttons.push([{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]);
+    await sendSafeMessage(ctx, botInstance, replyText, {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: buttons }
     });
   });
 }
@@ -40232,7 +40917,7 @@ async function ensureUser(telegramId, profile) {
   );
   return insertUser.rows[0];
 }
-async function handleBuy(ctx, productId, botInstance) {
+async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
   const { getBotStatus: getBotStatus2 } = await Promise.resolve().then(() => (init_settings(), settings_exports));
   const { isAdmin: isAdmin2 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
   const status = await getBotStatus2();
@@ -40436,12 +41121,38 @@ async function handleBuy(ctx, productId, botInstance) {
     username: ctx.from?.username,
     firstName: ctx.from?.first_name
   });
-  const { calculateCheckoutPrice: calculateCheckoutPrice2 } = await Promise.resolve().then(() => (init_membership(), membership_exports));
+  const { calculateCheckoutPrice: calculateCheckoutPrice2, isMembershipProduct: isMembershipProduct2, isDepositProduct: isDepositProduct2 } = await Promise.resolve().then(() => (init_membership(), membership_exports));
   const checkoutPricing = await calculateCheckoutPrice2(telegramId, {
     name: product.name,
     price: product.price
   });
-  const payableAmount = checkoutPricing.finalPayableAmount;
+  const { getPendingUserVoucher: getPendingUserVoucher2, clearPendingUserVoucher: clearPendingUserVoucher2, validateVoucherForTransaction: validateVoucherForTransaction2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+  const voucherCode = explicitVoucherCode || getPendingUserVoucher2(telegramId);
+  let appliedVoucher = null;
+  let voucherDiscount = 0;
+  let voucherCashback = 0;
+  if (voucherCode) {
+    const isMembership = isMembershipProduct2(product.name);
+    const isDeposit = isDepositProduct2(product.name);
+    const txnType = isDeposit ? "deposit" : isMembership ? "membership" : "product";
+    const vResult = await validateVoucherForTransaction2({
+      code: voucherCode,
+      userId: user.id,
+      telegramId,
+      transactionType: txnType,
+      productName: product.name,
+      productId: product.id,
+      amount: checkoutPricing.basePrice
+    });
+    if (vResult.valid && vResult.voucher) {
+      appliedVoucher = vResult.voucher;
+      voucherDiscount = vResult.discountAmount;
+      voucherCashback = vResult.cashbackAmount;
+      clearPendingUserVoucher2(telegramId);
+    }
+  }
+  const priceAfterDiscounts = Math.max(0, checkoutPricing.basePrice - checkoutPricing.discount - voucherDiscount);
+  const payableAmount = priceAfterDiscounts + checkoutPricing.fee;
   const orderCode = generateOrderCode();
   let qrisResult;
   try {
@@ -40504,17 +41215,30 @@ async function handleBuy(ctx, productId, botInstance) {
         base_price: checkoutPricing.basePrice,
         discount: checkoutPricing.discount,
         fee: checkoutPricing.fee,
-        payable_amount: checkoutPricing.finalPayableAmount,
-        is_vip_discount: checkoutPricing.isVipDiscountApplied
+        payable_amount: payableAmount,
+        is_vip_discount: checkoutPricing.isVipDiscountApplied,
+        voucher_id: appliedVoucher ? appliedVoucher.id : null,
+        voucher_code: appliedVoucher ? appliedVoucher.code : null,
+        voucher_discount: voucherDiscount,
+        voucher_cashback: voucherCashback
       })
     ]
   );
   const formattedPrice = `Rp ${payableAmount.toLocaleString("id-ID")}`;
-  const vipDiscountNotice = checkoutPricing.isVipDiscountApplied ? ` <i>(Hemat Rp 1.000 via VIP Member! \u{1F31F})</i>` : "";
+  let discountLabels = "";
+  if (checkoutPricing.isVipDiscountApplied) {
+    discountLabels += ` <i>(Hemat Rp 1.000 via VIP Member! \u{1F31F})</i>`;
+  }
+  if (voucherDiscount > 0 && appliedVoucher) {
+    discountLabels += ` <i>(Diskon Voucher ${escapeHtml5(appliedVoucher.code)}: -Rp ${voucherDiscount.toLocaleString("id-ID")}! \u{1F39F}\uFE0F)</i>`;
+  }
+  if (voucherCashback > 0 && appliedVoucher) {
+    discountLabels += ` <i>(Bonus Cashback ${escapeHtml5(appliedVoucher.code)}: +Rp ${voucherCashback.toLocaleString("id-ID")}! \u{1F381})</i>`;
+  }
   const invoiceCaption = `\u{1F9FE} <b>INVOICE PEMBAYARAN QRIS</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u{1F4E6} <b>Produk:</b> ${escapeHtml5(product.name)}
-\u{1F4B0} <b>Total:</b> ${escapeHtml5(formattedPrice)}${vipDiscountNotice}
+\u{1F4B0} <b>Total:</b> ${escapeHtml5(formattedPrice)}${discountLabels}
 \u{1F194} <b>Kode Order:</b> <code>${escapeHtml5(orderCode)}</code>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
@@ -40565,7 +41289,8 @@ function registerBuyHandler(botInstance) {
     const text = ctx.message?.text || "";
     const parts = text.trim().split(/\s+/);
     const productId = parts[1] || "";
-    await handleBuy(ctx, productId, botInstance);
+    const voucherCode = parts[2] || void 0;
+    await handleBuy(ctx, productId, botInstance, voucherCode);
   });
 }
 var init_buy = __esm({
