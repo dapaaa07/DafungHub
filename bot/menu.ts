@@ -715,18 +715,38 @@ export async function sendProductDetail(
  * Display user profile
  */
 export async function sendProfileMenu(ctx: Context, botInstance: ExtendedBot): Promise<void> {
-  let balance = 0;
-  let username = ctx.from?.username ? `@${ctx.from.username}` : '-';
-  const firstName = ctx.from?.first_name || 'Member';
   const telegramId = ctx.from?.id ? String(ctx.from.id) : '-';
+  const username = ctx.from?.username ? `@${ctx.from.username}` : (ctx.from?.first_name || '-');
+  const firstName = ctx.from?.first_name || 'Member';
+  const isOwner = isAdmin(ctx.from?.id);
 
-  try {
-    const prof = await getSupplierProfile();
-    balance = prof.balance || 0;
-    if (prof.username) username = prof.username;
-  } catch {
-    // Ignore profile fetch failure
+  let balance = 0;
+
+  if (ctx.from?.id) {
+    try {
+      const userRes = await query<{ balance: number }>(
+        `SELECT balance FROM users WHERE telegram_id = $1 LIMIT 1`,
+        [String(ctx.from.id)]
+      );
+      if (userRes.rows.length > 0 && typeof userRes.rows[0].balance === 'number') {
+        balance = userRes.rows[0].balance;
+      } else {
+        // Auto-register user in DB with initial balance 0 if not yet present
+        await query(
+          `INSERT INTO users (telegram_id, role, balance)
+           VALUES ($1, $2, 0)
+           ON CONFLICT (telegram_id) DO UPDATE SET telegram_id = EXCLUDED.telegram_id`,
+          [String(ctx.from.id), isOwner ? 'admin' : 'buyer']
+        );
+        balance = 0;
+      }
+    } catch (err) {
+      console.error('[Profile] Error fetching user balance:', err);
+      balance = 0;
+    }
   }
+
+  const roleText = isOwner ? '👑 Owner / Administrator' : 'Active Member';
 
   const profileText =
     `👤 <b>PROFIL PENGGUNA</b>\n` +
@@ -735,7 +755,7 @@ export async function sendProfileMenu(ctx: Context, botInstance: ExtendedBot): P
     `• Username: <b>${escapeHtml(username)}</b>\n` +
     `• Telegram ID: <code>${escapeHtml(telegramId)}</code>\n` +
     `• Saldo Akun: <b>Rp ${balance.toLocaleString('id-ID')}</b>\n` +
-    `• Status: <b>Active Member</b>\n` +
+    `• Status: <b>${roleText}</b>\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
     `Gunakan menu di bawah untuk top-up atau belanja:`;
 

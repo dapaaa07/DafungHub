@@ -17,7 +17,7 @@ import {
 } from '../bot/menu';
 import { Bot, Context } from 'node-telegram-bot-api';
 import { ExtendedBot } from '../bot/handler';
-import { pool } from '../lib/db';
+import { pool, query } from '../lib/db';
 
 after(async () => {
   await pool.end();
@@ -125,7 +125,7 @@ test('Interactive Menu: sendProductsMenu renders supplier products catalogue', a
   assert.ok((sentMarkup.inline_keyboard?.length || 0) > 1, 'Must have multiple product buttons');
 });
 
-test('Interactive Menu: sendProfileMenu renders user balance and profile', async () => {
+test('Interactive Menu: sendProfileMenu renders user balance and profile (not supplier balance)', async () => {
   const botInstance = new Bot('dummy_token') as ExtendedBot;
   let sentText = '';
 
@@ -134,16 +134,29 @@ test('Interactive Menu: sendProfileMenu renders user balance and profile', async
     return {};
   };
 
+  const testUserId = 778899;
+  // Seed user with specific balance in Dafung Hub database
+  await query(
+    `INSERT INTO users (telegram_id, role, balance)
+     VALUES ($1, 'buyer', 45000)
+     ON CONFLICT (telegram_id) DO UPDATE SET balance = 45000`,
+    [String(testUserId)]
+  );
+
   const mockCtx = {
-    chatId: 12345,
-    from: { id: 12345, first_name: 'dapp', username: 'DappaSecc' },
+    chatId: testUserId,
+    from: { id: testUserId, first_name: 'Budi', username: 'budi_buyer' },
     reply: async () => {},
   } as unknown as Context;
 
   await sendProfileMenu(mockCtx, botInstance);
 
   assert.ok(sentText.includes('PROFIL PENGGUNA'), 'Must show profile header');
-  assert.ok(sentText.includes('dapp'), 'Must show first name');
+  assert.ok(sentText.includes('Budi'), 'Must show first name');
+  assert.ok(sentText.includes('@budi_buyer'), 'Must show user telegram username');
+  assert.ok(sentText.includes('Rp 45.000'), 'Must show user Dafung Hub balance');
+  assert.ok(sentText.includes('Active Member'), 'Must show Active Member for regular buyer');
+  assert.ok(!sentText.includes('Supplier H2H'), 'Must never show supplier branding or details to regular user');
 });
 
 test('Interactive Menu: sendDepositMenu renders top-up nominals', async () => {

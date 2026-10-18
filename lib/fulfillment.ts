@@ -17,7 +17,7 @@ function escapeHtml(str: string): string {
 
 export interface FulfillmentResult {
   success: boolean;
-  mode: 'instant' | 'queued' | 'already_processed' | 'error';
+  mode: 'instant' | 'queued' | 'already_processed' | 'error' | 'deposit';
   message: string;
   orderCode?: string;
   deliveredKey?: string;
@@ -68,6 +68,74 @@ export async function processOrderPayment(
     `UPDATE orders SET payment_status = 'paid' WHERE id = $1`,
     [order.id]
   );
+
+  // 2b. Special Handling: Top-Up / Deposit Saldo
+  if (order.product_name.toLowerCase().includes('deposit saldo') || order.product_name.toLowerCase().startsWith('deposit')) {
+    const depositAmount = order.product_price;
+    await query(
+      `UPDATE users SET balance = balance + $1 WHERE id = $2`,
+      [depositAmount, order.user_id]
+    );
+
+    const confirmationMsg = `Top-up saldo akun sebesar Rp ${depositAmount.toLocaleString('id-ID')} berhasil.`;
+    const encryptedNote = encrypt(confirmationMsg);
+    await query(
+      `UPDATE orders
+       SET fulfillment_status = 'delivered',
+           credential_encrypted = $1,
+           delivered_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [encryptedNote, order.id]
+    );
+
+    const buyerDepositMessage =
+      `🎉 <b>DEPOSIT SALDO BERHASIL DITAMBAHKAN!</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n` +
+      `💰 <b>Nominal:</b> <b>Rp ${depositAmount.toLocaleString('id-ID')}</b>\n` +
+      `🆔 <b>Kode Transaksi:</b> <code>${escapeHtml(order.order_code)}</code>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n\n` +
+      `Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>👤 Profil</b> untuk melihat total saldo Anda.`;
+
+    await sendSafeMessage(
+      { chatId: order.telegram_id } as never,
+      botInstance,
+      buyerDepositMessage,
+      {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '👤 Lihat Profil & Saldo', callback_data: 'menu_profile' }],
+            [{ text: '🛍️ Beli Produk', callback_data: 'menu_products' }],
+            [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+          ],
+        },
+      }
+    );
+
+    // Notify Owner
+    const ownerDepositAlert =
+      `💰 <b>DEPOSIT USER BERHASIL MASUK</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n` +
+      `• <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>\n` +
+      `• <b>Pembeli:</b> <code>${escapeHtml(order.telegram_id)}</code>\n` +
+      `• <b>Nominal Deposit:</b> <b>Rp ${depositAmount.toLocaleString('id-ID')}</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━`;
+
+    await sendSafeMessage(
+      { chatId: ADMIN_TELEGRAM_ID } as never,
+      botInstance,
+      ownerDepositAlert,
+      { parse_mode: 'HTML' }
+    );
+
+    return {
+      success: true,
+      mode: 'deposit',
+      message: 'Deposit balance credited successfully.',
+      orderCode,
+      deliveredKey: confirmationMsg,
+    };
+  }
 
   // 3. Find supplier product to determine modal price and supplier ID
   let supplierProductId = order.product_id;

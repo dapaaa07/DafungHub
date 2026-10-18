@@ -13190,6 +13190,64 @@ async function processOrderPayment(orderCode, botInstance) {
     `UPDATE orders SET payment_status = 'paid' WHERE id = $1`,
     [order.id]
   );
+  if (order.product_name.toLowerCase().includes("deposit saldo") || order.product_name.toLowerCase().startsWith("deposit")) {
+    const depositAmount = order.product_price;
+    await query(
+      `UPDATE users SET balance = balance + $1 WHERE id = $2`,
+      [depositAmount, order.user_id]
+    );
+    const confirmationMsg = `Top-up saldo akun sebesar Rp ${depositAmount.toLocaleString("id-ID")} berhasil.`;
+    const encryptedNote = encrypt(confirmationMsg);
+    await query(
+      `UPDATE orders
+       SET fulfillment_status = 'delivered',
+           credential_encrypted = $1,
+           delivered_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [encryptedNote, order.id]
+    );
+    const buyerDepositMessage = `\u{1F389} <b>DEPOSIT SALDO BERHASIL DITAMBAHKAN!</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F4B0} <b>Nominal:</b> <b>Rp ${depositAmount.toLocaleString("id-ID")}</b>
+\u{1F194} <b>Kode Transaksi:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+
+Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464} Profil</b> untuk melihat total saldo Anda.`;
+    await sendSafeMessage(
+      { chatId: order.telegram_id },
+      botInstance,
+      buyerDepositMessage,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "\u{1F464} Lihat Profil & Saldo", callback_data: "menu_profile" }],
+            [{ text: "\u{1F6CD}\uFE0F Beli Produk", callback_data: "menu_products" }],
+            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+          ]
+        }
+      }
+    );
+    const ownerDepositAlert = `\u{1F4B0} <b>DEPOSIT USER BERHASIL MASUK</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u2022 <b>Pembeli:</b> <code>${escapeHtml2(order.telegram_id)}</code>
+\u2022 <b>Nominal Deposit:</b> <b>Rp ${depositAmount.toLocaleString("id-ID")}</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`;
+    await sendSafeMessage(
+      { chatId: ADMIN_TELEGRAM_ID },
+      botInstance,
+      ownerDepositAlert,
+      { parse_mode: "HTML" }
+    );
+    return {
+      success: true,
+      mode: "deposit",
+      message: "Deposit balance credited successfully.",
+      orderCode,
+      deliveredKey: confirmationMsg
+    };
+  }
   let supplierProductId = order.product_id;
   let modalPrice = order.product_price;
   try {
@@ -14415,23 +14473,41 @@ Sentuh tombol di bawah untuk langsung membuat invoice pembayaran QRIS:`;
   }
 }
 async function sendProfileMenu(ctx, botInstance) {
-  let balance = 0;
-  let username = ctx.from?.username ? `@${ctx.from.username}` : "-";
-  const firstName = ctx.from?.first_name || "Member";
   const telegramId = ctx.from?.id ? String(ctx.from.id) : "-";
-  try {
-    const prof = await getSupplierProfile();
-    balance = prof.balance || 0;
-    if (prof.username) username = prof.username;
-  } catch {
+  const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || "-";
+  const firstName = ctx.from?.first_name || "Member";
+  const isOwner = isAdmin(ctx.from?.id);
+  let balance = 0;
+  if (ctx.from?.id) {
+    try {
+      const userRes = await query(
+        `SELECT balance FROM users WHERE telegram_id = $1 LIMIT 1`,
+        [String(ctx.from.id)]
+      );
+      if (userRes.rows.length > 0 && typeof userRes.rows[0].balance === "number") {
+        balance = userRes.rows[0].balance;
+      } else {
+        await query(
+          `INSERT INTO users (telegram_id, role, balance)
+           VALUES ($1, $2, 0)
+           ON CONFLICT (telegram_id) DO UPDATE SET telegram_id = EXCLUDED.telegram_id`,
+          [String(ctx.from.id), isOwner ? "admin" : "buyer"]
+        );
+        balance = 0;
+      }
+    } catch (err) {
+      console.error("[Profile] Error fetching user balance:", err);
+      balance = 0;
+    }
   }
+  const roleText = isOwner ? "\u{1F451} Owner / Administrator" : "Active Member";
   const profileText = `\u{1F464} <b>PROFIL PENGGUNA</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u2022 Nama: <b>${escapeHtml4(firstName)}</b>
 \u2022 Username: <b>${escapeHtml4(username)}</b>
 \u2022 Telegram ID: <code>${escapeHtml4(telegramId)}</code>
 \u2022 Saldo Akun: <b>Rp ${balance.toLocaleString("id-ID")}</b>
-\u2022 Status: <b>Active Member</b>
+\u2022 Status: <b>${roleText}</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 Gunakan menu di bawah untuk top-up atau belanja:`;
   const inlineMarkup = {

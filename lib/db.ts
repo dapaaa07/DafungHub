@@ -8,6 +8,7 @@ export interface User {
   id: string;
   telegram_id: string;
   role: UserRole;
+  balance?: number;
   created_at: Date;
 }
 
