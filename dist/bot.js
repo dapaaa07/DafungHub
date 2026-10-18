@@ -5372,6 +5372,15 @@ var init_esm = __esm({
 });
 
 // lib/db.ts
+var db_exports = {};
+__export(db_exports, {
+  default: () => db_default,
+  getClient: () => getClient,
+  getPool: () => getPool,
+  pool: () => pool,
+  query: () => query,
+  testConnection: () => testConnection
+});
 function createPool() {
   const connectionString = process.env.DATABASE_URL;
   const isRemote = connectionString?.includes("supabase.co") || connectionString?.includes("pooler.supabase.com") || connectionString?.includes("sslmode=require");
@@ -5383,6 +5392,9 @@ function createPool() {
     ssl: isRemote ? { rejectUnauthorized: false } : void 0
   });
 }
+function getPool() {
+  return pool;
+}
 async function query(text, params) {
   const start2 = Date.now();
   const res = await pool.query(text, params);
@@ -5392,7 +5404,19 @@ async function query(text, params) {
   }
   return res;
 }
-var pool;
+async function getClient() {
+  return await pool.connect();
+}
+async function testConnection() {
+  try {
+    const res = await pool.query("SELECT 1 as alive");
+    return res.rows?.[0]?.alive === 1;
+  } catch (error) {
+    console.error("Failed to connect to PostgreSQL database:", error);
+    return false;
+  }
+}
+var pool, db_default;
 var init_db = __esm({
   "lib/db.ts"() {
     "use strict";
@@ -5407,6 +5431,7 @@ var init_db = __esm({
     if (process.env.NODE_ENV !== "production") {
       globalThis.postgresPoolGlobal = pool;
     }
+    db_default = pool;
   }
 });
 
@@ -13141,6 +13166,220 @@ var init_fulfillment = __esm({
   }
 });
 
+// lib/shopeepay.ts
+var shopeepay_exports = {};
+__export(shopeepay_exports, {
+  SHOPEEPAY_API_KEY: () => SHOPEEPAY_API_KEY,
+  SHOPEEPAY_BASE_URL: () => SHOPEEPAY_BASE_URL,
+  SHOPEEPAY_STATIC_QRIS: () => SHOPEEPAY_STATIC_QRIS,
+  checkShopeePayPayment: () => checkShopeePayPayment,
+  crc16Ccitt: () => crc16Ccitt,
+  createShopeePayInvoice: () => createShopeePayInvoice,
+  generateDynamicQrisFromStatic: () => generateDynamicQrisFromStatic,
+  getShopeePayAccount: () => getShopeePayAccount
+});
+function crc16Ccitt(data) {
+  let crc = 65535;
+  for (let i = 0; i < data.length; i++) {
+    crc ^= data.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 32768) !== 0) {
+        crc = (crc << 1 ^ 4129) & 65535;
+      } else {
+        crc = crc << 1 & 65535;
+      }
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, "0");
+}
+function generateDynamicQrisFromStatic(staticQris, amount) {
+  let qris = staticQris.replace("010211", "010212");
+  const crcIndex = qris.lastIndexOf("6304");
+  if (crcIndex !== -1) {
+    qris = qris.slice(0, crcIndex);
+  }
+  const roundedAmount = Math.round(amount);
+  const amtStr = String(roundedAmount);
+  const tag54 = "54" + String(amtStr.length).padStart(2, "0") + amtStr;
+  const idx53 = qris.indexOf("5303360");
+  if (idx53 !== -1) {
+    const after53 = idx53 + "5303360".length;
+    qris = qris.slice(0, after53) + tag54 + qris.slice(after53);
+  } else {
+    qris += tag54;
+  }
+  qris += "6304";
+  const crc = crc16Ccitt(qris);
+  return qris + crc;
+}
+async function getShopeePayAccount() {
+  const baseUrl = SHOPEEPAY_BASE_URL.replace(/\/+$/, "");
+  try {
+    const res = await fetch(`${baseUrl}/v1/account`, {
+      method: "GET",
+      headers: {
+        "x-api-key": SHOPEEPAY_API_KEY,
+        "Content-Type": "application/json"
+      }
+    });
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      error: err.message
+    };
+  }
+}
+async function createShopeePayInvoice(orderCode, amount) {
+  const roundedAmount = Math.round(amount);
+  const baseUrl = SHOPEEPAY_BASE_URL.replace(/\/+$/, "");
+  try {
+    const response = await fetch(`${baseUrl}/v1/qris/create`, {
+      method: "POST",
+      headers: {
+        "x-api-key": SHOPEEPAY_API_KEY,
+        "Content-Type": "application/json",
+        "Idempotency-Key": orderCode
+      },
+      body: JSON.stringify({ amount: roundedAmount })
+    });
+    const resJson = await response.json();
+    if (response.ok && resJson.success && resJson.data) {
+      const data = resJson.data;
+      const qrString = data.qris || data.qr_string || data.qr || "";
+      const token = data.token || data.qris_token || `shopee_${orderCode}`;
+      const qrCodeUrl2 = data.qr_image || data.qr_code_url || data.qr_url || `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrString)}`;
+      return {
+        qrCodeUrl: qrCodeUrl2,
+        qrUrl: qrCodeUrl2,
+        qrString,
+        checkoutUrl: data.checkout_url,
+        token,
+        orderCode,
+        grossAmount: roundedAmount,
+        gateway: "shopeepay",
+        method: "api_qris",
+        raw: resJson
+      };
+    } else {
+      console.warn(
+        `[ShopeePay API] /v1/qris/create returned non-success (${resJson.code || response.status}): ${resJson.error || "Unknown error"}. Falling back to dynamic static QRIS generation.`
+      );
+    }
+  } catch (apiErr) {
+    console.warn(
+      "[ShopeePay API] Failed to reach /v1/qris/create, falling back to dynamic static QRIS generation:",
+      apiErr
+    );
+  }
+  const dynamicQris = generateDynamicQrisFromStatic(SHOPEEPAY_STATIC_QRIS, roundedAmount);
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(dynamicQris)}`;
+  return {
+    qrCodeUrl,
+    qrUrl: qrCodeUrl,
+    qrString: dynamicQris,
+    token: `shopee_${orderCode}`,
+    orderCode,
+    grossAmount: roundedAmount,
+    gateway: "shopeepay",
+    method: "static_conversion",
+    raw: {
+      success: true,
+      mode: "static_conversion",
+      orderCode,
+      amount: roundedAmount
+    }
+  };
+}
+async function checkShopeePayPayment(params) {
+  const baseUrl = SHOPEEPAY_BASE_URL.replace(/\/+$/, "");
+  if (params.token && !params.token.startsWith("shopee_")) {
+    try {
+      const checkRes = await fetch(`${baseUrl}/v1/payment/check`, {
+        method: "POST",
+        headers: {
+          "x-api-key": SHOPEEPAY_API_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          token: params.token,
+          wait: false
+        })
+      });
+      if (checkRes.ok) {
+        const checkJson = await checkRes.json();
+        if (checkJson.success && checkJson.data) {
+          const status = String(
+            checkJson.data.status || checkJson.data.payment_status || ""
+          ).toLowerCase();
+          if (status === "success" || status === "paid" || status === "settlement" || status === "completed") {
+            return {
+              paid: true,
+              status: "paid",
+              transaction: checkJson.data
+            };
+          }
+        }
+      }
+    } catch (checkErr) {
+      console.warn("[ShopeePay] /v1/payment/check error:", checkErr);
+    }
+  }
+  try {
+    const txRes = await fetch(`${baseUrl}/transactions?page_size=20`, {
+      method: "GET",
+      headers: {
+        "x-api-key": SHOPEEPAY_API_KEY,
+        "Content-Type": "application/json"
+      }
+    });
+    if (txRes.ok) {
+      const txJson = await txRes.json();
+      const transactions = txJson?.data?.transactions || [];
+      if (params.amount && transactions.length > 0) {
+        const targetAmount = Math.round(params.amount);
+        const orderTime = params.orderCreatedAt ? new Date(params.orderCreatedAt).getTime() : 0;
+        const match = transactions.find((t) => {
+          const txAmt = Math.round(Number(t.amount || t.nominal || t.total || 0));
+          if (txAmt !== targetAmount) return false;
+          const rawDate = t.created_at || t.timestamp || t.date;
+          if (orderTime > 0 && rawDate) {
+            const txTime = new Date(rawDate).getTime();
+            if (txTime < orderTime - 3e5) return false;
+          }
+          return true;
+        });
+        if (match) {
+          return {
+            paid: true,
+            status: "paid",
+            transaction: match
+          };
+        }
+      }
+    }
+  } catch (txErr) {
+    console.warn("[ShopeePay] /transactions error:", txErr);
+  }
+  return { paid: false, status: "unpaid" };
+}
+var SHOPEEPAY_BASE_URL, SHOPEEPAY_API_KEY, SHOPEEPAY_STATIC_QRIS;
+var init_shopeepay = __esm({
+  "lib/shopeepay.ts"() {
+    "use strict";
+    if (!process.env.SHOPEEPAY_API_KEY) {
+      try {
+        process.loadEnvFile?.();
+      } catch {
+      }
+    }
+    SHOPEEPAY_BASE_URL = process.env.SHOPEEPAY_API_URL || "https://shopee.prastyaaneki.biz.id";
+    SHOPEEPAY_API_KEY = process.env.SHOPEEPAY_API_KEY || "";
+    SHOPEEPAY_STATIC_QRIS = process.env.SHOPEEPAY_STATIC_QRIS || "00020101021126610016ID.CO.SHOPEE.WWW01189360091800239501700208239501700303UMI51440014ID.CO.QRIS.WWW0215ID10266191349880303UMI5204481453033605802ID5910Dafung Hub6008KARAWANG61054137362070703A016304BBC9";
+  }
+});
+
 // bot/menu.ts
 var menu_exports = {};
 __export(menu_exports, {
@@ -13781,10 +14020,42 @@ async function sendOrderStatus(ctx, botInstance, orderCode) {
     );
     return;
   }
-  const o = ordRes.rows[0];
+  let o = ordRes.rows[0];
   if (o.payment_status === "unpaid") {
-    await sendOrderInvoice(ctx, botInstance, o);
-    return;
+    try {
+      const invData = typeof o.invoice_data === "string" ? JSON.parse(o.invoice_data || "{}") : o.invoice_data || {};
+      const gateway = (invData.gateway || process.env.PAYMENT_GATEWAY || "shopeepay").toLowerCase();
+      if (gateway === "shopeepay") {
+        const { checkShopeePayPayment: checkShopeePayPayment2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
+        const checkResult = await checkShopeePayPayment2({
+          token: invData.token,
+          orderCode: o.order_code,
+          amount: o.product_price,
+          orderCreatedAt: o.created_at
+        });
+        if (checkResult.paid) {
+          console.log(`[ShopeePay] Payment confirmed upon manual status refresh for order: ${o.order_code}`);
+          const { processOrderPayment: processOrderPayment2 } = await Promise.resolve().then(() => (init_fulfillment(), fulfillment_exports));
+          await processOrderPayment2(o.order_code, botInstance);
+          const updatedOrd = await query(
+            `SELECT o.*, p.name as product_name, p.price as product_price
+             FROM orders o
+             LEFT JOIN products p ON o.product_id = p.id
+             WHERE o.order_code = $1 LIMIT 1`,
+            [orderCode]
+          );
+          if (updatedOrd.rows.length > 0) {
+            o = updatedOrd.rows[0];
+          }
+        }
+      }
+    } catch (checkErr) {
+      console.warn("[Order Status Check] Error checking gateway payment status:", checkErr);
+    }
+    if (o.payment_status === "unpaid") {
+      await sendOrderInvoice(ctx, botInstance, o);
+      return;
+    }
   }
   const payStatusStr = o.payment_status === "paid" ? "\u{1F7E2} LUNAS (PAID)" : o.payment_status === "expired" ? "\u{1F534} KADALUWARSA (EXPIRED)" : escapeHtml2(String(o.payment_status).toUpperCase());
   const fulStatusStr = o.fulfillment_status === "delivered" ? "\u{1F7E2} SELESAI (DELIVERED)" : o.fulfillment_status === "processing" ? "\u{1F7E1} DALAM PROSES (ANTREAN SISTEM)" : escapeHtml2(String(o.fulfillment_status).toUpperCase());
@@ -38663,7 +38934,11 @@ async function handleBuy(ctx, productId, botInstance) {
   const orderCode = generateOrderCode();
   let qrisResult;
   try {
-    if (process.env.PAYMENT_GATEWAY === "midtrans") {
+    const gateway = (process.env.PAYMENT_GATEWAY || "shopeepay").toLowerCase();
+    if (gateway === "shopeepay") {
+      const { createShopeePayInvoice: createShopeePayInvoice2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
+      qrisResult = await createShopeePayInvoice2(orderCode, product.price);
+    } else if (gateway === "midtrans") {
       const { createQrisTransaction: createQrisTransaction2 } = await Promise.resolve().then(() => (init_midtrans(), midtrans_exports));
       qrisResult = await createQrisTransaction2(orderCode, product.price);
     } else {
@@ -39342,6 +39617,18 @@ var server = import_http.default.createServer((req, res) => {
           res.end(JSON.stringify({ status: "ok", order_id: orderId, paid: isPaid }));
           return;
         }
+        if (req.url?.includes("shopeepay")) {
+          const orderId = data.order_id || data.order_code || data.merchant_ref || data.token;
+          const status = String(data.status || data.payment_status || "").toLowerCase();
+          const isPaid = status === "success" || status === "paid" || status === "settlement" || status === "completed";
+          if (isPaid && orderId) {
+            console.log(`[ShopeePay Webhook] Payment confirmed for order: ${orderId}`);
+            await processOrderPayment(orderId, bot);
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true, message: "ShopeePay callback processed", order_id: orderId, paid: isPaid }));
+          return;
+        }
         await initBot({ mode: "webhook" });
         await handleWebhookUpdate(data);
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -39434,6 +39721,37 @@ var server = import_http.default.createServer((req, res) => {
 server.listen(port, () => {
   console.log(`\u{1F310} Webhook & Health check HTTP server active on port ${port}`);
 });
+setInterval(async () => {
+  try {
+    const { query: query2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const { checkShopeePayPayment: checkShopeePayPayment2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
+    const unpaidOrders = await query2(
+      `SELECT o.*, p.price as product_price
+       FROM orders o
+       LEFT JOIN products p ON o.product_id = p.id
+       WHERE o.payment_status = 'unpaid'
+         AND o.created_at >= NOW() - INTERVAL '60 minutes'
+       ORDER BY o.created_at DESC LIMIT 10`
+    );
+    for (const ord of unpaidOrders.rows) {
+      const invData = typeof ord.invoice_data === "string" ? JSON.parse(ord.invoice_data || "{}") : ord.invoice_data || {};
+      const gateway = (invData.gateway || process.env.PAYMENT_GATEWAY || "shopeepay").toLowerCase();
+      if (gateway === "shopeepay") {
+        const checkResult = await checkShopeePayPayment2({
+          token: invData.token,
+          orderCode: ord.order_code,
+          amount: ord.product_price,
+          orderCreatedAt: ord.created_at
+        });
+        if (checkResult.paid) {
+          console.log(`[ShopeePay Poller] Auto-detected payment for order: ${ord.order_code}`);
+          await processOrderPayment(ord.order_code, bot);
+        }
+      }
+    }
+  } catch {
+  }
+}, 2e4);
 async function start() {
   const mode = process.env.TELEGRAM_BOT_MODE || "webhook";
   if (mode === "polling") {

@@ -869,12 +869,50 @@ export async function sendOrderStatus(
     return;
   }
 
-  const o = ordRes.rows[0];
+  let o = ordRes.rows[0];
 
-  // If order is UNPAID, re-display the QRIS image & payment instructions
+  // If order is UNPAID, check real-time payment status with gateway before re-displaying
   if (o.payment_status === 'unpaid') {
-    await sendOrderInvoice(ctx, botInstance, o);
-    return;
+    try {
+      const invData = typeof o.invoice_data === 'string'
+        ? JSON.parse(o.invoice_data || '{}')
+        : (o.invoice_data || {});
+
+      const gateway = (invData.gateway || process.env.PAYMENT_GATEWAY || 'shopeepay').toLowerCase();
+      if (gateway === 'shopeepay') {
+        const { checkShopeePayPayment } = await import('../lib/shopeepay');
+        const checkResult = await checkShopeePayPayment({
+          token: invData.token,
+          orderCode: o.order_code,
+          amount: o.product_price,
+          orderCreatedAt: o.created_at,
+        });
+
+        if (checkResult.paid) {
+          console.log(`[ShopeePay] Payment confirmed upon manual status refresh for order: ${o.order_code}`);
+          const { processOrderPayment } = await import('../lib/fulfillment');
+          await processOrderPayment(o.order_code, botInstance);
+
+          const updatedOrd = await query<Order & { product_name: string; product_price: number }>(
+            `SELECT o.*, p.name as product_name, p.price as product_price
+             FROM orders o
+             LEFT JOIN products p ON o.product_id = p.id
+             WHERE o.order_code = $1 LIMIT 1`,
+            [orderCode]
+          );
+          if (updatedOrd.rows.length > 0) {
+            o = updatedOrd.rows[0];
+          }
+        }
+      }
+    } catch (checkErr) {
+      console.warn('[Order Status Check] Error checking gateway payment status:', checkErr);
+    }
+
+    if (o.payment_status === 'unpaid') {
+      await sendOrderInvoice(ctx, botInstance, o);
+      return;
+    }
   }
 
   // If order is PAID or EXPIRED

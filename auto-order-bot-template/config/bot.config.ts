@@ -32,7 +32,12 @@ export interface BotConfig {
     tieredMarkup: TieredMarkupRule[];
   };
   gateways: {
-    defaultGateway: 'sakurupiah' | 'midtrans' | 'manual';
+    defaultGateway: 'shopeepay' | 'sakurupiah' | 'midtrans' | 'manual';
+    shopeepay: {
+      apiKey: string;
+      baseUrl?: string;
+      staticQris?: string;
+    };
     sakurupiah: {
       apiId: string;
       apiKey: string;
@@ -107,7 +112,12 @@ export const config: BotConfig = {
   },
 
   gateways: {
-    defaultGateway: (process.env.DEFAULT_PAYMENT_GATEWAY as 'sakurupiah' | 'midtrans' | 'manual') || 'sakurupiah',
+    defaultGateway: (process.env.DEFAULT_PAYMENT_GATEWAY as 'shopeepay' | 'sakurupiah' | 'midtrans' | 'manual') || 'shopeepay',
+    shopeepay: {
+      apiKey: process.env.SHOPEEPAY_API_KEY || '',
+      baseUrl: process.env.SHOPEEPAY_API_URL || 'https://shopee.prastyaaneki.biz.id',
+      staticQris: process.env.SHOPEEPAY_STATIC_QRIS,
+    },
     sakurupiah: {
       apiId: process.env.SAKURUPIAH_API_ID || '',
       apiKey: process.env.SAKURUPIAH_API_KEY || '',

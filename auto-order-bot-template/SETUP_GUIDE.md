@@ -60,8 +60,15 @@ DATABASE_URL="postgresql://user:password@host:5432/dbname?sslmode=require"
 # Enkripsi Kredensial (Ketik string acak minimal 32 karakter)
 ENCRYPTION_SECRET="kunci-rahasia-enkripsi-akun-anda-32karakter"
 
-# Gateway Pembayaran Pilihan ("sakurupiah" atau "midtrans" atau "manual")
-DEFAULT_PAYMENT_GATEWAY="sakurupiah"
+# Gateway Pembayaran Pilihan ("shopeepay" atau "sakurupiah" atau "midtrans" atau "manual")
+DEFAULT_PAYMENT_GATEWAY="shopeepay"
+
+# ShopeePay API Gateway v3.2
+SHOPEEPAY_API_KEY="your_shopeepay_api_key_here"
+SHOPEEPAY_API_URL="https://shopee.prastyaaneki.biz.id"
+SHOPEEPAY_STATIC_QRIS="00020101021126610016ID.CO.SHOPEE.WWW01189360091800239501700208239501700303UMI51440014ID.CO.QRIS.WWW0215ID10266191349880303UMI5204481453033605802ID5910Dafung Hub6008KARAWANG61054137362070703A016304BBC9"
+
+# Sakurupiah (Alternatif)
 SAKURUPIAH_API_ID="SANBOX-xxxxxxxx"
 SAKURUPIAH_API_KEY="SANBOX-xxxxxxxxxxxxxxxxxxxx"
 SAKURUPIAH_MODE="sandbox" # Ganti ke "production" jika akun live

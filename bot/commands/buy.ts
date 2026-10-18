@@ -206,7 +206,11 @@ export async function handleBuy(
   };
 
   try {
-    if (process.env.PAYMENT_GATEWAY === 'midtrans') {
+    const gateway = (process.env.PAYMENT_GATEWAY || 'shopeepay').toLowerCase();
+    if (gateway === 'shopeepay') {
+      const { createShopeePayInvoice } = await import('../../lib/shopeepay');
+      qrisResult = await createShopeePayInvoice(orderCode, product.price);
+    } else if (gateway === 'midtrans') {
       const { createQrisTransaction } = await import('../../lib/midtrans');
       qrisResult = await createQrisTransaction(orderCode, product.price);
     } else {

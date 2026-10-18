@@ -66,6 +66,20 @@ const server = http.createServer((req, res) => {
           return;
         }
 
+        // Check if ShopeePay webhook
+        if (req.url?.includes('shopeepay')) {
+          const orderId = data.order_id || data.order_code || data.merchant_ref || data.token;
+          const status = String(data.status || data.payment_status || '').toLowerCase();
+          const isPaid = status === 'success' || status === 'paid' || status === 'settlement' || status === 'completed';
+          if (isPaid && orderId) {
+            console.log(`[ShopeePay Webhook] Payment confirmed for order: ${orderId}`);
+            await processOrderPayment(orderId, bot);
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, message: 'ShopeePay callback processed', order_id: orderId, paid: isPaid }));
+          return;
+        }
+
         // Default: Telegram Webhook update
         await initBot({ mode: 'webhook' });
         await handleWebhookUpdate(data);
@@ -166,6 +180,47 @@ const server = http.createServer((req, res) => {
 server.listen(port, () => {
   console.log(`🌐 Webhook & Health check HTTP server active on port ${port}`);
 });
+
+// Periodic background poller for unpaid ShopeePay orders (checks orders created in the last 60 minutes)
+setInterval(async () => {
+  try {
+    const { query } = await import('../lib/db');
+    const { checkShopeePayPayment } = await import('../lib/shopeepay');
+
+    const unpaidOrders = await query<any>(
+      `SELECT o.*, p.price as product_price
+       FROM orders o
+       LEFT JOIN products p ON o.product_id = p.id
+       WHERE o.payment_status = 'unpaid'
+         AND o.created_at >= NOW() - INTERVAL '60 minutes'
+       ORDER BY o.created_at DESC LIMIT 10`
+    );
+
+    for (const ord of unpaidOrders.rows) {
+      const invData =
+        typeof ord.invoice_data === 'string'
+          ? JSON.parse(ord.invoice_data || '{}')
+          : (ord.invoice_data || {});
+
+      const gateway = (invData.gateway || process.env.PAYMENT_GATEWAY || 'shopeepay').toLowerCase();
+      if (gateway === 'shopeepay') {
+        const checkResult = await checkShopeePayPayment({
+          token: invData.token,
+          orderCode: ord.order_code,
+          amount: ord.product_price,
+          orderCreatedAt: ord.created_at,
+        });
+
+        if (checkResult.paid) {
+          console.log(`[ShopeePay Poller] Auto-detected payment for order: ${ord.order_code}`);
+          await processOrderPayment(ord.order_code, bot);
+        }
+      }
+    }
+  } catch {
+    // Non-fatal, suppress periodic polling errors
+  }
+}, 20000);
 
 async function start(): Promise<void> {
   const mode = process.env.TELEGRAM_BOT_MODE || 'webhook';

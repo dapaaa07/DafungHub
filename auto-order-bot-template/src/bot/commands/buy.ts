@@ -7,6 +7,7 @@ import { getEffectiveSellingPrice } from '../../core/pricing';
 import { getCustomPrices } from '../../core/custom-prices';
 import { createSakurupiahInvoice } from '../../gateways/sakurupiah';
 import { createMidtransQris } from '../../gateways/midtrans';
+import { createShopeePayInvoice } from '../../gateways/shopeepay';
 import { getManualPaymentInstructions } from '../../gateways/manual';
 
 export function generateOrderCode(): string {
@@ -97,7 +98,12 @@ export async function handleBuy(
   let invoiceRaw: unknown = {};
 
   try {
-    if (gateway === 'sakurupiah') {
+    if (gateway === 'shopeepay') {
+      const shopeeRes = await createShopeePayInvoice(orderCode, sellingPrice);
+      qrCodeUrl = shopeeRes.qrCodeUrl;
+      qrString = shopeeRes.qrString;
+      invoiceRaw = shopeeRes.raw;
+    } else if (gateway === 'sakurupiah') {
       const sakuRes = await createSakurupiahInvoice({
         orderCode,
         amount: sellingPrice,
