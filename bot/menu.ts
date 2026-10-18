@@ -927,6 +927,37 @@ export async function sendOrdersMenu(ctx: Context, botInstance: ExtendedBot): Pr
     text += `Belum ada pesanan aktif.\nSilakan pilih menu <b>🟢 Produk</b> untuk mulai membeli akun digital!\n`;
   } else {
     for (const ord of ordersList) {
+      if (ord.payment_status === 'unpaid') {
+        try {
+          const invData =
+            typeof ord.invoice_data === 'string'
+              ? JSON.parse(ord.invoice_data || '{}')
+              : (ord.invoice_data || {});
+          const actualAmount =
+            Number(invData.payable_amount) ||
+            Number(invData.amount) ||
+            0;
+          const gateway = (invData.gateway || process.env.PAYMENT_GATEWAY || 'shopeepay').toLowerCase();
+          if (gateway === 'shopeepay' && actualAmount > 0) {
+            const { checkShopeePayPayment } = await import('../lib/shopeepay');
+            const checkResult = await checkShopeePayPayment({
+              token: invData.token,
+              orderCode: ord.order_code,
+              amount: actualAmount,
+              orderCreatedAt: ord.created_at,
+            });
+            if (checkResult.paid) {
+              const { processOrderPayment } = await import('../lib/fulfillment');
+              await processOrderPayment(ord.order_code, botInstance);
+              ord.payment_status = 'paid';
+              ord.fulfillment_status = 'delivered';
+            }
+          }
+        } catch (e) {
+          console.warn('[sendOrdersMenu] Auto check unpaid order error:', e);
+        }
+      }
+
       const isUnpaid = ord.payment_status === 'unpaid';
       const statusIcon = isUnpaid
         ? '⏳'
@@ -1133,13 +1164,19 @@ export async function sendOrderStatus(
         ? JSON.parse(o.invoice_data || '{}')
         : (o.invoice_data || {});
 
+      const actualAmount =
+        Number(invData.payable_amount) ||
+        Number(invData.amount) ||
+        Number(o.product_price) ||
+        0;
+
       const gateway = (invData.gateway || process.env.PAYMENT_GATEWAY || 'shopeepay').toLowerCase();
       if (gateway === 'shopeepay') {
         const { checkShopeePayPayment } = await import('../lib/shopeepay');
         const checkResult = await checkShopeePayPayment({
           token: invData.token,
           orderCode: o.order_code,
-          amount: o.product_price,
+          amount: actualAmount,
           orderCreatedAt: o.created_at,
         });
 

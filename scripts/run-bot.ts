@@ -202,12 +202,18 @@ setInterval(async () => {
           ? JSON.parse(ord.invoice_data || '{}')
           : (ord.invoice_data || {});
 
+      const actualAmount =
+        Number(invData.payable_amount) ||
+        Number(invData.amount) ||
+        Number(ord.product_price) ||
+        0;
+
       const gateway = (invData.gateway || process.env.PAYMENT_GATEWAY || 'shopeepay').toLowerCase();
-      if (gateway === 'shopeepay') {
+      if (gateway === 'shopeepay' && actualAmount > 0) {
         const checkResult = await checkShopeePayPayment({
           token: invData.token,
           orderCode: ord.order_code,
-          amount: ord.product_price,
+          amount: actualAmount,
           orderCreatedAt: ord.created_at,
         });
 

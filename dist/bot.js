@@ -13735,487 +13735,6 @@ var init_voucher = __esm({
   }
 });
 
-// lib/fulfillment.ts
-var fulfillment_exports = {};
-__export(fulfillment_exports, {
-  adminManualFulfill: () => adminManualFulfill,
-  adminRetrySupplierFulfill: () => adminRetrySupplierFulfill,
-  getPendingQueueOrders: () => getPendingQueueOrders,
-  processOrderPayment: () => processOrderPayment
-});
-function escapeHtml2(str) {
-  if (!str) return "";
-  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
-async function processOrderPayment(orderCode, botInstance) {
-  const orderRes = await query(
-    `SELECT o.*, u.telegram_id, p.name as product_name, p.price as product_price
-     FROM orders o
-     JOIN users u ON o.user_id = u.id
-     JOIN products p ON o.product_id = p.id
-     WHERE o.order_code = $1 LIMIT 1`,
-    [orderCode]
-  );
-  if (orderRes.rows.length === 0) {
-    return {
-      success: false,
-      mode: "error",
-      message: `Order with code "${orderCode}" not found.`
-    };
-  }
-  const order = orderRes.rows[0];
-  if (order.fulfillment_status === "delivered") {
-    return {
-      success: true,
-      mode: "already_processed",
-      message: `Order "${orderCode}" has already been fulfilled.`,
-      orderCode
-    };
-  }
-  await query(
-    `UPDATE orders SET payment_status = 'paid' WHERE id = $1`,
-    [order.id]
-  );
-  broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
-    console.warn("[Broadcast Warning] Failed to broadcast order payment success:", bErr);
-  });
-  const {
-    isMembershipProduct: isMembershipProduct2,
-    findMembershipPackage: findMembershipPackage2,
-    activateOrExtendMembership: activateOrExtendMembership2,
-    formatWibDate: formatWibDate2,
-    recordDiscountUsage: recordDiscountUsage2,
-    getUserMembership: getUserMembership2
-  } = await Promise.resolve().then(() => (init_membership(), membership_exports));
-  if (isMembershipProduct2(order.product_name)) {
-    const pkg = findMembershipPackage2(order.product_name);
-    const durationDays = pkg ? pkg.durationDays : 30;
-    const act = await activateOrExtendMembership2(order.user_id, durationDays);
-    const note = `Membership VIP diaktifkan hingga ${act.newExpiresAt.toISOString()}`;
-    const encryptedNote = encrypt(note);
-    await query(
-      `UPDATE orders
-       SET fulfillment_status = 'delivered',
-           credential_encrypted = $1,
-           delivered_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [encryptedNote, order.id]
-    );
-    const buyerMembershipMessage = `\u{1F389} <b>SELAMAT! MEMBERSHIP VIP ANDA TELAH AKTIF! \u2B50</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u{1F48E} <b>Paket:</b> ${escapeHtml2(order.product_name)}
-\u{1F4C5} <b>Masa Aktif:</b> Hingga <b>${formatWibDate2(act.newExpiresAt)}</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-
-\u{1F31F} <b>Keuntungan Eksklusif VIP Anda:</b>
-\u2022 \u{1F3F7}\uFE0F <b>Potongan Rp 1.000</b> untuk setiap pembelian akun digital.
-\u2022 \u{1F4CA} <b>Kuota Diskon Mingguan:</b> Rp 20.000 / minggu (Hemat s/d Rp 80.000+ per bulan!).
-\u2022 \u26A1 <b>Antrean Prioritas:</b> Pesanan diproses paling awal saat antrean manual.
-\u2022 \u{1F6E1}\uFE0F <b>Layanan Garansi VIP:</b> Klaim & penggantian akun lebih cepat.
-\u2022 \u{1F381} <b>Promo & Restock Spesial:</b> Akses lebih awal ke akun langka.
-
-\u{1F6D2} <i>Mulai belanja akun premium dengan harga lebih murah sekarang lewat katalog bot!</i>`;
-    await sendSafeMessage(
-      { chatId: order.telegram_id },
-      botInstance,
-      buyerMembershipMessage,
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "\u{1F6CD}\uFE0F Buka Katalog Produk", callback_data: "menu_products" }],
-            [{ text: "\u{1F464} Cek Profil Saya", callback_data: "menu_profile" }],
-            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
-          ]
-        }
-      }
-    );
-    const ownerMembershipAlert = `\u{1F48E} <b>PEMBELIAN MEMBERSHIP VIP BARU</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
-\u2022 <b>Pembeli:</b> <code>${escapeHtml2(order.telegram_id)}</code>
-\u2022 <b>Paket:</b> ${escapeHtml2(order.product_name)}
-\u2022 <b>Masa Aktif:</b> s/d ${formatWibDate2(act.newExpiresAt)}
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`;
-    await sendSafeMessage(
-      { chatId: ADMIN_TELEGRAM_ID },
-      botInstance,
-      ownerMembershipAlert,
-      { parse_mode: "HTML" }
-    );
-    return {
-      success: true,
-      mode: "deposit",
-      message: "VIP Membership activated successfully.",
-      orderCode,
-      deliveredKey: note
-    };
-  }
-  const invData = order.invoice_data || {};
-  if (order.product_name.toLowerCase().includes("deposit saldo") || order.product_name.toLowerCase().startsWith("deposit")) {
-    const depositAmount = order.product_price;
-    const cashback = Number(invData.voucher_cashback || 0);
-    const totalCredit = depositAmount + cashback;
-    await query(
-      `UPDATE users SET balance = balance + $1 WHERE id = $2`,
-      [totalCredit, order.user_id]
-    );
-    const cashbackNote = cashback > 0 ? ` (+Bonus Cashback Voucher Rp ${cashback.toLocaleString("id-ID")})` : "";
-    const confirmationMsg = `Top-up saldo akun sebesar Rp ${depositAmount.toLocaleString("id-ID")}${cashbackNote} berhasil.`;
-    const encryptedNote = encrypt(confirmationMsg);
-    await query(
-      `UPDATE orders
-       SET fulfillment_status = 'delivered',
-           credential_encrypted = $1,
-           delivered_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [encryptedNote, order.id]
-    );
-    const buyerDepositMessage = `\u{1F389} <b>DEPOSIT SALDO BERHASIL DITAMBAHKAN!</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u{1F4B0} <b>Nominal Pokok:</b> Rp ${depositAmount.toLocaleString("id-ID")}
-` + (cashback > 0 ? `\u{1F381} <b>Bonus Cashback Voucher:</b> +Rp ${cashback.toLocaleString("id-ID")} (<code>${escapeHtml2(String(invData.voucher_code || "VOUCHER"))}</code>)
-` : "") + `\u{1F4B3} <b>Total Saldo Masuk:</b> <b>Rp ${totalCredit.toLocaleString("id-ID")}</b>
-\u{1F194} <b>Kode Transaksi:</b> <code>${escapeHtml2(order.order_code)}</code>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-
-Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464} Profil</b> untuk melihat total saldo Anda.`;
-    await sendSafeMessage(
-      { chatId: order.telegram_id },
-      botInstance,
-      buyerDepositMessage,
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "\u{1F464} Lihat Profil & Saldo", callback_data: "menu_profile" }],
-            [{ text: "\u{1F6CD}\uFE0F Beli Produk", callback_data: "menu_products" }],
-            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
-          ]
-        }
-      }
-    );
-    const ownerDepositAlert = `\u{1F4B0} <b>DEPOSIT USER BERHASIL MASUK</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
-\u2022 <b>Pembeli:</b> <code>${escapeHtml2(order.telegram_id)}</code>
-\u2022 <b>Nominal Deposit:</b> <b>Rp ${depositAmount.toLocaleString("id-ID")}</b>
-` + (cashback > 0 ? `\u2022 <b>Cashback Voucher:</b> +Rp ${cashback.toLocaleString("id-ID")} (${escapeHtml2(String(invData.voucher_code))})
-` : "") + `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`;
-    await sendSafeMessage(
-      { chatId: ADMIN_TELEGRAM_ID },
-      botInstance,
-      ownerDepositAlert,
-      { parse_mode: "HTML" }
-    );
-    if (invData.voucher_id) {
-      const { applyVoucherUsage: applyVoucherUsage2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
-      await applyVoucherUsage2({
-        voucherId: invData.voucher_id,
-        userId: order.user_id,
-        orderId: order.id,
-        discountAmount: cashback
-      });
-    }
-    return {
-      success: true,
-      mode: "deposit",
-      message: "Deposit balance credited successfully.",
-      orderCode,
-      deliveredKey: confirmationMsg
-    };
-  }
-  if (invData.voucher_id) {
-    const { applyVoucherUsage: applyVoucherUsage2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
-    await applyVoucherUsage2({
-      voucherId: invData.voucher_id,
-      userId: order.user_id,
-      orderId: order.id,
-      discountAmount: Number(invData.voucher_discount || 0)
-    });
-  }
-  if (order.invoice_data?.is_vip_discount) {
-    await recordDiscountUsage2(order.user_id, 1e3);
-  }
-  let supplierProductId = order.product_id;
-  let modalPrice = order.product_price;
-  try {
-    const suppProducts = await getSupplierProducts();
-    const matchedSupp = suppProducts.find(
-      (p) => p.id === order.product_id || p.name.toLowerCase() === order.product_name.toLowerCase()
-    );
-    if (matchedSupp) {
-      supplierProductId = matchedSupp.id;
-      modalPrice = matchedSupp.price_idr;
-    }
-  } catch {
-  }
-  const sellingPrice = order.product_price;
-  const netProfit = Math.max(0, sellingPrice - modalPrice);
-  let currentBalance = 0;
-  try {
-    const balRes = await getSupplierBalance();
-    currentBalance = balRes.balance || 0;
-  } catch {
-    currentBalance = 0;
-  }
-  const buyerChatId = order.telegram_id;
-  if (currentBalance >= modalPrice && modalPrice > 0) {
-    try {
-      const orderResp = await createSupplierOrder(supplierProductId, 1);
-      const deliveredKey = orderResp.delivered_key || orderResp.delivered_keys?.[0];
-      if (deliveredKey) {
-        const encryptedKey = encrypt(deliveredKey);
-        await query(
-          `UPDATE orders
-           SET fulfillment_status = 'delivered',
-               credential_encrypted = $1,
-               delivered_at = CURRENT_TIMESTAMP
-           WHERE id = $2`,
-          [encryptedKey, order.id]
-        );
-        const buyerSuccessMessage = `\u{1F389} <b>PEMBAYARAN SUKSES & PESANAN SELESAI!</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u{1F4E6} <b>Produk:</b> ${escapeHtml2(order.product_name)}
-\u{1F194} <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-
-\u{1F511} <b>Kredensial / Lisensi Akun Anda:</b>
-<code>${escapeHtml2(deliveredKey)}</code>
-
-\u{1F4CC} <i>Simpan kredensial ini baik-baik. Garansi berlaku sesuai ketentuan produk. Terima kasih telah berbelanja di DaFung Hub!</i>`;
-        await sendSafeMessage(
-          { chatId: buyerChatId },
-          botInstance,
-          buyerSuccessMessage,
-          {
-            parse_mode: "HTML",
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: "\u{1F6CD}\uFE0F Beli Produk Lain", callback_data: "menu_products" }],
-                [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
-              ]
-            }
-          }
-        );
-        const ownerAlert = `\u2705 <b>ORDER SELESAI OTOMATIS (H2H INSTAN)</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
-\u2022 <b>Produk:</b> ${escapeHtml2(order.product_name)}
-\u2022 <b>Pembeli:</b> <code>${escapeHtml2(buyerChatId)}</code>
-\u2022 <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
-\u2022 <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString("id-ID")}
-\u2022 <b>Untung Bersih:</b> <b>+Rp ${netProfit.toLocaleString("id-ID")}</b>
-\u2022 <b>Sisa Saldo Supplier:</b> Rp ${(currentBalance - modalPrice).toLocaleString("id-ID")}
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`;
-        await sendSafeMessage(
-          { chatId: ADMIN_TELEGRAM_ID },
-          botInstance,
-          ownerAlert,
-          { parse_mode: "HTML" }
-        );
-        broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
-          console.warn("[Broadcast Warning] Failed to broadcast order success:", bErr);
-        });
-        return {
-          success: true,
-          mode: "instant",
-          message: "Order fulfilled instantly via supplier H2H.",
-          orderCode,
-          deliveredKey
-        };
-      }
-    } catch (suppErr) {
-      console.warn("[Fulfillment] Supplier order attempt failed, switching to Queue Mode:", suppErr);
-    }
-  }
-  await query(
-    `UPDATE orders SET fulfillment_status = 'processing' WHERE id = $1`,
-    [order.id]
-  );
-  const buyerQueueMessage = `\u{1F9FE} <b>PEMBAYARAN DITERIMA!</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u{1F4E6} <b>Produk:</b> ${escapeHtml2(order.product_name)}
-\u{1F4B0} <b>Total:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
-\u{1F194} <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-
-\u23F3 <i>Pesanan Anda sedang disiapkan oleh antrean sistem kami (estimasi 1\u201310 menit).</i>
-<i>Kredensial akun digital akan langsung dikirimkan otomatis ke chat ini begitu siap!</i>`;
-  await sendSafeMessage(
-    { chatId: buyerChatId },
-    botInstance,
-    buyerQueueMessage,
-    {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "\u{1F504} Cek Status Pesanan", callback_data: `status_${order.order_code}` }],
-          [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
-        ]
-      }
-    }
-  );
-  const memberInfo = await getUserMembership2(order.user_id).catch(() => null);
-  const vipPriorityBadge = memberInfo?.isVip ? " \u2B50 <b>[VIP MEMBER - PRIORITAS]</b>" : "";
-  const ownerQueueAlert = `\u{1F514} <b>PESANAN BARU MASUK (MODE ANTREAN)</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code> <i>(Sentuh untuk salin)</i>
-\u2022 <b>Produk:</b> ${escapeHtml2(order.product_name)}
-\u2022 <b>Pembeli:</b> <code>${escapeHtml2(buyerChatId)}</code>${vipPriorityBadge}
-\u2022 <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
-\u2022 <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString("id-ID")}
-\u2022 <b>Estimasi Untung:</b> <b>+Rp ${netProfit.toLocaleString("id-ID")}</b>
-\u2022 <b>Saldo Supplier:</b> Rp ${currentBalance.toLocaleString("id-ID")} (Kurang)
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-
-\u{1F449} <i>Pilihan eksekusi pengiriman:</i>
-1. Klik tombol <b>\u{1F4CB} Salin Kode Order</b> di bawah (1-klik salin untuk desktop & mobile).
-2. Kirim manual ke pembeli dengan format:
-   <code>/kirim ${escapeHtml2(order.order_code)} &lt;email:password&gt;</code>
-3. Atau klik <b>\u{1F680} Proses via Supplier</b> setelah saldo supplier diisi.`;
-  const ownerActionButtons = {
-    inline_keyboard: [
-      [
-        {
-          text: `\u{1F4CB} Salin Kode: ${order.order_code}`,
-          copy_text: { text: order.order_code }
-        }
-      ],
-      [
-        {
-          text: "\u{1F680} Proses via Supplier (1-Klik)",
-          callback_data: `admin_process_${order.order_code}`
-        }
-      ],
-      [{ text: "\u{1F4E6} Buka Antrean Pesanan", callback_data: "admin_queue" }]
-    ]
-  };
-  await sendSafeMessage(
-    { chatId: ADMIN_TELEGRAM_ID },
-    botInstance,
-    ownerQueueAlert,
-    {
-      parse_mode: "HTML",
-      reply_markup: ownerActionButtons
-    }
-  );
-  return {
-    success: true,
-    mode: "queued",
-    message: "Order moved to queue mode. Owner notified.",
-    orderCode
-  };
-}
-async function adminManualFulfill(orderCode, credentialsText, botInstance) {
-  const cleanKey = credentialsText?.trim();
-  if (!cleanKey) {
-    return { success: false, message: "Kredensial akun tidak boleh kosong." };
-  }
-  const orderRes = await query(
-    `SELECT o.*, u.telegram_id, p.name as product_name
-     FROM orders o
-     JOIN users u ON o.user_id = u.id
-     JOIN products p ON o.product_id = p.id
-     WHERE o.order_code = $1 LIMIT 1`,
-    [orderCode]
-  );
-  if (orderRes.rows.length === 0) {
-    return { success: false, message: `Order "${orderCode}" tidak ditemukan.` };
-  }
-  const order = orderRes.rows[0];
-  const encryptedKey = encrypt(cleanKey);
-  await query(
-    `UPDATE orders
-     SET fulfillment_status = 'delivered',
-         credential_encrypted = $1,
-         delivered_at = CURRENT_TIMESTAMP
-     WHERE id = $2`,
-    [encryptedKey, order.id]
-  );
-  const buyerMessage = `\u{1F389} <b>PESANAN ANDA TELAH SELESAI!</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\u{1F4E6} <b>Produk:</b> ${escapeHtml2(order.product_name)}
-\u{1F194} <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-
-\u{1F511} <b>Kredensial / Detail Akun:</b>
-<code>${escapeHtml2(cleanKey)}</code>
-
-\u{1F4CC} <i>Terima kasih telah berbelanja di DaFung Hub! Hubungi admin jika butuh bantuan atau klaim garansi.</i>`;
-  await sendSafeMessage(
-    { chatId: order.telegram_id },
-    botInstance,
-    buyerMessage,
-    {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "\u{1F6CD}\uFE0F Beli Produk Baru", callback_data: "menu_products" }],
-          [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
-        ]
-      }
-    }
-  );
-  broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
-    console.warn("[Broadcast Warning] Failed to broadcast manual fulfillment:", bErr);
-  });
-  return {
-    success: true,
-    message: `\u2705 Akun untuk order <code>${orderCode}</code> berhasil dikirimkan ke pembeli!`
-  };
-}
-async function adminRetrySupplierFulfill(orderCode, botInstance) {
-  const result = await processOrderPayment(orderCode, botInstance);
-  if (result.mode === "instant") {
-    return {
-      success: true,
-      message: `\u{1F680} <b>Berhasil!</b> Order <code>${orderCode}</code> telah dieksekusi via supplier dan akun sudah otomatis terkirim ke pembeli.`
-    };
-  }
-  if (result.mode === "already_processed") {
-    return {
-      success: true,
-      message: `\u2139\uFE0F Order <code>${orderCode}</code> sudah selesai sebelumnya.`
-    };
-  }
-  let currentBal = 0;
-  try {
-    currentBal = (await getSupplierBalance()).balance || 0;
-  } catch {
-  }
-  return {
-    success: false,
-    message: `\u26A0\uFE0F Saldo supplier Anda saat ini <b>Rp ${currentBal.toLocaleString("id-ID")}</b> masih belum cukup untuk order ini.
-
-Silakan top up di supplier terlebih dahulu, lalu klik tombol ini lagi, atau gunakan perintah <code>/kirim ${orderCode} &lt;kredensial&gt;</code>.`
-  };
-}
-async function getPendingQueueOrders(limit = 50) {
-  const res = await query(
-    `SELECT o.*, p.name as product_name, p.price as product_price, u.telegram_id
-     FROM orders o
-     JOIN products p ON o.product_id = p.id
-     JOIN users u ON o.user_id = u.id
-     WHERE o.fulfillment_status = 'processing'
-     ORDER BY o.created_at DESC
-     LIMIT $1`,
-    [limit]
-  );
-  return res.rows;
-}
-var init_fulfillment = __esm({
-  "lib/fulfillment.ts"() {
-    "use strict";
-    init_db();
-    init_encrypt();
-    init_supplier();
-    init_handler();
-    init_pricing();
-    init_broadcast();
-  }
-});
-
 // node_modules/qrcode/lib/can-promise.js
 var require_can_promise = __commonJS({
   "node_modules/qrcode/lib/can-promise.js"(exports2, module2) {
@@ -18926,10 +18445,14 @@ async function checkShopeePayPayment(params) {
         const match = transactions.find((t) => {
           const txAmt = Math.round(Number(t.amount || t.nominal || t.total || 0));
           if (txAmt !== targetAmount) return false;
-          const rawDate = t.created_at || t.timestamp || t.date;
+          const rawDate = t.time || t.created_at || t.timestamp || t.date;
           if (orderTime > 0 && rawDate) {
-            const txTime = new Date(rawDate).getTime();
-            if (txTime < orderTime - 3e5) return false;
+            const dateStr = String(rawDate).trim();
+            const normalizedDate = dateStr.includes("+") || dateStr.includes("Z") ? dateStr : dateStr.replace(" ", "T") + "+07:00";
+            const txTime = new Date(normalizedDate).getTime();
+            if (!isNaN(txTime)) {
+              if (txTime < orderTime - 6e5) return false;
+            }
           }
           return true;
         });
@@ -18960,6 +18483,524 @@ var init_shopeepay = __esm({
     SHOPEEPAY_BASE_URL = process.env.SHOPEEPAY_API_URL || "https://shopee.prastyaaneki.biz.id";
     SHOPEEPAY_API_KEY = process.env.SHOPEEPAY_API_KEY || "";
     SHOPEEPAY_STATIC_QRIS = process.env.SHOPEEPAY_STATIC_QRIS || "00020101021126610016ID.CO.SHOPEE.WWW01189360091800239501700208239501700303UMI51440014ID.CO.QRIS.WWW0215ID10266191349880303UMI5204481453033605802ID5910Dafung Hub6008KARAWANG61054137362070703A016304BBC9";
+  }
+});
+
+// lib/fulfillment.ts
+var fulfillment_exports = {};
+__export(fulfillment_exports, {
+  adminManualFulfill: () => adminManualFulfill,
+  adminRetrySupplierFulfill: () => adminRetrySupplierFulfill,
+  checkAndProcessUnpaidShopeeOrders: () => checkAndProcessUnpaidShopeeOrders,
+  getPendingQueueOrders: () => getPendingQueueOrders,
+  processOrderPayment: () => processOrderPayment
+});
+function escapeHtml2(str) {
+  if (!str) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+async function processOrderPayment(orderCode, botInstance) {
+  const orderRes = await query(
+    `SELECT o.*, u.telegram_id, p.name as product_name, p.price as product_price
+     FROM orders o
+     JOIN users u ON o.user_id = u.id
+     JOIN products p ON o.product_id = p.id
+     WHERE o.order_code = $1 LIMIT 1`,
+    [orderCode]
+  );
+  if (orderRes.rows.length === 0) {
+    return {
+      success: false,
+      mode: "error",
+      message: `Order with code "${orderCode}" not found.`
+    };
+  }
+  const order = orderRes.rows[0];
+  if (order.fulfillment_status === "delivered") {
+    return {
+      success: true,
+      mode: "already_processed",
+      message: `Order "${orderCode}" has already been fulfilled.`,
+      orderCode
+    };
+  }
+  await query(
+    `UPDATE orders SET payment_status = 'paid' WHERE id = $1`,
+    [order.id]
+  );
+  broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
+    console.warn("[Broadcast Warning] Failed to broadcast order payment success:", bErr);
+  });
+  const {
+    isMembershipProduct: isMembershipProduct2,
+    findMembershipPackage: findMembershipPackage2,
+    activateOrExtendMembership: activateOrExtendMembership2,
+    formatWibDate: formatWibDate2,
+    recordDiscountUsage: recordDiscountUsage2,
+    getUserMembership: getUserMembership2
+  } = await Promise.resolve().then(() => (init_membership(), membership_exports));
+  if (isMembershipProduct2(order.product_name)) {
+    const pkg = findMembershipPackage2(order.product_name);
+    const durationDays = pkg ? pkg.durationDays : 30;
+    const act = await activateOrExtendMembership2(order.user_id, durationDays);
+    const note = `Membership VIP diaktifkan hingga ${act.newExpiresAt.toISOString()}`;
+    const encryptedNote = encrypt(note);
+    await query(
+      `UPDATE orders
+       SET fulfillment_status = 'delivered',
+           credential_encrypted = $1,
+           delivered_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [encryptedNote, order.id]
+    );
+    const buyerMembershipMessage = `\u{1F389} <b>SELAMAT! MEMBERSHIP VIP ANDA TELAH AKTIF! \u2B50</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F48E} <b>Paket:</b> ${escapeHtml2(order.product_name)}
+\u{1F4C5} <b>Masa Aktif:</b> Hingga <b>${formatWibDate2(act.newExpiresAt)}</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+
+\u{1F31F} <b>Keuntungan Eksklusif VIP Anda:</b>
+\u2022 \u{1F3F7}\uFE0F <b>Potongan Rp 1.000</b> untuk setiap pembelian akun digital.
+\u2022 \u{1F4CA} <b>Kuota Diskon Mingguan:</b> Rp 20.000 / minggu (Hemat s/d Rp 80.000+ per bulan!).
+\u2022 \u26A1 <b>Antrean Prioritas:</b> Pesanan diproses paling awal saat antrean manual.
+\u2022 \u{1F6E1}\uFE0F <b>Layanan Garansi VIP:</b> Klaim & penggantian akun lebih cepat.
+\u2022 \u{1F381} <b>Promo & Restock Spesial:</b> Akses lebih awal ke akun langka.
+
+\u{1F6D2} <i>Mulai belanja akun premium dengan harga lebih murah sekarang lewat katalog bot!</i>`;
+    await sendSafeMessage(
+      { chatId: order.telegram_id },
+      botInstance,
+      buyerMembershipMessage,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "\u{1F6CD}\uFE0F Buka Katalog Produk", callback_data: "menu_products" }],
+            [{ text: "\u{1F464} Cek Profil Saya", callback_data: "menu_profile" }],
+            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+          ]
+        }
+      }
+    );
+    const ownerMembershipAlert = `\u{1F48E} <b>PEMBELIAN MEMBERSHIP VIP BARU</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u2022 <b>Pembeli:</b> <code>${escapeHtml2(order.telegram_id)}</code>
+\u2022 <b>Paket:</b> ${escapeHtml2(order.product_name)}
+\u2022 <b>Masa Aktif:</b> s/d ${formatWibDate2(act.newExpiresAt)}
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`;
+    await sendSafeMessage(
+      { chatId: ADMIN_TELEGRAM_ID },
+      botInstance,
+      ownerMembershipAlert,
+      { parse_mode: "HTML" }
+    );
+    return {
+      success: true,
+      mode: "deposit",
+      message: "VIP Membership activated successfully.",
+      orderCode,
+      deliveredKey: note
+    };
+  }
+  const invData = order.invoice_data || {};
+  if (order.product_name.toLowerCase().includes("deposit saldo") || order.product_name.toLowerCase().startsWith("deposit")) {
+    const depositAmount = order.product_price;
+    const cashback = Number(invData.voucher_cashback || 0);
+    const totalCredit = depositAmount + cashback;
+    await query(
+      `UPDATE users SET balance = balance + $1 WHERE id = $2`,
+      [totalCredit, order.user_id]
+    );
+    const cashbackNote = cashback > 0 ? ` (+Bonus Cashback Voucher Rp ${cashback.toLocaleString("id-ID")})` : "";
+    const confirmationMsg = `Top-up saldo akun sebesar Rp ${depositAmount.toLocaleString("id-ID")}${cashbackNote} berhasil.`;
+    const encryptedNote = encrypt(confirmationMsg);
+    await query(
+      `UPDATE orders
+       SET fulfillment_status = 'delivered',
+           credential_encrypted = $1,
+           delivered_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [encryptedNote, order.id]
+    );
+    const buyerDepositMessage = `\u{1F389} <b>DEPOSIT SALDO BERHASIL DITAMBAHKAN!</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F4B0} <b>Nominal Pokok:</b> Rp ${depositAmount.toLocaleString("id-ID")}
+` + (cashback > 0 ? `\u{1F381} <b>Bonus Cashback Voucher:</b> +Rp ${cashback.toLocaleString("id-ID")} (<code>${escapeHtml2(String(invData.voucher_code || "VOUCHER"))}</code>)
+` : "") + `\u{1F4B3} <b>Total Saldo Masuk:</b> <b>Rp ${totalCredit.toLocaleString("id-ID")}</b>
+\u{1F194} <b>Kode Transaksi:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+
+Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464} Profil</b> untuk melihat total saldo Anda.`;
+    await sendSafeMessage(
+      { chatId: order.telegram_id },
+      botInstance,
+      buyerDepositMessage,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "\u{1F464} Lihat Profil & Saldo", callback_data: "menu_profile" }],
+            [{ text: "\u{1F6CD}\uFE0F Beli Produk", callback_data: "menu_products" }],
+            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+          ]
+        }
+      }
+    );
+    const ownerDepositAlert = `\u{1F4B0} <b>DEPOSIT USER BERHASIL MASUK</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u2022 <b>Pembeli:</b> <code>${escapeHtml2(order.telegram_id)}</code>
+\u2022 <b>Nominal Deposit:</b> <b>Rp ${depositAmount.toLocaleString("id-ID")}</b>
+` + (cashback > 0 ? `\u2022 <b>Cashback Voucher:</b> +Rp ${cashback.toLocaleString("id-ID")} (${escapeHtml2(String(invData.voucher_code))})
+` : "") + `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`;
+    await sendSafeMessage(
+      { chatId: ADMIN_TELEGRAM_ID },
+      botInstance,
+      ownerDepositAlert,
+      { parse_mode: "HTML" }
+    );
+    if (invData.voucher_id) {
+      const { applyVoucherUsage: applyVoucherUsage2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+      await applyVoucherUsage2({
+        voucherId: invData.voucher_id,
+        userId: order.user_id,
+        orderId: order.id,
+        discountAmount: cashback
+      });
+    }
+    return {
+      success: true,
+      mode: "deposit",
+      message: "Deposit balance credited successfully.",
+      orderCode,
+      deliveredKey: confirmationMsg
+    };
+  }
+  if (invData.voucher_id) {
+    const { applyVoucherUsage: applyVoucherUsage2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+    await applyVoucherUsage2({
+      voucherId: invData.voucher_id,
+      userId: order.user_id,
+      orderId: order.id,
+      discountAmount: Number(invData.voucher_discount || 0)
+    });
+  }
+  if (order.invoice_data?.is_vip_discount) {
+    await recordDiscountUsage2(order.user_id, 1e3);
+  }
+  let supplierProductId = order.product_id;
+  let modalPrice = order.product_price;
+  try {
+    const suppProducts = await getSupplierProducts();
+    const matchedSupp = suppProducts.find(
+      (p) => p.id === order.product_id || p.name.toLowerCase() === order.product_name.toLowerCase()
+    );
+    if (matchedSupp) {
+      supplierProductId = matchedSupp.id;
+      modalPrice = matchedSupp.price_idr;
+    }
+  } catch {
+  }
+  const sellingPrice = order.product_price;
+  const netProfit = Math.max(0, sellingPrice - modalPrice);
+  let currentBalance = 0;
+  try {
+    const balRes = await getSupplierBalance();
+    currentBalance = balRes.balance || 0;
+  } catch {
+    currentBalance = 0;
+  }
+  const buyerChatId = order.telegram_id;
+  if (currentBalance >= modalPrice && modalPrice > 0) {
+    try {
+      const orderResp = await createSupplierOrder(supplierProductId, 1);
+      const deliveredKey = orderResp.delivered_key || orderResp.delivered_keys?.[0];
+      if (deliveredKey) {
+        const encryptedKey = encrypt(deliveredKey);
+        await query(
+          `UPDATE orders
+           SET fulfillment_status = 'delivered',
+               credential_encrypted = $1,
+               delivered_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [encryptedKey, order.id]
+        );
+        const buyerSuccessMessage = `\u{1F389} <b>PEMBAYARAN SUKSES & PESANAN SELESAI!</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F4E6} <b>Produk:</b> ${escapeHtml2(order.product_name)}
+\u{1F194} <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+
+\u{1F511} <b>Kredensial / Lisensi Akun Anda:</b>
+<code>${escapeHtml2(deliveredKey)}</code>
+
+\u{1F4CC} <i>Simpan kredensial ini baik-baik. Garansi berlaku sesuai ketentuan produk. Terima kasih telah berbelanja di DaFung Hub!</i>`;
+        await sendSafeMessage(
+          { chatId: buyerChatId },
+          botInstance,
+          buyerSuccessMessage,
+          {
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "\u{1F6CD}\uFE0F Beli Produk Lain", callback_data: "menu_products" }],
+                [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+              ]
+            }
+          }
+        );
+        const ownerAlert = `\u2705 <b>ORDER SELESAI OTOMATIS (H2H INSTAN)</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u2022 <b>Produk:</b> ${escapeHtml2(order.product_name)}
+\u2022 <b>Pembeli:</b> <code>${escapeHtml2(buyerChatId)}</code>
+\u2022 <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
+\u2022 <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString("id-ID")}
+\u2022 <b>Untung Bersih:</b> <b>+Rp ${netProfit.toLocaleString("id-ID")}</b>
+\u2022 <b>Sisa Saldo Supplier:</b> Rp ${(currentBalance - modalPrice).toLocaleString("id-ID")}
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`;
+        await sendSafeMessage(
+          { chatId: ADMIN_TELEGRAM_ID },
+          botInstance,
+          ownerAlert,
+          { parse_mode: "HTML" }
+        );
+        broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
+          console.warn("[Broadcast Warning] Failed to broadcast order success:", bErr);
+        });
+        return {
+          success: true,
+          mode: "instant",
+          message: "Order fulfilled instantly via supplier H2H.",
+          orderCode,
+          deliveredKey
+        };
+      }
+    } catch (suppErr) {
+      console.warn("[Fulfillment] Supplier order attempt failed, switching to Queue Mode:", suppErr);
+    }
+  }
+  await query(
+    `UPDATE orders SET fulfillment_status = 'processing' WHERE id = $1`,
+    [order.id]
+  );
+  const buyerQueueMessage = `\u{1F9FE} <b>PEMBAYARAN DITERIMA!</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F4E6} <b>Produk:</b> ${escapeHtml2(order.product_name)}
+\u{1F4B0} <b>Total:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
+\u{1F194} <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+
+\u23F3 <i>Pesanan Anda sedang disiapkan oleh antrean sistem kami (estimasi 1\u201310 menit).</i>
+<i>Kredensial akun digital akan langsung dikirimkan otomatis ke chat ini begitu siap!</i>`;
+  await sendSafeMessage(
+    { chatId: buyerChatId },
+    botInstance,
+    buyerQueueMessage,
+    {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "\u{1F504} Cek Status Pesanan", callback_data: `status_${order.order_code}` }],
+          [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+        ]
+      }
+    }
+  );
+  const memberInfo = await getUserMembership2(order.user_id).catch(() => null);
+  const vipPriorityBadge = memberInfo?.isVip ? " \u2B50 <b>[VIP MEMBER - PRIORITAS]</b>" : "";
+  const ownerQueueAlert = `\u{1F514} <b>PESANAN BARU MASUK (MODE ANTREAN)</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code> <i>(Sentuh untuk salin)</i>
+\u2022 <b>Produk:</b> ${escapeHtml2(order.product_name)}
+\u2022 <b>Pembeli:</b> <code>${escapeHtml2(buyerChatId)}</code>${vipPriorityBadge}
+\u2022 <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
+\u2022 <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString("id-ID")}
+\u2022 <b>Estimasi Untung:</b> <b>+Rp ${netProfit.toLocaleString("id-ID")}</b>
+\u2022 <b>Saldo Supplier:</b> Rp ${currentBalance.toLocaleString("id-ID")} (Kurang)
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+
+\u{1F449} <i>Pilihan eksekusi pengiriman:</i>
+1. Klik tombol <b>\u{1F4CB} Salin Kode Order</b> di bawah (1-klik salin untuk desktop & mobile).
+2. Kirim manual ke pembeli dengan format:
+   <code>/kirim ${escapeHtml2(order.order_code)} &lt;email:password&gt;</code>
+3. Atau klik <b>\u{1F680} Proses via Supplier</b> setelah saldo supplier diisi.`;
+  const ownerActionButtons = {
+    inline_keyboard: [
+      [
+        {
+          text: `\u{1F4CB} Salin Kode: ${order.order_code}`,
+          copy_text: { text: order.order_code }
+        }
+      ],
+      [
+        {
+          text: "\u{1F680} Proses via Supplier (1-Klik)",
+          callback_data: `admin_process_${order.order_code}`
+        }
+      ],
+      [{ text: "\u{1F4E6} Buka Antrean Pesanan", callback_data: "admin_queue" }]
+    ]
+  };
+  await sendSafeMessage(
+    { chatId: ADMIN_TELEGRAM_ID },
+    botInstance,
+    ownerQueueAlert,
+    {
+      parse_mode: "HTML",
+      reply_markup: ownerActionButtons
+    }
+  );
+  return {
+    success: true,
+    mode: "queued",
+    message: "Order moved to queue mode. Owner notified.",
+    orderCode
+  };
+}
+async function adminManualFulfill(orderCode, credentialsText, botInstance) {
+  const cleanKey = credentialsText?.trim();
+  if (!cleanKey) {
+    return { success: false, message: "Kredensial akun tidak boleh kosong." };
+  }
+  const orderRes = await query(
+    `SELECT o.*, u.telegram_id, p.name as product_name
+     FROM orders o
+     JOIN users u ON o.user_id = u.id
+     JOIN products p ON o.product_id = p.id
+     WHERE o.order_code = $1 LIMIT 1`,
+    [orderCode]
+  );
+  if (orderRes.rows.length === 0) {
+    return { success: false, message: `Order "${orderCode}" tidak ditemukan.` };
+  }
+  const order = orderRes.rows[0];
+  const encryptedKey = encrypt(cleanKey);
+  await query(
+    `UPDATE orders
+     SET fulfillment_status = 'delivered',
+         credential_encrypted = $1,
+         delivered_at = CURRENT_TIMESTAMP
+     WHERE id = $2`,
+    [encryptedKey, order.id]
+  );
+  const buyerMessage = `\u{1F389} <b>PESANAN ANDA TELAH SELESAI!</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F4E6} <b>Produk:</b> ${escapeHtml2(order.product_name)}
+\u{1F194} <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+
+\u{1F511} <b>Kredensial / Detail Akun:</b>
+<code>${escapeHtml2(cleanKey)}</code>
+
+\u{1F4CC} <i>Terima kasih telah berbelanja di DaFung Hub! Hubungi admin jika butuh bantuan atau klaim garansi.</i>`;
+  await sendSafeMessage(
+    { chatId: order.telegram_id },
+    botInstance,
+    buyerMessage,
+    {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "\u{1F6CD}\uFE0F Beli Produk Baru", callback_data: "menu_products" }],
+          [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+        ]
+      }
+    }
+  );
+  broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
+    console.warn("[Broadcast Warning] Failed to broadcast manual fulfillment:", bErr);
+  });
+  return {
+    success: true,
+    message: `\u2705 Akun untuk order <code>${orderCode}</code> berhasil dikirimkan ke pembeli!`
+  };
+}
+async function adminRetrySupplierFulfill(orderCode, botInstance) {
+  const result = await processOrderPayment(orderCode, botInstance);
+  if (result.mode === "instant") {
+    return {
+      success: true,
+      message: `\u{1F680} <b>Berhasil!</b> Order <code>${orderCode}</code> telah dieksekusi via supplier dan akun sudah otomatis terkirim ke pembeli.`
+    };
+  }
+  if (result.mode === "already_processed") {
+    return {
+      success: true,
+      message: `\u2139\uFE0F Order <code>${orderCode}</code> sudah selesai sebelumnya.`
+    };
+  }
+  let currentBal = 0;
+  try {
+    currentBal = (await getSupplierBalance()).balance || 0;
+  } catch {
+  }
+  return {
+    success: false,
+    message: `\u26A0\uFE0F Saldo supplier Anda saat ini <b>Rp ${currentBal.toLocaleString("id-ID")}</b> masih belum cukup untuk order ini.
+
+Silakan top up di supplier terlebih dahulu, lalu klik tombol ini lagi, atau gunakan perintah <code>/kirim ${orderCode} &lt;kredensial&gt;</code>.`
+  };
+}
+async function getPendingQueueOrders(limit = 50) {
+  const res = await query(
+    `SELECT o.*, p.name as product_name, p.price as product_price, u.telegram_id
+     FROM orders o
+     JOIN products p ON o.product_id = p.id
+     JOIN users u ON o.user_id = u.id
+     WHERE o.fulfillment_status = 'processing'
+     ORDER BY o.created_at DESC
+     LIMIT $1`,
+    [limit]
+  );
+  return res.rows;
+}
+async function checkAndProcessUnpaidShopeeOrders(botInstance) {
+  const gateway = (process.env.PAYMENT_GATEWAY || "shopeepay").toLowerCase();
+  if (gateway !== "shopeepay") return 0;
+  let confirmedCount = 0;
+  try {
+    const unpaidOrders = await query(
+      `SELECT o.*
+       FROM orders o
+       WHERE o.payment_status = 'unpaid'
+         AND o.created_at >= NOW() - INTERVAL '60 minutes'
+       ORDER BY o.created_at DESC
+       LIMIT 10`
+    );
+    for (const ord of unpaidOrders.rows) {
+      const invData = typeof ord.invoice_data === "string" ? JSON.parse(ord.invoice_data || "{}") : ord.invoice_data || {};
+      const actualAmount = Number(invData.payable_amount) || Number(invData.amount) || 0;
+      if (actualAmount > 0) {
+        const { checkShopeePayPayment: checkShopeePayPayment2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
+        const checkResult = await checkShopeePayPayment2({
+          token: invData.token,
+          orderCode: ord.order_code,
+          amount: actualAmount,
+          orderCreatedAt: ord.created_at
+        });
+        if (checkResult.paid) {
+          console.log(`[Auto-Check] Payment confirmed for order: ${ord.order_code}`);
+          await processOrderPayment(ord.order_code, botInstance);
+          confirmedCount++;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[Auto-Check] Error checking unpaid orders:", err);
+  }
+  return confirmedCount;
+}
+var init_fulfillment = __esm({
+  "lib/fulfillment.ts"() {
+    "use strict";
+    init_db();
+    init_encrypt();
+    init_supplier();
+    init_handler();
+    init_pricing();
+    init_broadcast();
   }
 });
 
@@ -19888,6 +19929,30 @@ Silakan pilih menu <b>\u{1F7E2} Produk</b> untuk mulai membeli akun digital!
 `;
   } else {
     for (const ord of ordersList) {
+      if (ord.payment_status === "unpaid") {
+        try {
+          const invData = typeof ord.invoice_data === "string" ? JSON.parse(ord.invoice_data || "{}") : ord.invoice_data || {};
+          const actualAmount = Number(invData.payable_amount) || Number(invData.amount) || 0;
+          const gateway = (invData.gateway || process.env.PAYMENT_GATEWAY || "shopeepay").toLowerCase();
+          if (gateway === "shopeepay" && actualAmount > 0) {
+            const { checkShopeePayPayment: checkShopeePayPayment2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
+            const checkResult = await checkShopeePayPayment2({
+              token: invData.token,
+              orderCode: ord.order_code,
+              amount: actualAmount,
+              orderCreatedAt: ord.created_at
+            });
+            if (checkResult.paid) {
+              const { processOrderPayment: processOrderPayment2 } = await Promise.resolve().then(() => (init_fulfillment(), fulfillment_exports));
+              await processOrderPayment2(ord.order_code, botInstance);
+              ord.payment_status = "paid";
+              ord.fulfillment_status = "delivered";
+            }
+          }
+        } catch (e) {
+          console.warn("[sendOrdersMenu] Auto check unpaid order error:", e);
+        }
+      }
       const isUnpaid = ord.payment_status === "unpaid";
       const statusIcon = isUnpaid ? "\u23F3" : ord.fulfillment_status === "delivered" ? "\u{1F7E2}" : ord.fulfillment_status === "processing" ? "\u{1F7E1}" : "\u26AA";
       const statusLabel = isUnpaid ? "MENUNGGU PEMBAYARAN" : ord.fulfillment_status.toUpperCase();
@@ -20028,13 +20093,14 @@ async function sendOrderStatus(ctx, botInstance, orderCode) {
   if (o.payment_status === "unpaid") {
     try {
       const invData = typeof o.invoice_data === "string" ? JSON.parse(o.invoice_data || "{}") : o.invoice_data || {};
+      const actualAmount = Number(invData.payable_amount) || Number(invData.amount) || Number(o.product_price) || 0;
       const gateway = (invData.gateway || process.env.PAYMENT_GATEWAY || "shopeepay").toLowerCase();
       if (gateway === "shopeepay") {
         const { checkShopeePayPayment: checkShopeePayPayment2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
         const checkResult = await checkShopeePayPayment2({
           token: invData.token,
           orderCode: o.order_code,
-          amount: o.product_price,
+          amount: actualAmount,
           orderCreatedAt: o.created_at
         });
         if (checkResult.paid) {
@@ -46639,12 +46705,13 @@ setInterval(async () => {
     );
     for (const ord of unpaidOrders.rows) {
       const invData = typeof ord.invoice_data === "string" ? JSON.parse(ord.invoice_data || "{}") : ord.invoice_data || {};
+      const actualAmount = Number(invData.payable_amount) || Number(invData.amount) || Number(ord.product_price) || 0;
       const gateway = (invData.gateway || process.env.PAYMENT_GATEWAY || "shopeepay").toLowerCase();
-      if (gateway === "shopeepay") {
+      if (gateway === "shopeepay" && actualAmount > 0) {
         const checkResult = await checkShopeePayPayment2({
           token: invData.token,
           orderCode: ord.order_code,
-          amount: ord.product_price,
+          amount: actualAmount,
           orderCreatedAt: ord.created_at
         });
         if (checkResult.paid) {

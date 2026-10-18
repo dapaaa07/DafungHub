@@ -597,3 +597,56 @@ export async function getPendingQueueOrders(limit: number = 50): Promise<
   );
   return res.rows;
 }
+
+/**
+ * Periodically or on-demand checks all recent unpaid ShopeePay orders against incoming transactions.
+ */
+export async function checkAndProcessUnpaidShopeeOrders(
+  botInstance: ExtendedBot
+): Promise<number> {
+  const gateway = (process.env.PAYMENT_GATEWAY || 'shopeepay').toLowerCase();
+  if (gateway !== 'shopeepay') return 0;
+
+  let confirmedCount = 0;
+  try {
+    const unpaidOrders = await query<any>(
+      `SELECT o.*
+       FROM orders o
+       WHERE o.payment_status = 'unpaid'
+         AND o.created_at >= NOW() - INTERVAL '60 minutes'
+       ORDER BY o.created_at DESC
+       LIMIT 10`
+    );
+
+    for (const ord of unpaidOrders.rows) {
+      const invData =
+        typeof ord.invoice_data === 'string'
+          ? JSON.parse(ord.invoice_data || '{}')
+          : (ord.invoice_data || {});
+
+      const actualAmount =
+        Number(invData.payable_amount) ||
+        Number(invData.amount) ||
+        0;
+
+      if (actualAmount > 0) {
+        const { checkShopeePayPayment } = await import('./shopeepay');
+        const checkResult = await checkShopeePayPayment({
+          token: invData.token,
+          orderCode: ord.order_code,
+          amount: actualAmount,
+          orderCreatedAt: ord.created_at,
+        });
+
+        if (checkResult.paid) {
+          console.log(`[Auto-Check] Payment confirmed for order: ${ord.order_code}`);
+          await processOrderPayment(ord.order_code, botInstance);
+          confirmedCount++;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Auto-Check] Error checking unpaid orders:', err);
+  }
+  return confirmedCount;
+}

@@ -312,11 +312,18 @@ export async function checkShopeePayPayment(params: {
           if (txAmt !== targetAmount) return false;
 
           // If timestamp is available, verify it occurred around or after order creation
-          const rawDate = t.created_at || t.timestamp || t.date;
+          const rawDate = t.time || t.created_at || t.timestamp || t.date;
           if (orderTime > 0 && rawDate) {
-            const txTime = new Date(rawDate).getTime();
-            // Allow 5 minutes clock skew before order creation
-            if (txTime < orderTime - 300000) return false;
+            const dateStr = String(rawDate).trim();
+            const normalizedDate =
+              dateStr.includes('+') || dateStr.includes('Z')
+                ? dateStr
+                : dateStr.replace(' ', 'T') + '+07:00';
+            const txTime = new Date(normalizedDate).getTime();
+            if (!isNaN(txTime)) {
+              // Allow up to 10 minutes clock skew before order creation
+              if (txTime < orderTime - 600000) return false;
+            }
           }
 
           return true;

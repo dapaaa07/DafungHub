@@ -6,6 +6,16 @@ export async function POST(req: NextRequest) {
     const update = await req.json();
     await initBot({ mode: 'webhook' });
     await handleWebhookUpdate(update);
+
+    // Auto-check recent unpaid ShopeePay orders in background
+    import('@/lib/fulfillment')
+      .then(({ checkAndProcessUnpaidShopeeOrders }) => {
+        import('@/bot/handler').then(({ bot }) => {
+          checkAndProcessUnpaidShopeeOrders(bot).catch(() => {});
+        });
+      })
+      .catch(() => {});
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error('Telegram webhook error:', err);
