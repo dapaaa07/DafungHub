@@ -74,7 +74,89 @@ export async function processOrderPayment(
     console.warn('[Broadcast Warning] Failed to broadcast order payment success:', bErr);
   });
 
-  // 2b. Special Handling: Top-Up / Deposit Saldo
+  // 2b. Special Handling: Membership VIP Subscription
+  const {
+    isMembershipProduct,
+    findMembershipPackage,
+    activateOrExtendMembership,
+    formatWibDate,
+    recordDiscountUsage,
+    getUserMembership,
+  } = await import('./membership');
+
+  if (isMembershipProduct(order.product_name)) {
+    const pkg = findMembershipPackage(order.product_name);
+    const durationDays = pkg ? pkg.durationDays : 30;
+    const act = await activateOrExtendMembership(order.user_id, durationDays);
+
+    const note = `Membership VIP diaktifkan hingga ${act.newExpiresAt.toISOString()}`;
+    const encryptedNote = encrypt(note);
+    await query(
+      `UPDATE orders
+       SET fulfillment_status = 'delivered',
+           credential_encrypted = $1,
+           delivered_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [encryptedNote, order.id]
+    );
+
+    const buyerMembershipMessage =
+      `🎉 <b>SELAMAT! MEMBERSHIP VIP ANDA TELAH AKTIF! ⭐</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n` +
+      `💎 <b>Paket:</b> ${escapeHtml(order.product_name)}\n` +
+      `📅 <b>Masa Aktif:</b> Hingga <b>${formatWibDate(act.newExpiresAt)}</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n\n` +
+      `🌟 <b>Keuntungan Eksklusif VIP Anda:</b>\n` +
+      `• 🏷️ <b>Potongan Rp 1.000</b> untuk setiap pembelian akun digital.\n` +
+      `• 📊 <b>Kuota Diskon Mingguan:</b> Rp 20.000 / minggu (Hemat s/d Rp 80.000+ per bulan!).\n` +
+      `• ⚡ <b>Antrean Prioritas:</b> Pesanan diproses paling awal saat antrean manual.\n` +
+      `• 🛡️ <b>Layanan Garansi VIP:</b> Klaim & penggantian akun lebih cepat.\n` +
+      `• 🎁 <b>Promo & Restock Spesial:</b> Akses lebih awal ke akun langka.\n\n` +
+      `🛒 <i>Mulai belanja akun premium dengan harga lebih murah sekarang lewat katalog bot!</i>`;
+
+    await sendSafeMessage(
+      { chatId: order.telegram_id } as never,
+      botInstance,
+      buyerMembershipMessage,
+      {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🛍️ Buka Katalog Produk', callback_data: 'menu_products' }],
+            [{ text: '👤 Cek Profil Saya', callback_data: 'menu_profile' }],
+            [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+          ],
+        },
+      }
+    );
+
+    // Notify Owner
+    const ownerMembershipAlert =
+      `💎 <b>PEMBELIAN MEMBERSHIP VIP BARU</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n` +
+      `• <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>\n` +
+      `• <b>Pembeli:</b> <code>${escapeHtml(order.telegram_id)}</code>\n` +
+      `• <b>Paket:</b> ${escapeHtml(order.product_name)}\n` +
+      `• <b>Masa Aktif:</b> s/d ${formatWibDate(act.newExpiresAt)}\n` +
+      `━━━━━━━━━━━━━━━━━━━`;
+
+    await sendSafeMessage(
+      { chatId: ADMIN_TELEGRAM_ID } as never,
+      botInstance,
+      ownerMembershipAlert,
+      { parse_mode: 'HTML' }
+    );
+
+    return {
+      success: true,
+      mode: 'deposit',
+      message: 'VIP Membership activated successfully.',
+      orderCode,
+      deliveredKey: note,
+    };
+  }
+
+  // 2c. Special Handling: Top-Up / Deposit Saldo
   if (order.product_name.toLowerCase().includes('deposit saldo') || order.product_name.toLowerCase().startsWith('deposit')) {
     const depositAmount = order.product_price;
     await query(
@@ -140,6 +222,11 @@ export async function processOrderPayment(
       orderCode,
       deliveredKey: confirmationMsg,
     };
+  }
+
+  // 2d. Record VIP Discount usage if discount was applied on this order
+  if ((order.invoice_data as Record<string, unknown>)?.is_vip_discount) {
+    await recordDiscountUsage(order.user_id, 1000);
   }
 
   // 3. Find supplier product to determine modal price and supplier ID
@@ -289,13 +376,16 @@ export async function processOrderPayment(
     }
   );
 
+  const memberInfo = await getUserMembership(order.user_id).catch(() => null);
+  const vipPriorityBadge = memberInfo?.isVip ? ' ⭐ <b>[VIP MEMBER - PRIORITAS]</b>' : '';
+
   // Send Actionable Alert to Owner
   const ownerQueueAlert =
     `🔔 <b>PESANAN BARU MASUK (MODE ANTREAN)</b>\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
     `• <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code> <i>(Sentuh untuk salin)</i>\n` +
     `• <b>Produk:</b> ${escapeHtml(order.product_name)}\n` +
-    `• <b>Pembeli:</b> <code>${escapeHtml(buyerChatId)}</code>\n` +
+    `• <b>Pembeli:</b> <code>${escapeHtml(buyerChatId)}</code>${vipPriorityBadge}\n` +
     `• <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString('id-ID')}\n` +
     `• <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString('id-ID')}\n` +
     `• <b>Estimasi Untung:</b> <b>+Rp ${netProfit.toLocaleString('id-ID')}</b>\n` +

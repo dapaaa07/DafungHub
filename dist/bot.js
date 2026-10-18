@@ -13178,6 +13178,248 @@ var init_broadcast = __esm({
   }
 });
 
+// lib/membership.ts
+var membership_exports = {};
+__export(membership_exports, {
+  MEMBERSHIP_PACKAGES: () => MEMBERSHIP_PACKAGES,
+  MEMBERSHIP_PRODUCT_DISCOUNT: () => MEMBERSHIP_PRODUCT_DISCOUNT,
+  MEMBERSHIP_WEEKLY_QUOTA_LIMIT: () => MEMBERSHIP_WEEKLY_QUOTA_LIMIT,
+  TRANSACTION_FEE: () => TRANSACTION_FEE,
+  activateOrExtendMembership: () => activateOrExtendMembership,
+  calculateCheckoutPrice: () => calculateCheckoutPrice,
+  findMembershipPackage: () => findMembershipPackage,
+  formatWibDate: () => formatWibDate,
+  getUserMembership: () => getUserMembership,
+  isDepositProduct: () => isDepositProduct,
+  isMembershipProduct: () => isMembershipProduct,
+  recordDiscountUsage: () => recordDiscountUsage
+});
+function isMembershipProduct(productName) {
+  if (!productName) return false;
+  return /\bmembership\b/i.test(productName);
+}
+function isDepositProduct(productName) {
+  if (!productName) return false;
+  const lower = productName.toLowerCase();
+  return lower.includes("deposit saldo") || lower.startsWith("deposit");
+}
+function findMembershipPackage(identifier) {
+  const clean = identifier.trim().toLowerCase();
+  return MEMBERSHIP_PACKAGES.find(
+    (pkg) => pkg.id.toLowerCase() === clean || pkg.name.toLowerCase() === clean || clean.includes(pkg.name.toLowerCase())
+  ) || null;
+}
+function formatWibDate(dateInput) {
+  if (!dateInput) return "-";
+  const d = new Date(dateInput);
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "Mei",
+    "Jun",
+    "Jul",
+    "Agu",
+    "Sep",
+    "Okt",
+    "Nov",
+    "Des"
+  ];
+  const utc = d.getTime() + d.getTimezoneOffset() * 6e4;
+  const wib = new Date(utc + 7 * 36e5);
+  const day = wib.getDate();
+  const month = months[wib.getMonth()];
+  const year = wib.getFullYear();
+  const hours = String(wib.getHours()).padStart(2, "0");
+  const minutes = String(wib.getMinutes()).padStart(2, "0");
+  return `${day} ${month} ${year}, ${hours}:${minutes} WIB`;
+}
+async function getUserMembership(telegramIdOrUserId) {
+  const userRes = await query(
+    `SELECT id, telegram_id, membership_tier, membership_expires_at,
+            weekly_discount_used, weekly_discount_reset_at
+     FROM users
+     WHERE telegram_id = $1 OR id::text = $1
+     LIMIT 1`,
+    [telegramIdOrUserId]
+  );
+  if (userRes.rows.length === 0) {
+    return {
+      userId: "",
+      telegramId: telegramIdOrUserId,
+      isVip: false,
+      tier: "free",
+      expiresAt: null,
+      daysRemaining: 0,
+      weeklyUsed: 0,
+      weeklyLimit: MEMBERSHIP_WEEKLY_QUOTA_LIMIT,
+      remainingWeeklyQuota: MEMBERSHIP_WEEKLY_QUOTA_LIMIT,
+      resetAt: null
+    };
+  }
+  const user = userRes.rows[0];
+  const now = /* @__PURE__ */ new Date();
+  const expiresAt = user.membership_expires_at ? new Date(user.membership_expires_at) : null;
+  const isVip = Boolean(expiresAt && expiresAt.getTime() > now.getTime() && user.membership_tier === "vip");
+  let daysRemaining = 0;
+  if (isVip && expiresAt) {
+    daysRemaining = Math.max(0, Math.ceil((expiresAt.getTime() - now.getTime()) / (1e3 * 60 * 60 * 24)));
+  }
+  let weeklyUsed = Number(user.weekly_discount_used || 0);
+  let resetAt = user.weekly_discount_reset_at ? new Date(user.weekly_discount_reset_at) : null;
+  if (!resetAt || now.getTime() >= resetAt.getTime()) {
+    weeklyUsed = 0;
+    resetAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1e3);
+    await query(
+      `UPDATE users
+       SET weekly_discount_used = 0,
+           weekly_discount_reset_at = $1
+       WHERE id = $2`,
+      [resetAt, user.id]
+    ).catch(() => {
+    });
+  }
+  const remainingWeeklyQuota = Math.max(0, MEMBERSHIP_WEEKLY_QUOTA_LIMIT - weeklyUsed);
+  return {
+    userId: user.id,
+    telegramId: user.telegram_id,
+    isVip,
+    tier: isVip ? "vip" : "free",
+    expiresAt,
+    daysRemaining,
+    weeklyUsed,
+    weeklyLimit: MEMBERSHIP_WEEKLY_QUOTA_LIMIT,
+    remainingWeeklyQuota,
+    resetAt
+  };
+}
+async function calculateCheckoutPrice(telegramIdOrUserId, product) {
+  const membershipStatus = await getUserMembership(telegramIdOrUserId);
+  const basePrice = Number(product.price || 0);
+  const isSpecialProduct = isMembershipProduct(product.name) || isDepositProduct(product.name);
+  let discount = 0;
+  let isVipDiscountApplied = false;
+  if (membershipStatus.isVip && !isSpecialProduct && membershipStatus.remainingWeeklyQuota >= MEMBERSHIP_PRODUCT_DISCOUNT && basePrice > MEMBERSHIP_PRODUCT_DISCOUNT) {
+    discount = MEMBERSHIP_PRODUCT_DISCOUNT;
+    isVipDiscountApplied = true;
+  }
+  const fee = TRANSACTION_FEE;
+  const priceAfterDiscount = Math.max(0, basePrice - discount);
+  const finalPayableAmount = priceAfterDiscount + fee;
+  const remainingQuotaAfter = Math.max(0, membershipStatus.remainingWeeklyQuota - discount);
+  return {
+    basePrice,
+    discount,
+    fee,
+    finalPayableAmount,
+    isVipDiscountApplied,
+    remainingQuotaAfter,
+    membershipStatus
+  };
+}
+async function recordDiscountUsage(userId, discountAmount) {
+  if (discountAmount <= 0) return;
+  await query(
+    `UPDATE users
+     SET weekly_discount_used = weekly_discount_used + $1
+     WHERE id = $2`,
+    [discountAmount, userId]
+  ).catch((err) => {
+    console.error("[Membership] Error recording discount usage:", err);
+  });
+}
+async function activateOrExtendMembership(userId, durationDays) {
+  try {
+    const userRes = await query(
+      `SELECT membership_expires_at, weekly_discount_reset_at FROM users WHERE id = $1 LIMIT 1`,
+      [userId]
+    );
+    if (userRes.rows.length === 0) {
+      return { success: false, newExpiresAt: /* @__PURE__ */ new Date(), extended: false };
+    }
+    const currentExpires = userRes.rows[0].membership_expires_at ? new Date(userRes.rows[0].membership_expires_at) : null;
+    const now = /* @__PURE__ */ new Date();
+    const isActive = Boolean(currentExpires && currentExpires.getTime() > now.getTime());
+    let newExpiresAt;
+    let extended = false;
+    if (isActive && currentExpires) {
+      newExpiresAt = new Date(currentExpires.getTime() + durationDays * 24 * 60 * 60 * 1e3);
+      extended = true;
+    } else {
+      newExpiresAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1e3);
+      extended = false;
+    }
+    let resetAt = userRes.rows[0].weekly_discount_reset_at;
+    if (!resetAt) {
+      resetAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1e3);
+    }
+    await query(
+      `UPDATE users
+       SET membership_tier = 'vip',
+           membership_expires_at = $1,
+           weekly_discount_reset_at = COALESCE(weekly_discount_reset_at, $2)
+       WHERE id = $3`,
+      [newExpiresAt, resetAt, userId]
+    );
+    console.log(
+      `[Membership] User ${userId} ${extended ? "extended" : "activated"} VIP membership until ${newExpiresAt.toISOString()}`
+    );
+    return { success: true, newExpiresAt, extended };
+  } catch (err) {
+    console.error("[Membership] Failed to activate/extend membership:", err);
+    throw err;
+  }
+}
+var TRANSACTION_FEE, MEMBERSHIP_PRODUCT_DISCOUNT, MEMBERSHIP_WEEKLY_QUOTA_LIMIT, MEMBERSHIP_PACKAGES;
+var init_membership = __esm({
+  "lib/membership.ts"() {
+    "use strict";
+    init_db();
+    TRANSACTION_FEE = 100;
+    MEMBERSHIP_PRODUCT_DISCOUNT = 1e3;
+    MEMBERSHIP_WEEKLY_QUOTA_LIMIT = 2e4;
+    MEMBERSHIP_PACKAGES = [
+      {
+        id: "vip_1m",
+        name: "Membership VIP 1 Bulan",
+        durationMonths: 1,
+        durationDays: 30,
+        price: 3e3,
+        badge: "\u{1F949} 1 Bulan",
+        tagline: "Aktif 30 Hari \u2014 Hemat Rp 1.000 / produk"
+      },
+      {
+        id: "vip_3m",
+        name: "Membership VIP 3 Bulan",
+        durationMonths: 3,
+        durationDays: 90,
+        price: 9e3,
+        badge: "\u{1F948} 3 Bulan",
+        tagline: "Aktif 90 Hari \u2014 Lebih hemat & tenang"
+      },
+      {
+        id: "vip_6m",
+        name: "Membership VIP 6 Bulan",
+        durationMonths: 6,
+        durationDays: 180,
+        price: 17e3,
+        badge: "\u{1F947} 6 Bulan",
+        tagline: "Aktif 180 Hari \u2014 Diskon paket Rp 1.000"
+      },
+      {
+        id: "vip_12m",
+        name: "Membership VIP 12 Bulan",
+        durationMonths: 12,
+        durationDays: 365,
+        price: 34e3,
+        badge: "\u{1F451} 12 Bulan (1 Tahun)",
+        tagline: "Aktif 365 Hari \u2014 Paling Populer & Super Hemat"
+      }
+    ];
+  }
+});
+
 // lib/fulfillment.ts
 var fulfillment_exports = {};
 __export(fulfillment_exports, {
@@ -13222,6 +13464,78 @@ async function processOrderPayment(orderCode, botInstance) {
   broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
     console.warn("[Broadcast Warning] Failed to broadcast order payment success:", bErr);
   });
+  const {
+    isMembershipProduct: isMembershipProduct2,
+    findMembershipPackage: findMembershipPackage2,
+    activateOrExtendMembership: activateOrExtendMembership2,
+    formatWibDate: formatWibDate2,
+    recordDiscountUsage: recordDiscountUsage2,
+    getUserMembership: getUserMembership2
+  } = await Promise.resolve().then(() => (init_membership(), membership_exports));
+  if (isMembershipProduct2(order.product_name)) {
+    const pkg = findMembershipPackage2(order.product_name);
+    const durationDays = pkg ? pkg.durationDays : 30;
+    const act = await activateOrExtendMembership2(order.user_id, durationDays);
+    const note = `Membership VIP diaktifkan hingga ${act.newExpiresAt.toISOString()}`;
+    const encryptedNote = encrypt(note);
+    await query(
+      `UPDATE orders
+       SET fulfillment_status = 'delivered',
+           credential_encrypted = $1,
+           delivered_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [encryptedNote, order.id]
+    );
+    const buyerMembershipMessage = `\u{1F389} <b>SELAMAT! MEMBERSHIP VIP ANDA TELAH AKTIF! \u2B50</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F48E} <b>Paket:</b> ${escapeHtml2(order.product_name)}
+\u{1F4C5} <b>Masa Aktif:</b> Hingga <b>${formatWibDate2(act.newExpiresAt)}</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+
+\u{1F31F} <b>Keuntungan Eksklusif VIP Anda:</b>
+\u2022 \u{1F3F7}\uFE0F <b>Potongan Rp 1.000</b> untuk setiap pembelian akun digital.
+\u2022 \u{1F4CA} <b>Kuota Diskon Mingguan:</b> Rp 20.000 / minggu (Hemat s/d Rp 80.000+ per bulan!).
+\u2022 \u26A1 <b>Antrean Prioritas:</b> Pesanan diproses paling awal saat antrean manual.
+\u2022 \u{1F6E1}\uFE0F <b>Layanan Garansi VIP:</b> Klaim & penggantian akun lebih cepat.
+\u2022 \u{1F381} <b>Promo & Restock Spesial:</b> Akses lebih awal ke akun langka.
+
+\u{1F6D2} <i>Mulai belanja akun premium dengan harga lebih murah sekarang lewat katalog bot!</i>`;
+    await sendSafeMessage(
+      { chatId: order.telegram_id },
+      botInstance,
+      buyerMembershipMessage,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "\u{1F6CD}\uFE0F Buka Katalog Produk", callback_data: "menu_products" }],
+            [{ text: "\u{1F464} Cek Profil Saya", callback_data: "menu_profile" }],
+            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+          ]
+        }
+      }
+    );
+    const ownerMembershipAlert = `\u{1F48E} <b>PEMBELIAN MEMBERSHIP VIP BARU</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u2022 <b>Pembeli:</b> <code>${escapeHtml2(order.telegram_id)}</code>
+\u2022 <b>Paket:</b> ${escapeHtml2(order.product_name)}
+\u2022 <b>Masa Aktif:</b> s/d ${formatWibDate2(act.newExpiresAt)}
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`;
+    await sendSafeMessage(
+      { chatId: ADMIN_TELEGRAM_ID },
+      botInstance,
+      ownerMembershipAlert,
+      { parse_mode: "HTML" }
+    );
+    return {
+      success: true,
+      mode: "deposit",
+      message: "VIP Membership activated successfully.",
+      orderCode,
+      deliveredKey: note
+    };
+  }
   if (order.product_name.toLowerCase().includes("deposit saldo") || order.product_name.toLowerCase().startsWith("deposit")) {
     const depositAmount = order.product_price;
     await query(
@@ -13279,6 +13593,9 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
       orderCode,
       deliveredKey: confirmationMsg
     };
+  }
+  if (order.invoice_data?.is_vip_discount) {
+    await recordDiscountUsage2(order.user_id, 1e3);
   }
   let supplierProductId = order.product_id;
   let modalPrice = order.product_price;
@@ -13399,11 +13716,13 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
       }
     }
   );
+  const memberInfo = await getUserMembership2(order.user_id).catch(() => null);
+  const vipPriorityBadge = memberInfo?.isVip ? " \u2B50 <b>[VIP MEMBER - PRIORITAS]</b>" : "";
   const ownerQueueAlert = `\u{1F514} <b>PESANAN BARU MASUK (MODE ANTREAN)</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code> <i>(Sentuh untuk salin)</i>
 \u2022 <b>Produk:</b> ${escapeHtml2(order.product_name)}
-\u2022 <b>Pembeli:</b> <code>${escapeHtml2(buyerChatId)}</code>
+\u2022 <b>Pembeli:</b> <code>${escapeHtml2(buyerChatId)}</code>${vipPriorityBadge}
 \u2022 <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
 \u2022 <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString("id-ID")}
 \u2022 <b>Estimasi Untung:</b> <b>+Rp ${netProfit.toLocaleString("id-ID")}</b>
@@ -13998,6 +14317,7 @@ __export(menu_exports, {
   sendDepositMenu: () => sendDepositMenu,
   sendMainMenu: () => sendMainMenu,
   sendMaintenanceMessage: () => sendMaintenanceMessage,
+  sendMembershipMenu: () => sendMembershipMenu,
   sendOrderInvoice: () => sendOrderInvoice,
   sendOrderStatus: () => sendOrderStatus,
   sendOrdersMenu: () => sendOrdersMenu,
@@ -14065,9 +14385,10 @@ function getMainMenuInlineKeyboard(isOwner = false) {
   ]);
   keyboard.push([
     { text: "\u{1F4B0} Deposit", callback_data: "menu_deposit" },
-    { text: "\u{1F4E9} Pesanan Saya", callback_data: "menu_orders" }
+    { text: "\u{1F48E} Membership", callback_data: "menu_membership" }
   ]);
   keyboard.push([
+    { text: "\u{1F4E9} Pesanan Saya", callback_data: "menu_orders" },
     { text: "\u{1F4E2} Gabung Channel \u2197", url: "https://t.me/DafungHub" }
   ]);
   return { inline_keyboard: keyboard };
@@ -14076,12 +14397,13 @@ function getPersistentKeyboard(isOwner = false) {
   const rows = [];
   if (isOwner) {
     rows.push([{ text: "\u{1F451} Panel Owner" }, { text: "\u{1F7E2} Produk" }]);
-    rows.push([{ text: "\u{1F464} Profil" }, { text: "\u{1F4B0} Deposit" }]);
-    rows.push([{ text: "\u{1F4E9} Pesanan Saya" }, { text: "\u2753 Bantuan" }]);
-  } else {
-    rows.push([{ text: "\u{1F7E2} Produk" }, { text: "\u{1F464} Profil" }]);
+    rows.push([{ text: "\u{1F464} Profil" }, { text: "\u{1F48E} Membership" }]);
     rows.push([{ text: "\u{1F4B0} Deposit" }, { text: "\u{1F4E9} Pesanan Saya" }]);
     rows.push([{ text: "\u2753 Bantuan" }]);
+  } else {
+    rows.push([{ text: "\u{1F7E2} Produk" }, { text: "\u{1F464} Profil" }]);
+    rows.push([{ text: "\u{1F48E} Membership" }, { text: "\u{1F4B0} Deposit" }]);
+    rows.push([{ text: "\u{1F4E9} Pesanan Saya" }, { text: "\u2753 Bantuan" }]);
   }
   return {
     keyboard: rows,
@@ -14465,11 +14787,26 @@ async function sendProductDetail(ctx, botInstance, productId, platformId = "all"
     const sellingPrice = getEffectiveSellingPrice(prod, customPrices);
     const priceStr = `Rp ${sellingPrice.toLocaleString("id-ID")}`;
     const statusStr = prod.availability === "in_stock" ? "\u{1F7E2} Stok Tersedia" : "\u{1F534} Stok Habis";
+    const { getUserMembership: getUserMembership2 } = await Promise.resolve().then(() => (init_membership(), membership_exports));
+    const memberInfo = await getUserMembership2(String(ctx.from?.id)).catch(() => null);
+    let priceSection = `\u2022 Harga: <b>${escapeHtml4(priceStr)}</b>
+`;
+    let buttonBuyText = `\u{1F4B3} Beli Sekarang (${priceStr})`;
+    if (memberInfo?.isVip && memberInfo.remainingWeeklyQuota >= 1e3 && sellingPrice > 1e3) {
+      const vipPrice = sellingPrice - 1e3;
+      const vipPriceStr = `Rp ${vipPrice.toLocaleString("id-ID")}`;
+      priceSection = `\u2022 Harga Normal: <s>${escapeHtml4(priceStr)}</s>
+\u2022 Harga VIP Member: <b>${escapeHtml4(vipPriceStr)}</b> <i>(Hemat Rp 1.000! \u{1F31F})</i>
+`;
+      buttonBuyText = `\u{1F4B3} Beli Sekarang (${vipPriceStr})`;
+    } else if (!memberInfo?.isVip && sellingPrice > 1e3) {
+      priceSection += `\u{1F4A1} <i>Tips: Gabung VIP Member untuk dapat harga Rp ${(sellingPrice - 1e3).toLocaleString("id-ID")}!</i>
+`;
+    }
     const detailText = `\u{1F4E6} <b>DETAIL PRODUK</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u2022 Nama: <b>${escapeHtml4(prod.name)}</b>
-\u2022 Harga: <b>${escapeHtml4(priceStr)}</b>
-\u2022 Status: <b>${statusStr}</b>
+` + priceSection + `\u2022 Status: <b>${statusStr}</b>
 ` + (prod.description ? `
 \u{1F4DD} <b>Deskripsi / Ketentuan:</b>
 ${escapeHtml4(prod.description.substring(0, 300))}
@@ -14479,7 +14816,7 @@ Sentuh tombol di bawah untuk langsung membuat invoice pembayaran QRIS:`;
     if (prod.availability === "in_stock") {
       buttons.push([
         {
-          text: `\u{1F4B3} Beli Sekarang (${priceStr})`,
+          text: buttonBuyText,
           callback_data: `buy_${prod.id}`
         }
       ]);
@@ -14540,17 +14877,28 @@ async function sendProfileMenu(ctx, botInstance) {
     }
   }
   const roleText = isOwner ? "\u{1F451} Owner / Administrator" : "Active Member";
+  const { getUserMembership: getUserMembership2, formatWibDate: formatWibDate2 } = await Promise.resolve().then(() => (init_membership(), membership_exports));
+  const mem = await getUserMembership2(telegramId);
+  const membershipInfo = mem.isVip ? `\u2B50 <b>VIP Member</b> (Aktif s/d ${formatWibDate2(mem.expiresAt)})
+\u2022 Sisa Kuota Diskon: <b>Rp ${mem.remainingWeeklyQuota.toLocaleString("id-ID")} / Rp ${mem.weeklyLimit.toLocaleString("id-ID")}</b>` : `<b>Reguler (Non-Member)</b>`;
   const profileText = `\u{1F464} <b>PROFIL PENGGUNA</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u2022 Nama: <b>${escapeHtml4(firstName)}</b>
 \u2022 Username: <b>${escapeHtml4(username)}</b>
 \u2022 Telegram ID: <code>${escapeHtml4(telegramId)}</code>
 \u2022 Saldo Akun: <b>Rp ${balance.toLocaleString("id-ID")}</b>
-\u2022 Status: <b>${roleText}</b>
+\u2022 Status Akun: <b>${roleText}</b>
+\u2022 Membership: ${membershipInfo}
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-Gunakan menu di bawah untuk top-up atau belanja:`;
+Gunakan menu di bawah untuk top-up, langganan VIP, atau belanja:`;
   const inlineMarkup = {
     inline_keyboard: [
+      [
+        {
+          text: mem.isVip ? "\u{1F48E} Perpanjang Membership VIP" : "\u{1F48E} Gabung Membership VIP",
+          callback_data: "menu_membership"
+        }
+      ],
       [
         { text: "\u{1F4B0} Deposit Saldo", callback_data: "menu_deposit" },
         { text: "\u{1F4E9} Riwayat Pesanan", callback_data: "menu_orders" }
@@ -14584,6 +14932,49 @@ Sistem akan langsung membuat invoice QRIS instan otomatis:`;
   await sendSafeMessage(ctx, botInstance, depositText, {
     parse_mode: "HTML",
     reply_markup: inlineMarkup
+  });
+}
+async function sendMembershipMenu(ctx, botInstance) {
+  const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.from?.id;
+  const telegramId = ctx.from?.id ? String(ctx.from.id) : String(chatId);
+  const { getUserMembership: getUserMembership2, formatWibDate: formatWibDate2, MEMBERSHIP_PACKAGES: MEMBERSHIP_PACKAGES2 } = await Promise.resolve().then(() => (init_membership(), membership_exports));
+  const mem = await getUserMembership2(telegramId);
+  let statusSection = "";
+  if (mem.isVip) {
+    statusSection = `\u2B50 <b>STATUS: VIP MEMBER AKTIF</b>
+\u{1F4C5} <b>Masa Aktif:</b> Hingga <b>${formatWibDate2(mem.expiresAt)}</b> (Sisa ${mem.daysRemaining} hari)
+\u{1F4CA} <b>Sisa Kuota Diskon:</b> <b>Rp ${mem.remainingWeeklyQuota.toLocaleString("id-ID")} / Rp ${mem.weeklyLimit.toLocaleString("id-ID")}</b>
+\u{1F504} <b>Jadwal Reset Mingguan:</b> ${formatWibDate2(mem.resetAt)}
+
+<i>Pilih paket di bawah untuk memperpanjang masa aktif membership Anda:</i>`;
+  } else {
+    statusSection = `\u{1F464} <b>STATUS: REGULER (NON-MEMBER)</b>
+
+Upgrade ke <b>VIP Membership</b> dan nikmati keuntungan eksklusif:
+\u2022 \u{1F3F7}\uFE0F <b>Potongan Rp 1.000</b> langsung untuk setiap produk akun digital.
+\u2022 \u{1F4CA} <b>Jatah Kuota Diskon:</b> Maksimal Rp 20.000 per minggu (Hemat s/d Rp 80.000+ per bulan!).
+\u2022 \u26A1 <b>Antrean Prioritas:</b> Pesanan diproses paling awal saat antrean manual.
+\u2022 \u{1F6E1}\uFE0F <b>Layanan Garansi VIP:</b> Klaim & penggantian akun lebih cepat.
+\u2022 \u{1F381} <b>Promo & Restock Spesial:</b> Akses lebih awal ke akun langka.
+
+Silakan pilih paket langganan yang Anda inginkan:`;
+  }
+  const membershipText = `\u{1F48E} <b>VIP MEMBERSHIP DAFUNG HUB</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+` + statusSection;
+  const buttons = MEMBERSHIP_PACKAGES2.map((pkg) => [
+    {
+      text: `${pkg.badge} \u2014 Rp ${pkg.price.toLocaleString("id-ID")}`,
+      callback_data: `buy_membership_${pkg.id}`
+    }
+  ]);
+  buttons.push([
+    { text: "\u{1F6CD}\uFE0F Buka Katalog Produk", callback_data: "menu_products" },
+    { text: "\u{1F519} Menu Utama", callback_data: "menu_main" }
+  ]);
+  await sendSafeMessage(ctx, botInstance, membershipText, {
+    parse_mode: "HTML",
+    reply_markup: { inline_keyboard: buttons }
   });
 }
 async function sendOrdersMenu(ctx, botInstance) {
@@ -15482,6 +15873,8 @@ Pesan telah diposting live di https://t.me/DafungHub.`,
         if (prodId) {
           await handleBuy(ctx, prodId, botInstance);
         }
+      } else if (data === "menu_membership") {
+        await sendMembershipMenu(ctx, botInstance);
       } else if (data === "menu_orders") {
         await sendOrdersMenu(ctx, botInstance);
       } else if (data.startsWith("status_")) {
@@ -15543,6 +15936,29 @@ Pesan telah diposting live di https://t.me/DafungHub.`,
       }
     }
     await sendDepositMenu(ctx, botInstance);
+  });
+  botInstance.hears(/^(?:💎\s*)?(?:membership|vip)$/i, async (ctx) => {
+    console.log(`[Telegram Text] Heard "Membership" from user ${ctx.from?.id}`);
+    if (!isAdmin(ctx.from?.id)) {
+      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt2(ctx, botInstance);
+        return;
+      }
+    }
+    await sendMembershipMenu(ctx, botInstance);
+  });
+  botInstance.command(["membership", "vip"], async (ctx) => {
+    if (!isAdmin(ctx.from?.id)) {
+      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt2(ctx, botInstance);
+        return;
+      }
+    }
+    await sendMembershipMenu(ctx, botInstance);
   });
   botInstance.hears(/^(?:📩\s*)?pesanan(?:\s*saya)?$/i, async (ctx) => {
     console.log(`[Telegram Text] Heard "Pesanan" from user ${ctx.from?.id}`);
@@ -39864,6 +40280,37 @@ async function handleBuy(ctx, productId, botInstance) {
   } catch {
     product = null;
   }
+  if (!product && trimmedId.startsWith("membership_")) {
+    try {
+      const { findMembershipPackage: findMembershipPackage2 } = await Promise.resolve().then(() => (init_membership(), membership_exports));
+      const pkgId = trimmedId.replace("membership_", "");
+      const pkg = findMembershipPackage2(pkgId);
+      if (pkg) {
+        const existingByName = await query(
+          "SELECT * FROM products WHERE name = $1 LIMIT 1",
+          [pkg.name]
+        );
+        if (existingByName.rows.length > 0) {
+          product = existingByName.rows[0];
+          if (product.price !== pkg.price) {
+            product.price = pkg.price;
+            await query("UPDATE products SET price = $1 WHERE id = $2", [pkg.price, product.id]).catch(() => {
+            });
+          }
+        } else {
+          const ins = await query(
+            `INSERT INTO products (name, price, stock, is_active)
+             VALUES ($1, $2, 9999, true)
+             RETURNING *`,
+            [pkg.name, pkg.price]
+          );
+          product = ins.rows[0];
+        }
+      }
+    } catch (mErr) {
+      console.error("[Buy Command] Error resolving membership package:", mErr);
+    }
+  }
   if (!product) {
     try {
       const isCallerAdmin = isAdmin2(ctx.from?.id);
@@ -39989,22 +40436,28 @@ async function handleBuy(ctx, productId, botInstance) {
     username: ctx.from?.username,
     firstName: ctx.from?.first_name
   });
+  const { calculateCheckoutPrice: calculateCheckoutPrice2 } = await Promise.resolve().then(() => (init_membership(), membership_exports));
+  const checkoutPricing = await calculateCheckoutPrice2(telegramId, {
+    name: product.name,
+    price: product.price
+  });
+  const payableAmount = checkoutPricing.finalPayableAmount;
   const orderCode = generateOrderCode();
   let qrisResult;
   try {
     const gateway = (process.env.PAYMENT_GATEWAY || "shopeepay").toLowerCase();
     if (gateway === "shopeepay") {
       const { createShopeePayInvoice: createShopeePayInvoice2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
-      qrisResult = await createShopeePayInvoice2(orderCode, product.price);
+      qrisResult = await createShopeePayInvoice2(orderCode, payableAmount);
     } else if (gateway === "midtrans") {
       const { createQrisTransaction: createQrisTransaction2 } = await Promise.resolve().then(() => (init_midtrans(), midtrans_exports));
-      qrisResult = await createQrisTransaction2(orderCode, product.price);
+      qrisResult = await createQrisTransaction2(orderCode, payableAmount);
     } else {
       const { createSakurupiahInvoice: createSakurupiahInvoice2 } = await Promise.resolve().then(() => (init_sakurupiah(), sakurupiah_exports));
       const telegramUsername = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || `User_${ctx.from?.id || "Buyer"}`;
       qrisResult = await createSakurupiahInvoice2(
         orderCode,
-        product.price,
+        payableAmount,
         product.name,
         telegramUsername
       );
@@ -40047,15 +40500,21 @@ async function handleBuy(ctx, productId, botInstance) {
         customer_first_name: ctx.from?.first_name || null,
         qr_code_url: qrisResult.qrCodeUrl,
         qr_string: qrisResult.qrString,
-        checkout_url: qrisResult.checkoutUrl
+        checkout_url: qrisResult.checkoutUrl,
+        base_price: checkoutPricing.basePrice,
+        discount: checkoutPricing.discount,
+        fee: checkoutPricing.fee,
+        payable_amount: checkoutPricing.finalPayableAmount,
+        is_vip_discount: checkoutPricing.isVipDiscountApplied
       })
     ]
   );
-  const formattedPrice = `Rp ${product.price.toLocaleString("id-ID")}`;
+  const formattedPrice = `Rp ${payableAmount.toLocaleString("id-ID")}`;
+  const vipDiscountNotice = checkoutPricing.isVipDiscountApplied ? ` <i>(Hemat Rp 1.000 via VIP Member! \u{1F31F})</i>` : "";
   const invoiceCaption = `\u{1F9FE} <b>INVOICE PEMBAYARAN QRIS</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u{1F4E6} <b>Produk:</b> ${escapeHtml5(product.name)}
-\u{1F4B0} <b>Total:</b> ${escapeHtml5(formattedPrice)}
+\u{1F4B0} <b>Total:</b> ${escapeHtml5(formattedPrice)}${vipDiscountNotice}
 \u{1F194} <b>Kode Order:</b> <code>${escapeHtml5(orderCode)}</code>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 

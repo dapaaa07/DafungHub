@@ -11,6 +11,10 @@ export interface User {
   balance?: number;
   username?: string | null;
   first_name?: string | null;
+  membership_tier?: string;
+  membership_expires_at?: Date | null;
+  weekly_discount_used?: number;
+  weekly_discount_reset_at?: Date | null;
   created_at: Date;
 }
 

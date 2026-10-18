@@ -37,9 +37,13 @@ model User {
   telegramId  String   @unique @map("telegram_id") @db.VarChar(255)
   role        UserRole @default(buyer)
   balance     Int      @default(0)
-  username    String?  @db.VarChar(255)
-  firstName   String?  @map("first_name") @db.VarChar(255)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  username               String?   @db.VarChar(255)
+  firstName              String?   @map("first_name") @db.VarChar(255)
+  membershipTier         String    @default("free") @map("membership_tier") @db.VarChar(50)
+  membershipExpiresAt    DateTime? @map("membership_expires_at") @db.Timestamptz(6)
+  weeklyDiscountUsed     Int       @default(0) @map("weekly_discount_used")
+  weeklyDiscountResetAt  DateTime? @map("weekly_discount_reset_at") @db.Timestamptz(6)
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   orders      Order[]
 

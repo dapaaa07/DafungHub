@@ -126,6 +126,38 @@ export async function handleBuy(
     product = null;
   }
 
+  // If not found in DB, check if it is a membership package purchase
+  if (!product && trimmedId.startsWith('membership_')) {
+    try {
+      const { findMembershipPackage } = await import('../../lib/membership');
+      const pkgId = trimmedId.replace('membership_', '');
+      const pkg = findMembershipPackage(pkgId);
+      if (pkg) {
+        const existingByName = await query<Product>(
+          'SELECT * FROM products WHERE name = $1 LIMIT 1',
+          [pkg.name]
+        );
+        if (existingByName.rows.length > 0) {
+          product = existingByName.rows[0];
+          if (product.price !== pkg.price) {
+            product.price = pkg.price;
+            await query('UPDATE products SET price = $1 WHERE id = $2', [pkg.price, product.id]).catch(() => {});
+          }
+        } else {
+          const ins = await query<Product>(
+            `INSERT INTO products (name, price, stock, is_active)
+             VALUES ($1, $2, 9999, true)
+             RETURNING *`,
+            [pkg.name, pkg.price]
+          );
+          product = ins.rows[0];
+        }
+      }
+    } catch (mErr) {
+      console.error('[Buy Command] Error resolving membership package:', mErr);
+    }
+  }
+
   // If not found in local DB, check supplier API catalogue
   if (!product) {
     try {
@@ -263,10 +295,18 @@ export async function handleBuy(
     firstName: ctx.from?.first_name,
   });
 
-  // 4. Generate unique order_code
+  // 4. Calculate checkout pricing (VIP discount + hidden fee Rp 100)
+  const { calculateCheckoutPrice } = await import('../../lib/membership');
+  const checkoutPricing = await calculateCheckoutPrice(telegramId, {
+    name: product.name,
+    price: product.price,
+  });
+  const payableAmount = checkoutPricing.finalPayableAmount;
+
+  // 5. Generate unique order_code
   const orderCode = generateOrderCode();
 
-  // 5. Create dynamic QRIS transaction via Sakurupiah (with Midtrans fallback)
+  // 6. Create dynamic QRIS transaction via Sakurupiah (with Midtrans fallback)
   let qrisResult: {
     qrCodeUrl: string;
     qrString: string;
@@ -278,10 +318,10 @@ export async function handleBuy(
     const gateway = (process.env.PAYMENT_GATEWAY || 'shopeepay').toLowerCase();
     if (gateway === 'shopeepay') {
       const { createShopeePayInvoice } = await import('../../lib/shopeepay');
-      qrisResult = await createShopeePayInvoice(orderCode, product.price);
+      qrisResult = await createShopeePayInvoice(orderCode, payableAmount);
     } else if (gateway === 'midtrans') {
       const { createQrisTransaction } = await import('../../lib/midtrans');
-      qrisResult = await createQrisTransaction(orderCode, product.price);
+      qrisResult = await createQrisTransaction(orderCode, payableAmount);
     } else {
       const { createSakurupiahInvoice } = await import('../../lib/sakurupiah');
       // Ambil username Telegram buyer untuk data customerName di Sakurupiah
@@ -291,7 +331,7 @@ export async function handleBuy(
 
       qrisResult = await createSakurupiahInvoice(
         orderCode,
-        product.price,
+        payableAmount,
         product.name,
         telegramUsername
       );
@@ -316,7 +356,7 @@ export async function handleBuy(
     return;
   }
 
-  // 6. Insert order into PostgreSQL `orders` table
+  // 7. Insert order into PostgreSQL `orders` table
   await query(
     `INSERT INTO orders (
        user_id,
@@ -337,17 +377,26 @@ export async function handleBuy(
         qr_code_url: qrisResult.qrCodeUrl,
         qr_string: qrisResult.qrString,
         checkout_url: qrisResult.checkoutUrl,
+        base_price: checkoutPricing.basePrice,
+        discount: checkoutPricing.discount,
+        fee: checkoutPricing.fee,
+        payable_amount: checkoutPricing.finalPayableAmount,
+        is_vip_discount: checkoutPricing.isVipDiscountApplied,
       }),
     ]
   );
 
-  // 7. Format invoice message & send QRIS
-  const formattedPrice = `Rp ${product.price.toLocaleString('id-ID')}`;
+  // 8. Format invoice message & send QRIS
+  const formattedPrice = `Rp ${payableAmount.toLocaleString('id-ID')}`;
+  const vipDiscountNotice = checkoutPricing.isVipDiscountApplied
+    ? ` <i>(Hemat Rp 1.000 via VIP Member! 🌟)</i>`
+    : '';
+
   const invoiceCaption =
     '🧾 <b>INVOICE PEMBAYARAN QRIS</b>\n' +
     '━━━━━━━━━━━━━━━━━━━\n' +
     `📦 <b>Produk:</b> ${escapeHtml(product.name)}\n` +
-    `💰 <b>Total:</b> ${escapeHtml(formattedPrice)}\n` +
+    `💰 <b>Total:</b> ${escapeHtml(formattedPrice)}${vipDiscountNotice}\n` +
     `🆔 <b>Kode Order:</b> <code>${escapeHtml(orderCode)}</code>\n` +
     '━━━━━━━━━━━━━━━━━━━\n\n' +
     '📌 <b>Instruksi Pembayaran:</b>\n' +

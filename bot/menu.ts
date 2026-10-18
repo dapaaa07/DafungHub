@@ -103,10 +103,11 @@ export function getMainMenuInlineKeyboard(isOwner: boolean = false) {
 
   keyboard.push([
     { text: '💰 Deposit', callback_data: 'menu_deposit' },
-    { text: '📩 Pesanan Saya', callback_data: 'menu_orders' },
+    { text: '💎 Membership', callback_data: 'menu_membership' },
   ]);
 
   keyboard.push([
+    { text: '📩 Pesanan Saya', callback_data: 'menu_orders' },
     { text: '📢 Gabung Channel ↗', url: 'https://t.me/DafungHub' },
   ]);
 
@@ -120,12 +121,13 @@ export function getPersistentKeyboard(isOwner: boolean = false) {
   const rows = [];
   if (isOwner) {
     rows.push([{ text: '👑 Panel Owner' }, { text: '🟢 Produk' }]);
-    rows.push([{ text: '👤 Profil' }, { text: '💰 Deposit' }]);
-    rows.push([{ text: '📩 Pesanan Saya' }, { text: '❓ Bantuan' }]);
-  } else {
-    rows.push([{ text: '🟢 Produk' }, { text: '👤 Profil' }]);
+    rows.push([{ text: '👤 Profil' }, { text: '💎 Membership' }]);
     rows.push([{ text: '💰 Deposit' }, { text: '📩 Pesanan Saya' }]);
     rows.push([{ text: '❓ Bantuan' }]);
+  } else {
+    rows.push([{ text: '🟢 Produk' }, { text: '👤 Profil' }]);
+    rows.push([{ text: '💎 Membership' }, { text: '💰 Deposit' }]);
+    rows.push([{ text: '📩 Pesanan Saya' }, { text: '❓ Bantuan' }]);
   }
 
   return {
@@ -661,11 +663,27 @@ export async function sendProductDetail(
     const priceStr = `Rp ${sellingPrice.toLocaleString('id-ID')}`;
     const statusStr = prod.availability === 'in_stock' ? '🟢 Stok Tersedia' : '🔴 Stok Habis';
 
+    const { getUserMembership } = await import('../lib/membership');
+    const memberInfo = await getUserMembership(String(ctx.from?.id)).catch(() => null);
+    let priceSection = `• Harga: <b>${escapeHtml(priceStr)}</b>\n`;
+    let buttonBuyText = `💳 Beli Sekarang (${priceStr})`;
+
+    if (memberInfo?.isVip && memberInfo.remainingWeeklyQuota >= 1000 && sellingPrice > 1000) {
+      const vipPrice = sellingPrice - 1000;
+      const vipPriceStr = `Rp ${vipPrice.toLocaleString('id-ID')}`;
+      priceSection =
+        `• Harga Normal: <s>${escapeHtml(priceStr)}</s>\n` +
+        `• Harga VIP Member: <b>${escapeHtml(vipPriceStr)}</b> <i>(Hemat Rp 1.000! 🌟)</i>\n`;
+      buttonBuyText = `💳 Beli Sekarang (${vipPriceStr})`;
+    } else if (!memberInfo?.isVip && sellingPrice > 1000) {
+      priceSection += `💡 <i>Tips: Gabung VIP Member untuk dapat harga Rp ${(sellingPrice - 1000).toLocaleString('id-ID')}!</i>\n`;
+    }
+
     const detailText =
       `📦 <b>DETAIL PRODUK</b>\n` +
       `━━━━━━━━━━━━━━━━━━━\n` +
       `• Nama: <b>${escapeHtml(prod.name)}</b>\n` +
-      `• Harga: <b>${escapeHtml(priceStr)}</b>\n` +
+      priceSection +
       `• Status: <b>${statusStr}</b>\n` +
       (prod.description
         ? `\n📝 <b>Deskripsi / Ketentuan:</b>\n${escapeHtml(prod.description.substring(0, 300))}\n`
@@ -677,7 +695,7 @@ export async function sendProductDetail(
     if (prod.availability === 'in_stock') {
       buttons.push([
         {
-          text: `💳 Beli Sekarang (${priceStr})`,
+          text: buttonBuyText,
           callback_data: `buy_${prod.id}`,
         },
       ]);
@@ -748,6 +766,14 @@ export async function sendProfileMenu(ctx: Context, botInstance: ExtendedBot): P
 
   const roleText = isOwner ? '👑 Owner / Administrator' : 'Active Member';
 
+  const { getUserMembership, formatWibDate } = await import('../lib/membership');
+  const mem = await getUserMembership(telegramId);
+
+  const membershipInfo = mem.isVip
+    ? `⭐ <b>VIP Member</b> (Aktif s/d ${formatWibDate(mem.expiresAt)})\n` +
+      `• Sisa Kuota Diskon: <b>Rp ${mem.remainingWeeklyQuota.toLocaleString('id-ID')} / Rp ${mem.weeklyLimit.toLocaleString('id-ID')}</b>`
+    : `<b>Reguler (Non-Member)</b>`;
+
   const profileText =
     `👤 <b>PROFIL PENGGUNA</b>\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
@@ -755,12 +781,19 @@ export async function sendProfileMenu(ctx: Context, botInstance: ExtendedBot): P
     `• Username: <b>${escapeHtml(username)}</b>\n` +
     `• Telegram ID: <code>${escapeHtml(telegramId)}</code>\n` +
     `• Saldo Akun: <b>Rp ${balance.toLocaleString('id-ID')}</b>\n` +
-    `• Status: <b>${roleText}</b>\n` +
+    `• Status Akun: <b>${roleText}</b>\n` +
+    `• Membership: ${membershipInfo}\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
-    `Gunakan menu di bawah untuk top-up atau belanja:`;
+    `Gunakan menu di bawah untuk top-up, langganan VIP, atau belanja:`;
 
   const inlineMarkup = {
     inline_keyboard: [
+      [
+        {
+          text: mem.isVip ? '💎 Perpanjang Membership VIP' : '💎 Gabung Membership VIP',
+          callback_data: 'menu_membership',
+        },
+      ],
       [
         { text: '💰 Deposit Saldo', callback_data: 'menu_deposit' },
         { text: '📩 Riwayat Pesanan', callback_data: 'menu_orders' },
@@ -802,6 +835,58 @@ export async function sendDepositMenu(ctx: Context, botInstance: ExtendedBot): P
   await sendSafeMessage(ctx, botInstance, depositText, {
     parse_mode: 'HTML',
     reply_markup: inlineMarkup,
+  });
+}
+
+/**
+ * Display VIP Membership packages and status
+ */
+export async function sendMembershipMenu(ctx: Context, botInstance: ExtendedBot): Promise<void> {
+  const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.from?.id;
+  const telegramId = ctx.from?.id ? String(ctx.from.id) : String(chatId);
+  const { getUserMembership, formatWibDate, MEMBERSHIP_PACKAGES } = await import('../lib/membership');
+  const mem = await getUserMembership(telegramId);
+
+  let statusSection = '';
+  if (mem.isVip) {
+    statusSection =
+      `⭐ <b>STATUS: VIP MEMBER AKTIF</b>\n` +
+      `📅 <b>Masa Aktif:</b> Hingga <b>${formatWibDate(mem.expiresAt)}</b> (Sisa ${mem.daysRemaining} hari)\n` +
+      `📊 <b>Sisa Kuota Diskon:</b> <b>Rp ${mem.remainingWeeklyQuota.toLocaleString('id-ID')} / Rp ${mem.weeklyLimit.toLocaleString('id-ID')}</b>\n` +
+      `🔄 <b>Jadwal Reset Mingguan:</b> ${formatWibDate(mem.resetAt)}\n\n` +
+      `<i>Pilih paket di bawah untuk memperpanjang masa aktif membership Anda:</i>`;
+  } else {
+    statusSection =
+      `👤 <b>STATUS: REGULER (NON-MEMBER)</b>\n\n` +
+      `Upgrade ke <b>VIP Membership</b> dan nikmati keuntungan eksklusif:\n` +
+      `• 🏷️ <b>Potongan Rp 1.000</b> langsung untuk setiap produk akun digital.\n` +
+      `• 📊 <b>Jatah Kuota Diskon:</b> Maksimal Rp 20.000 per minggu (Hemat s/d Rp 80.000+ per bulan!).\n` +
+      `• ⚡ <b>Antrean Prioritas:</b> Pesanan diproses paling awal saat antrean manual.\n` +
+      `• 🛡️ <b>Layanan Garansi VIP:</b> Klaim & penggantian akun lebih cepat.\n` +
+      `• 🎁 <b>Promo & Restock Spesial:</b> Akses lebih awal ke akun langka.\n\n` +
+      `Silakan pilih paket langganan yang Anda inginkan:`;
+  }
+
+  const membershipText =
+    `💎 <b>VIP MEMBERSHIP DAFUNG HUB</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    statusSection;
+
+  const buttons = MEMBERSHIP_PACKAGES.map((pkg) => [
+    {
+      text: `${pkg.badge} — Rp ${pkg.price.toLocaleString('id-ID')}`,
+      callback_data: `buy_membership_${pkg.id}`,
+    },
+  ]);
+
+  buttons.push([
+    { text: '🛍️ Buka Katalog Produk', callback_data: 'menu_products' },
+    { text: '🔙 Menu Utama', callback_data: 'menu_main' },
+  ]);
+
+  await sendSafeMessage(ctx, botInstance, membershipText, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: buttons },
   });
 }
 
@@ -1880,6 +1965,8 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
         if (prodId) {
           await handleBuy(ctx, prodId, botInstance);
         }
+      } else if (data === 'menu_membership') {
+        await sendMembershipMenu(ctx, botInstance);
       } else if (data === 'menu_orders') {
         await sendOrdersMenu(ctx, botInstance);
       } else if (data.startsWith('status_')) {
@@ -1948,6 +2035,31 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
       }
     }
     await sendDepositMenu(ctx, botInstance);
+  });
+
+  botInstance.hears(/^(?:💎\s*)?(?:membership|vip)$/i, async (ctx: Context) => {
+    console.log(`[Telegram Text] Heard "Membership" from user ${ctx.from?.id}`);
+    if (!isAdmin(ctx.from?.id)) {
+      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
+      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt(ctx, botInstance);
+        return;
+      }
+    }
+    await sendMembershipMenu(ctx, botInstance);
+  });
+
+  botInstance.command(['membership', 'vip'], async (ctx: Context) => {
+    if (!isAdmin(ctx.from?.id)) {
+      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
+      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
+      if (!isMember) {
+        await sendChannelJoinPrompt(ctx, botInstance);
+        return;
+      }
+    }
+    await sendMembershipMenu(ctx, botInstance);
   });
 
   botInstance.hears(/^(?:📩\s*)?pesanan(?:\s*saya)?$/i, async (ctx: Context) => {
