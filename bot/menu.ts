@@ -60,7 +60,9 @@ export function formatIndonesianDateTime(d: Date = new Date()): string {
   return `${dayName}, ${dateNum} ${monthName} ${year} • ${hours}:${minutes}:${seconds}`;
 }
 
-const adminBroadcastPending = new Map<string, string>();
+import type { BroadcastDraft } from '../lib/broadcast';
+
+const adminBroadcastPending = new Map<string, BroadcastDraft>();
 const adminWaitingBroadcast = new Map<string, boolean>();
 
 export function setAdminWaitingBroadcast(chatId: string | number, isWaiting: boolean): void {
@@ -71,12 +73,20 @@ export function getAdminWaitingBroadcast(chatId: string | number): boolean {
   return adminWaitingBroadcast.get(String(chatId)) || false;
 }
 
+export function setAdminPendingBroadcastDraft(chatId: string | number, draft: BroadcastDraft): void {
+  adminBroadcastPending.set(String(chatId), draft);
+}
+
 export function setAdminPendingBroadcastText(chatId: string | number, text: string): void {
-  adminBroadcastPending.set(String(chatId), text);
+  adminBroadcastPending.set(String(chatId), { type: 'text', text });
+}
+
+export function getAdminPendingBroadcastDraft(chatId: string | number): BroadcastDraft | undefined {
+  return adminBroadcastPending.get(String(chatId));
 }
 
 export function getAdminPendingBroadcastText(chatId: string | number): string | undefined {
-  return adminBroadcastPending.get(String(chatId));
+  return adminBroadcastPending.get(String(chatId))?.text;
 }
 
 export function clearAdminBroadcastState(chatId: string | number): void {
@@ -1577,31 +1587,42 @@ export async function sendAdminBroadcastMenu(
 export async function sendAdminBroadcastPreview(
   ctx: Context,
   botInstance: ExtendedBot,
-  broadcastText: string
+  broadcastInput: string | BroadcastDraft
 ): Promise<void> {
   if (!isAdmin(ctx.from?.id)) return;
 
   const { getBroadcastChannel } = await import('../lib/broadcast');
   const targetChannel = await getBroadcastChannel();
   const chatId = ctx.chatId || ctx.message?.chat?.id || ctx.from?.id;
+
+  const draft: BroadcastDraft =
+    typeof broadcastInput === 'string'
+      ? { type: 'text', text: broadcastInput }
+      : broadcastInput;
+
   if (chatId) {
-    setAdminPendingBroadcastText(chatId, broadcastText);
+    setAdminPendingBroadcastDraft(chatId, draft);
   }
+
+  const hasMedia = draft.type && draft.type !== 'text' && draft.type !== 'none';
+  const mediaLabel = hasMedia
+    ? `\n• <b>Tipe Media:</b> <code>${(draft.type || 'MEDIA').toUpperCase()}${draft.fileName ? ` (${escapeHtml(draft.fileName)})` : ''}</code>`
+    : '';
 
   const previewText =
     `👁️ <b>PREVIEW PESAN SIARAN</b>\n` +
-    `<b>Target:</b> <code>${escapeHtml(targetChannel)}</code>\n` +
+    `• <b>Target:</b> <code>${escapeHtml(targetChannel)}</code>${mediaLabel}\n` +
     `━━━━━━━━━━━━━━━━━━━\n\n` +
-    `${broadcastText}\n\n` +
+    (draft.text ? `${draft.text}\n\n` : hasMedia ? `<i>(Media terlampir tanpa teks caption)</i>\n\n` : '') +
     `━━━━━━━━━━━━━━━━━━━\n` +
-    `Apakah Anda ingin menyiarkan pesan ini ke channel sekarang?`;
+    `Apakah Anda ingin menyiarkan konten ${hasMedia ? 'dan media ' : ''}ini ke channel sekarang?`;
 
   const buttons = [
     [
       { text: '🚀 Kirim ke Channel Sekarang', callback_data: 'admin_send_broadcast' },
     ],
     [
-      { text: '✏️ Tulis Ulang', callback_data: 'admin_create_broadcast' },
+      { text: '✏️ Ganti Pesan / Media', callback_data: 'admin_create_broadcast' },
       { text: '❌ Batalkan', callback_data: 'admin_broadcast' },
     ],
   ];
@@ -2178,12 +2199,15 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
         await sendSafeMessage(
           ctx,
           botInstance,
-          `✍️ <b>TULIS PESAN BROADCAST KE @DafungHub</b>\n` +
+          `✍️ <b>TULIS / KIRIM PESAN BROADCAST KE @DafungHub</b>\n` +
           `━━━━━━━━━━━━━━━━━━━\n` +
-          `Ketikkan pesan yang ingin Anda siarkan ke channel di chat ini.\n\n` +
-          `💡 <i>Format cepat: Anda juga bisa ketik perintah:\n` +
-          `<code>/broadcast &lt;pesan Anda&gt;</code></i>\n\n` +
-          `Mendukung format HTML standar (<b>tebal</b>, <i>miring</i>, <code>kode</code>, <a href="...">link</a>).`,
+          `Kirimkan konten yang ingin Anda siarkan ke channel di chat ini:\n` +
+          `• <b>Pesan Teks / Promo</b>\n` +
+          `• <b>Foto / Banner Promo</b> (bisa dengan caption)\n` +
+          `• <b>File / Dokumen</b> (contoh: <code>.txt</code>, <code>.pdf</code>, <code>.zip</code>)\n` +
+          `• <b>Video / Animasi GIF / Voice</b>\n\n` +
+          `💡 <i>Format cepat command: <code>/broadcast &lt;pesan&gt;</code></i>\n` +
+          `<i>(Mendukung format HTML standar).</i>`,
           {
             parse_mode: 'HTML',
             reply_markup: {
@@ -2194,8 +2218,8 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
       } else if (data === 'admin_send_broadcast') {
         if (!isAdmin(ctx.from?.id)) return;
         const chatId = ctx.chatId || ctx.from?.id;
-        const pendingText = chatId ? getAdminPendingBroadcastText(chatId) : undefined;
-        if (!pendingText) {
+        const pendingDraft = chatId ? getAdminPendingBroadcastDraft(chatId) : undefined;
+        if (!pendingDraft || (!pendingDraft.text && (!pendingDraft.type || pendingDraft.type === 'none' || pendingDraft.type === 'text'))) {
           await sendSafeMessage(ctx, botInstance, '⚠️ Tidak ada draf siaran yang siap dikirim.', {
             reply_markup: {
               inline_keyboard: [[{ text: '🔙 Menu Broadcast', callback_data: 'admin_broadcast' }]],
@@ -2204,7 +2228,7 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
           return;
         }
         const { sendManualBroadcast } = await import('../lib/broadcast');
-        const result = await sendManualBroadcast(pendingText, botInstance);
+        const result = await sendManualBroadcast(pendingDraft, botInstance);
         if (chatId) clearAdminBroadcastState(chatId);
 
         if (result.success) {

@@ -471,18 +471,39 @@ export async function processOrderPayment(
   };
 }
 
+export interface AdminFulfillMedia {
+  hasMedia: boolean;
+  type: 'document' | 'photo' | 'video' | 'audio' | 'voice' | 'sticker' | 'animation' | 'none';
+  fileId?: string;
+  fileName?: string;
+  mimeType?: string;
+  fromChatId?: number | string;
+  messageId?: number;
+}
+
 /**
  * Admin Manual Fulfillment:
  * Owner fulfills the order manually using command `/kirim <orderCode> <credentials>`
+ * Supports text credentials, document/file (.txt etc.), photos, or any media attachments.
  */
 export async function adminManualFulfill(
   orderCode: string,
   credentialsText: string,
-  botInstance: ExtendedBot
+  botInstance: ExtendedBot,
+  mediaData?: AdminFulfillMedia
 ): Promise<{ success: boolean; message: string }> {
-  const cleanKey = credentialsText?.trim();
-  if (!cleanKey) {
-    return { success: false, message: 'Kredensial akun tidak boleh kosong.' };
+  const hasMedia = Boolean(mediaData && mediaData.hasMedia && (mediaData.fileId || mediaData.messageId));
+  const cleanKey = credentialsText?.trim() || '';
+
+  if (!cleanKey && !hasMedia) {
+    return {
+      success: false,
+      message:
+        'Kredensial atau file akun tidak boleh kosong.\n\n' +
+        '⚡ <b>Format pengiriman:</b>\n' +
+        '• <b>Kirim file (.txt dll):</b> Upload file dengan caption <code>/kirim &lt;order_code&gt; [keterangan]</code> atau reply file tersebut.\n' +
+        '• <b>Kirim teks biasa:</b> <code>/kirim &lt;order_code&gt; &lt;email:password&gt;</code>',
+    };
   }
 
   const orderRes = await query<Order & { telegram_id: string; product_name: string }>(
@@ -495,11 +516,14 @@ export async function adminManualFulfill(
   );
 
   if (orderRes.rows.length === 0) {
-    return { success: false, message: `Order "${orderCode}" tidak ditemukan.` };
+    return { success: false, message: `Order "<code>${escapeHtml(orderCode)}</code>" tidak ditemukan.` };
   }
 
   const order = orderRes.rows[0];
-  const encryptedKey = encrypt(cleanKey);
+  const storedCredential = hasMedia
+    ? `[FILE: ${(mediaData!.type || 'MEDIA').toUpperCase()}${mediaData!.fileName ? ` - ${mediaData!.fileName}` : ''}] ${cleanKey}`
+    : cleanKey;
+  const encryptedKey = encrypt(storedCredential);
 
   await query(
     `UPDATE orders
@@ -526,40 +550,131 @@ export async function adminManualFulfill(
     }
   }
 
-  // Send account credentials to the buyer
-  const buyerMessage =
-    `🎉 <b>PESANAN ANDA TELAH SELESAI!</b>\n` +
-    `━━━━━━━━━━━━━━━━━━━\n` +
-    `📦 <b>Produk:</b> ${escapeHtml(order.product_name)}\n` +
-    `🆔 <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>\n` +
-    `━━━━━━━━━━━━━━━━━━━\n\n` +
-    `🔑 <b>Kredensial / Detail Akun:</b>\n` +
-    `<code>${escapeHtml(cleanKey)}</code>\n\n` +
-    `📌 <i>Terima kasih telah berbelanja di DaFung Hub! Hubungi admin jika butuh bantuan atau klaim garansi.</i>`;
+  const buyerChatId = order.telegram_id;
+  const replyMarkup = {
+    inline_keyboard: [
+      [{ text: '🛍️ Beli Produk Baru', callback_data: 'menu_products' }],
+      [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+    ],
+  };
 
-  await sendSafeMessage(
-    { chatId: order.telegram_id } as never,
-    botInstance,
-    buyerMessage,
-    {
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '🛍️ Beli Produk Baru', callback_data: 'menu_products' }],
-          [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
-        ],
-      },
+  // If media is present, deliver via Telegram API (document, photo, video, etc.)
+  if (hasMedia && mediaData) {
+    const { sendTelegramApi } = await import('./broadcast');
+
+    const buyerCaption =
+      `🎉 <b>PESANAN ANDA TELAH SELESAI!</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n` +
+      `📦 <b>Produk:</b> ${escapeHtml(order.product_name)}\n` +
+      `🆔 <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n\n` +
+      `📁 <b>File Kredensial Terlampir:</b>\n` +
+      `<code>${escapeHtml(mediaData.fileName || mediaData.type)}</code>\n` +
+      (cleanKey ? `\n💬 <b>Keterangan / Detail:</b>\n<code>${escapeHtml(cleanKey)}</code>\n` : '') +
+      `\n📌 <i>Simpan file ini baik-baik. Garansi berlaku sesuai ketentuan produk. Terima kasih telah berbelanja di DaFung Hub!</i>`;
+
+    let deliveredMedia = false;
+
+    // 1. Try copyMessage if original messageId & fromChatId exist
+    if (mediaData.messageId && mediaData.fromChatId) {
+      const copyRes = await sendTelegramApi('copyMessage', {
+        chat_id: buyerChatId,
+        from_chat_id: mediaData.fromChatId,
+        message_id: mediaData.messageId,
+        caption: buyerCaption,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+      if (copyRes.ok) {
+        deliveredMedia = true;
+      }
     }
-  );
+
+    // 2. Direct methods based on fileId if copyMessage didn't deliver
+    if (!deliveredMedia && mediaData.fileId) {
+      if (mediaData.type === 'document') {
+        const docRes = await sendTelegramApi('sendDocument', {
+          chat_id: buyerChatId,
+          document: mediaData.fileId,
+          caption: buyerCaption,
+          parse_mode: 'HTML',
+          reply_markup: replyMarkup,
+        });
+        if (docRes.ok) deliveredMedia = true;
+      } else if (mediaData.type === 'photo') {
+        const photoRes = await sendTelegramApi('sendPhoto', {
+          chat_id: buyerChatId,
+          photo: mediaData.fileId,
+          caption: buyerCaption,
+          parse_mode: 'HTML',
+          reply_markup: replyMarkup,
+        });
+        if (photoRes.ok) deliveredMedia = true;
+      } else if (mediaData.type === 'video') {
+        const vidRes = await sendTelegramApi('sendVideo', {
+          chat_id: buyerChatId,
+          video: mediaData.fileId,
+          caption: buyerCaption,
+          parse_mode: 'HTML',
+          reply_markup: replyMarkup,
+        });
+        if (vidRes.ok) deliveredMedia = true;
+      } else if (mediaData.type === 'audio') {
+        const audRes = await sendTelegramApi('sendAudio', {
+          chat_id: buyerChatId,
+          audio: mediaData.fileId,
+          caption: buyerCaption,
+          parse_mode: 'HTML',
+          reply_markup: replyMarkup,
+        });
+        if (audRes.ok) deliveredMedia = true;
+      }
+    }
+
+    // Fallback if media could not be forwarded directly: send message alert to buyer
+    if (!deliveredMedia) {
+      await sendSafeMessage(
+        { chatId: buyerChatId } as never,
+        botInstance,
+        buyerCaption,
+        {
+          parse_mode: 'HTML',
+          reply_markup: replyMarkup,
+        }
+      );
+    }
+  } else {
+    // Standard text delivery
+    const buyerMessage =
+      `🎉 <b>PESANAN ANDA TELAH SELESAI!</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n` +
+      `📦 <b>Produk:</b> ${escapeHtml(order.product_name)}\n` +
+      `🆔 <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n\n` +
+      `🔑 <b>Kredensial / Detail Akun:</b>\n` +
+      `<code>${escapeHtml(cleanKey)}</code>\n\n` +
+      `📌 <i>Terima kasih telah berbelanja di DaFung Hub! Hubungi admin jika butuh bantuan atau klaim garansi.</i>`;
+
+    await sendSafeMessage(
+      { chatId: buyerChatId } as never,
+      botInstance,
+      buyerMessage,
+      {
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      }
+    );
+  }
 
   // Broadcast successful order to Telegram channel
   broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
     console.warn('[Broadcast Warning] Failed to broadcast manual fulfillment:', bErr);
   });
 
+  const mediaNote = hasMedia ? ` beserta file (<b>${escapeHtml(mediaData!.fileName || mediaData!.type)}</b>)` : '';
   return {
     success: true,
-    message: `✅ Akun untuk order <code>${orderCode}</code> berhasil dikirimkan ke pembeli!`,
+    message: `✅ Kredensial${mediaNote} untuk order <code>${escapeHtml(orderCode)}</code> berhasil dikirimkan ke pembeli!`,
   };
 }
 

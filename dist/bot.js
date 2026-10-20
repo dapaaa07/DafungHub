@@ -12874,6 +12874,7 @@ __export(broadcast_exports, {
   maskOrderCode: () => maskOrderCode,
   maskUsername: () => maskUsername,
   sendManualBroadcast: () => sendManualBroadcast,
+  sendTelegramApi: () => sendTelegramApi,
   setAutoOrderBroadcastEnabled: () => setAutoOrderBroadcastEnabled,
   setBroadcastChannel: () => setBroadcastChannel
 });
@@ -13005,6 +13006,16 @@ async function sendTelegramApi(method, payload) {
     body: JSON.stringify(payload)
   });
   const data = await response.json();
+  if (!data.ok && payload.parse_mode && data.description?.toLowerCase().includes("can't parse entities")) {
+    const fallbackPayload = { ...payload };
+    delete fallbackPayload.parse_mode;
+    const retryRes = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fallbackPayload)
+    });
+    return retryRes.json();
+  }
   return data;
 }
 async function broadcastOrderSuccess(orderCode, botInstance) {
@@ -13092,71 +13103,129 @@ async function broadcastOrderSuccess(orderCode, botInstance) {
     return { success: false, error: errorMsg };
   }
 }
-async function sendManualBroadcast(messageText, botInstance, options) {
+async function sendManualBroadcast(input, botInstance, options) {
   try {
     const channel = await getBroadcastChannel();
-    const cleanText = messageText?.trim();
-    if (!cleanText) {
-      return { success: false, error: "Pesan broadcast tidak boleh kosong." };
+    const draft = typeof input === "string" ? { type: options?.photoUrl ? "photo" : "text", text: input, fileId: options?.photoUrl } : input;
+    const cleanText = draft.text?.trim() || "";
+    const hasMedia = draft.type && draft.type !== "text" && draft.type !== "none";
+    if (!cleanText && !hasMedia) {
+      return { success: false, error: "Pesan atau media broadcast tidak boleh kosong." };
     }
-    let sentOk = false;
-    let messageId;
-    if (options?.photoUrl) {
-      if (botInstance && typeof botInstance.sendPhoto === "function") {
-        try {
-          const res = await botInstance.sendPhoto(channel, options.photoUrl, {
-            caption: cleanText,
-            parse_mode: "HTML"
-          });
-          if (res?.message_id) {
-            sentOk = true;
-            messageId = res.message_id;
+    const replyMarkup = {
+      inline_keyboard: [
+        [
+          {
+            text: "\u{1F6CD}\uFE0F Order via Bot",
+            url: `https://t.me/${BOT_USERNAME}`
           }
-        } catch {
-        }
+        ]
+      ]
+    };
+    const fromChatId = draft.fromChatId || draft.chatId;
+    if (draft.messageId && fromChatId) {
+      const copyRes = await sendTelegramApi("copyMessage", {
+        chat_id: channel,
+        from_chat_id: fromChatId,
+        message_id: draft.messageId,
+        reply_markup: replyMarkup
+      });
+      if (copyRes.ok && copyRes.result?.message_id) {
+        return { success: true, messageId: copyRes.result.message_id, channel };
       }
-      if (!sentOk) {
-        const apiRes = await sendTelegramApi("sendPhoto", {
-          chat_id: channel,
-          photo: options.photoUrl,
-          caption: cleanText,
-          parse_mode: "HTML"
-        });
-        if (apiRes.ok) {
-          sentOk = true;
-          messageId = apiRes.result?.message_id;
-        } else {
-          return { success: false, channel, error: apiRes.description };
-        }
+    }
+    if (draft.type === "document" && draft.fileId) {
+      const docRes = await sendTelegramApi("sendDocument", {
+        chat_id: channel,
+        document: draft.fileId,
+        caption: cleanText,
+        parse_mode: "HTML",
+        reply_markup: replyMarkup
+      });
+      if (docRes.ok && docRes.result?.message_id) {
+        return { success: true, messageId: docRes.result.message_id, channel };
+      }
+    } else if (draft.type === "photo" && draft.fileId) {
+      const photoRes = await sendTelegramApi("sendPhoto", {
+        chat_id: channel,
+        photo: draft.fileId,
+        caption: cleanText,
+        parse_mode: "HTML",
+        reply_markup: replyMarkup
+      });
+      if (photoRes.ok && photoRes.result?.message_id) {
+        return { success: true, messageId: photoRes.result.message_id, channel };
+      }
+    } else if (draft.type === "video" && draft.fileId) {
+      const vidRes = await sendTelegramApi("sendVideo", {
+        chat_id: channel,
+        video: draft.fileId,
+        caption: cleanText,
+        parse_mode: "HTML",
+        reply_markup: replyMarkup
+      });
+      if (vidRes.ok && vidRes.result?.message_id) {
+        return { success: true, messageId: vidRes.result.message_id, channel };
+      }
+    } else if (draft.type === "audio" && draft.fileId) {
+      const audRes = await sendTelegramApi("sendAudio", {
+        chat_id: channel,
+        audio: draft.fileId,
+        caption: cleanText,
+        parse_mode: "HTML",
+        reply_markup: replyMarkup
+      });
+      if (audRes.ok && audRes.result?.message_id) {
+        return { success: true, messageId: audRes.result.message_id, channel };
+      }
+    } else if (draft.type === "voice" && draft.fileId) {
+      const voiceRes = await sendTelegramApi("sendVoice", {
+        chat_id: channel,
+        voice: draft.fileId,
+        caption: cleanText,
+        parse_mode: "HTML",
+        reply_markup: replyMarkup
+      });
+      if (voiceRes.ok && voiceRes.result?.message_id) {
+        return { success: true, messageId: voiceRes.result.message_id, channel };
+      }
+    } else if (draft.type === "animation" && draft.fileId) {
+      const animRes = await sendTelegramApi("sendAnimation", {
+        chat_id: channel,
+        animation: draft.fileId,
+        caption: cleanText,
+        parse_mode: "HTML",
+        reply_markup: replyMarkup
+      });
+      if (animRes.ok && animRes.result?.message_id) {
+        return { success: true, messageId: animRes.result.message_id, channel };
+      }
+    } else if (draft.type === "sticker" && draft.fileId) {
+      const stickRes = await sendTelegramApi("sendSticker", {
+        chat_id: channel,
+        sticker: draft.fileId,
+        reply_markup: replyMarkup
+      });
+      if (stickRes.ok && stickRes.result?.message_id) {
+        return { success: true, messageId: stickRes.result.message_id, channel };
       }
     } else {
-      if (botInstance && typeof botInstance.sendMessage === "function") {
-        try {
-          const res = await botInstance.sendMessage(channel, cleanText, {
-            parse_mode: "HTML"
-          });
-          if (res?.message_id) {
-            sentOk = true;
-            messageId = res.message_id;
-          }
-        } catch {
-        }
+      const textRes = await sendTelegramApi("sendMessage", {
+        chat_id: channel,
+        text: cleanText,
+        parse_mode: "HTML",
+        reply_markup: replyMarkup
+      });
+      if (textRes.ok && textRes.result?.message_id) {
+        return { success: true, messageId: textRes.result.message_id, channel };
       }
-      if (!sentOk) {
-        const apiRes = await sendTelegramApi("sendMessage", {
-          chat_id: channel,
-          text: cleanText,
-          parse_mode: "HTML"
-        });
-        if (apiRes.ok) {
-          sentOk = true;
-          messageId = apiRes.result?.message_id;
-        } else {
-          return { success: false, channel, error: apiRes.description };
-        }
-      }
+      return {
+        success: false,
+        channel,
+        error: textRes.description || "Gagal mengirim pesan ke channel"
+      };
     }
-    return { success: true, messageId, channel };
+    return { success: false, channel, error: "Gagal menyiarkan media ke channel" };
   } catch (err) {
     const errorMsg = err.message || String(err);
     return { success: false, error: errorMsg };
@@ -18931,10 +19000,14 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
     orderCode
   };
 }
-async function adminManualFulfill(orderCode, credentialsText, botInstance) {
-  const cleanKey = credentialsText?.trim();
-  if (!cleanKey) {
-    return { success: false, message: "Kredensial akun tidak boleh kosong." };
+async function adminManualFulfill(orderCode, credentialsText, botInstance, mediaData) {
+  const hasMedia = Boolean(mediaData && mediaData.hasMedia && (mediaData.fileId || mediaData.messageId));
+  const cleanKey = credentialsText?.trim() || "";
+  if (!cleanKey && !hasMedia) {
+    return {
+      success: false,
+      message: "Kredensial atau file akun tidak boleh kosong.\n\n\u26A1 <b>Format pengiriman:</b>\n\u2022 <b>Kirim file (.txt dll):</b> Upload file dengan caption <code>/kirim &lt;order_code&gt; [keterangan]</code> atau reply file tersebut.\n\u2022 <b>Kirim teks biasa:</b> <code>/kirim &lt;order_code&gt; &lt;email:password&gt;</code>"
+    };
   }
   const orderRes = await query(
     `SELECT o.*, u.telegram_id, p.name as product_name
@@ -18945,10 +19018,11 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance) {
     [orderCode]
   );
   if (orderRes.rows.length === 0) {
-    return { success: false, message: `Order "${orderCode}" tidak ditemukan.` };
+    return { success: false, message: `Order "<code>${escapeHtml2(orderCode)}</code>" tidak ditemukan.` };
   }
   const order = orderRes.rows[0];
-  const encryptedKey = encrypt(cleanKey);
+  const storedCredential = hasMedia ? `[FILE: ${(mediaData.type || "MEDIA").toUpperCase()}${mediaData.fileName ? ` - ${mediaData.fileName}` : ""}] ${cleanKey}` : cleanKey;
+  const encryptedKey = encrypt(storedCredential);
   await query(
     `UPDATE orders
      SET payment_status = 'paid',
@@ -18972,7 +19046,94 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance) {
       });
     }
   }
-  const buyerMessage = `\u{1F389} <b>PESANAN ANDA TELAH SELESAI!</b>
+  const buyerChatId = order.telegram_id;
+  const replyMarkup = {
+    inline_keyboard: [
+      [{ text: "\u{1F6CD}\uFE0F Beli Produk Baru", callback_data: "menu_products" }],
+      [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+    ]
+  };
+  if (hasMedia && mediaData) {
+    const { sendTelegramApi: sendTelegramApi2 } = await Promise.resolve().then(() => (init_broadcast(), broadcast_exports));
+    const buyerCaption = `\u{1F389} <b>PESANAN ANDA TELAH SELESAI!</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F4E6} <b>Produk:</b> ${escapeHtml2(order.product_name)}
+\u{1F194} <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+
+\u{1F4C1} <b>File Kredensial Terlampir:</b>
+<code>${escapeHtml2(mediaData.fileName || mediaData.type)}</code>
+` + (cleanKey ? `
+\u{1F4AC} <b>Keterangan / Detail:</b>
+<code>${escapeHtml2(cleanKey)}</code>
+` : "") + `
+\u{1F4CC} <i>Simpan file ini baik-baik. Garansi berlaku sesuai ketentuan produk. Terima kasih telah berbelanja di DaFung Hub!</i>`;
+    let deliveredMedia = false;
+    if (mediaData.messageId && mediaData.fromChatId) {
+      const copyRes = await sendTelegramApi2("copyMessage", {
+        chat_id: buyerChatId,
+        from_chat_id: mediaData.fromChatId,
+        message_id: mediaData.messageId,
+        caption: buyerCaption,
+        parse_mode: "HTML",
+        reply_markup: replyMarkup
+      });
+      if (copyRes.ok) {
+        deliveredMedia = true;
+      }
+    }
+    if (!deliveredMedia && mediaData.fileId) {
+      if (mediaData.type === "document") {
+        const docRes = await sendTelegramApi2("sendDocument", {
+          chat_id: buyerChatId,
+          document: mediaData.fileId,
+          caption: buyerCaption,
+          parse_mode: "HTML",
+          reply_markup: replyMarkup
+        });
+        if (docRes.ok) deliveredMedia = true;
+      } else if (mediaData.type === "photo") {
+        const photoRes = await sendTelegramApi2("sendPhoto", {
+          chat_id: buyerChatId,
+          photo: mediaData.fileId,
+          caption: buyerCaption,
+          parse_mode: "HTML",
+          reply_markup: replyMarkup
+        });
+        if (photoRes.ok) deliveredMedia = true;
+      } else if (mediaData.type === "video") {
+        const vidRes = await sendTelegramApi2("sendVideo", {
+          chat_id: buyerChatId,
+          video: mediaData.fileId,
+          caption: buyerCaption,
+          parse_mode: "HTML",
+          reply_markup: replyMarkup
+        });
+        if (vidRes.ok) deliveredMedia = true;
+      } else if (mediaData.type === "audio") {
+        const audRes = await sendTelegramApi2("sendAudio", {
+          chat_id: buyerChatId,
+          audio: mediaData.fileId,
+          caption: buyerCaption,
+          parse_mode: "HTML",
+          reply_markup: replyMarkup
+        });
+        if (audRes.ok) deliveredMedia = true;
+      }
+    }
+    if (!deliveredMedia) {
+      await sendSafeMessage(
+        { chatId: buyerChatId },
+        botInstance,
+        buyerCaption,
+        {
+          parse_mode: "HTML",
+          reply_markup: replyMarkup
+        }
+      );
+    }
+  } else {
+    const buyerMessage = `\u{1F389} <b>PESANAN ANDA TELAH SELESAI!</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u{1F4E6} <b>Produk:</b> ${escapeHtml2(order.product_name)}
 \u{1F194} <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
@@ -18982,26 +19143,23 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance) {
 <code>${escapeHtml2(cleanKey)}</code>
 
 \u{1F4CC} <i>Terima kasih telah berbelanja di DaFung Hub! Hubungi admin jika butuh bantuan atau klaim garansi.</i>`;
-  await sendSafeMessage(
-    { chatId: order.telegram_id },
-    botInstance,
-    buyerMessage,
-    {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "\u{1F6CD}\uFE0F Beli Produk Baru", callback_data: "menu_products" }],
-          [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
-        ]
+    await sendSafeMessage(
+      { chatId: buyerChatId },
+      botInstance,
+      buyerMessage,
+      {
+        parse_mode: "HTML",
+        reply_markup: replyMarkup
       }
-    }
-  );
+    );
+  }
   broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
     console.warn("[Broadcast Warning] Failed to broadcast manual fulfillment:", bErr);
   });
+  const mediaNote = hasMedia ? ` beserta file (<b>${escapeHtml2(mediaData.fileName || mediaData.type)}</b>)` : "";
   return {
     success: true,
-    message: `\u2705 Akun untuk order <code>${orderCode}</code> berhasil dikirimkan ke pembeli!`
+    message: `\u2705 Kredensial${mediaNote} untuk order <code>${escapeHtml2(orderCode)}</code> berhasil dikirimkan ke pembeli!`
   };
 }
 async function adminRetrySupplierFulfill(orderCode, botInstance) {
@@ -19357,6 +19515,7 @@ __export(menu_exports, {
   extractQrisFromInvoiceData: () => extractQrisFromInvoiceData,
   filterProductsByPlatform: () => filterProductsByPlatform,
   formatIndonesianDateTime: () => formatIndonesianDateTime,
+  getAdminPendingBroadcastDraft: () => getAdminPendingBroadcastDraft,
   getAdminPendingBroadcastText: () => getAdminPendingBroadcastText,
   getAdminWaitingBroadcast: () => getAdminWaitingBroadcast,
   getMainMenuInlineKeyboard: () => getMainMenuInlineKeyboard,
@@ -19388,6 +19547,7 @@ __export(menu_exports, {
   sendProductDetail: () => sendProductDetail,
   sendProductsMenu: () => sendProductsMenu,
   sendProfileMenu: () => sendProfileMenu,
+  setAdminPendingBroadcastDraft: () => setAdminPendingBroadcastDraft,
   setAdminPendingBroadcastText: () => setAdminPendingBroadcastText,
   setAdminWaitingBroadcast: () => setAdminWaitingBroadcast
 });
@@ -19426,11 +19586,17 @@ function setAdminWaitingBroadcast(chatId, isWaiting) {
 function getAdminWaitingBroadcast(chatId) {
   return adminWaitingBroadcast.get(String(chatId)) || false;
 }
+function setAdminPendingBroadcastDraft(chatId, draft) {
+  adminBroadcastPending.set(String(chatId), draft);
+}
 function setAdminPendingBroadcastText(chatId, text) {
-  adminBroadcastPending.set(String(chatId), text);
+  adminBroadcastPending.set(String(chatId), { type: "text", text });
+}
+function getAdminPendingBroadcastDraft(chatId) {
+  return adminBroadcastPending.get(String(chatId));
 }
 function getAdminPendingBroadcastText(chatId) {
-  return adminBroadcastPending.get(String(chatId));
+  return adminBroadcastPending.get(String(chatId))?.text;
 }
 function clearAdminBroadcastState(chatId) {
   const key = String(chatId);
@@ -20568,28 +20734,34 @@ Pilih aksi di bawah untuk membuat siaran baru atau mengatur siaran otomatis:`;
     reply_markup: { inline_keyboard: buttons }
   });
 }
-async function sendAdminBroadcastPreview(ctx, botInstance, broadcastText) {
+async function sendAdminBroadcastPreview(ctx, botInstance, broadcastInput) {
   if (!isAdmin(ctx.from?.id)) return;
   const { getBroadcastChannel: getBroadcastChannel2 } = await Promise.resolve().then(() => (init_broadcast(), broadcast_exports));
   const targetChannel = await getBroadcastChannel2();
   const chatId = ctx.chatId || ctx.message?.chat?.id || ctx.from?.id;
+  const draft = typeof broadcastInput === "string" ? { type: "text", text: broadcastInput } : broadcastInput;
   if (chatId) {
-    setAdminPendingBroadcastText(chatId, broadcastText);
+    setAdminPendingBroadcastDraft(chatId, draft);
   }
+  const hasMedia = draft.type && draft.type !== "text" && draft.type !== "none";
+  const mediaLabel = hasMedia ? `
+\u2022 <b>Tipe Media:</b> <code>${(draft.type || "MEDIA").toUpperCase()}${draft.fileName ? ` (${escapeHtml4(draft.fileName)})` : ""}</code>` : "";
   const previewText = `\u{1F441}\uFE0F <b>PREVIEW PESAN SIARAN</b>
-<b>Target:</b> <code>${escapeHtml4(targetChannel)}</code>
+\u2022 <b>Target:</b> <code>${escapeHtml4(targetChannel)}</code>${mediaLabel}
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
-${broadcastText}
+` + (draft.text ? `${draft.text}
 
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-Apakah Anda ingin menyiarkan pesan ini ke channel sekarang?`;
+` : hasMedia ? `<i>(Media terlampir tanpa teks caption)</i>
+
+` : "") + `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Apakah Anda ingin menyiarkan konten ${hasMedia ? "dan media " : ""}ini ke channel sekarang?`;
   const buttons = [
     [
       { text: "\u{1F680} Kirim ke Channel Sekarang", callback_data: "admin_send_broadcast" }
     ],
     [
-      { text: "\u270F\uFE0F Tulis Ulang", callback_data: "admin_create_broadcast" },
+      { text: "\u270F\uFE0F Ganti Pesan / Media", callback_data: "admin_create_broadcast" },
       { text: "\u274C Batalkan", callback_data: "admin_broadcast" }
     ]
   ];
@@ -21094,14 +21266,16 @@ Produk <code>${escapeHtml4(prodId)}</code> sekarang kembali otomatis dihitung da
         await sendSafeMessage(
           ctx,
           botInstance,
-          `\u270D\uFE0F <b>TULIS PESAN BROADCAST KE @DafungHub</b>
+          `\u270D\uFE0F <b>TULIS / KIRIM PESAN BROADCAST KE @DafungHub</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-Ketikkan pesan yang ingin Anda siarkan ke channel di chat ini.
+Kirimkan konten yang ingin Anda siarkan ke channel di chat ini:
+\u2022 <b>Pesan Teks / Promo</b>
+\u2022 <b>Foto / Banner Promo</b> (bisa dengan caption)
+\u2022 <b>File / Dokumen</b> (contoh: <code>.txt</code>, <code>.pdf</code>, <code>.zip</code>)
+\u2022 <b>Video / Animasi GIF / Voice</b>
 
-\u{1F4A1} <i>Format cepat: Anda juga bisa ketik perintah:
-<code>/broadcast &lt;pesan Anda&gt;</code></i>
-
-Mendukung format HTML standar (<b>tebal</b>, <i>miring</i>, <code>kode</code>, <a href="...">link</a>).`,
+\u{1F4A1} <i>Format cepat command: <code>/broadcast &lt;pesan&gt;</code></i>
+<i>(Mendukung format HTML standar).</i>`,
           {
             parse_mode: "HTML",
             reply_markup: {
@@ -21112,8 +21286,8 @@ Mendukung format HTML standar (<b>tebal</b>, <i>miring</i>, <code>kode</code>, <
       } else if (data === "admin_send_broadcast") {
         if (!isAdmin(ctx.from?.id)) return;
         const chatId = ctx.chatId || ctx.from?.id;
-        const pendingText = chatId ? getAdminPendingBroadcastText(chatId) : void 0;
-        if (!pendingText) {
+        const pendingDraft = chatId ? getAdminPendingBroadcastDraft(chatId) : void 0;
+        if (!pendingDraft || !pendingDraft.text && (!pendingDraft.type || pendingDraft.type === "none" || pendingDraft.type === "text")) {
           await sendSafeMessage(ctx, botInstance, "\u26A0\uFE0F Tidak ada draf siaran yang siap dikirim.", {
             reply_markup: {
               inline_keyboard: [[{ text: "\u{1F519} Menu Broadcast", callback_data: "admin_broadcast" }]]
@@ -21122,7 +21296,7 @@ Mendukung format HTML standar (<b>tebal</b>, <i>miring</i>, <code>kode</code>, <
           return;
         }
         const { sendManualBroadcast: sendManualBroadcast2 } = await Promise.resolve().then(() => (init_broadcast(), broadcast_exports));
-        const result = await sendManualBroadcast2(pendingText, botInstance);
+        const result = await sendManualBroadcast2(pendingDraft, botInstance);
         if (chatId) clearAdminBroadcastState(chatId);
         if (result.success) {
           await sendSafeMessage(
@@ -46223,6 +46397,7 @@ __export(handler_exports, {
   cleanupChatMessages: () => cleanupChatMessages,
   clearPreviousBotMessages: () => clearPreviousBotMessages,
   default: () => handler_default,
+  extractMediaFromMessage: () => extractMediaFromMessage,
   handleWebhookUpdate: () => handleWebhookUpdate,
   initBot: () => initBot,
   recordBotMessage: () => recordBotMessage,
@@ -46388,6 +46563,85 @@ async function sendSafePhoto(ctx, botInstance, photo, options) {
   }
   return sentResult;
 }
+function extractMediaFromMessage(message) {
+  if (!message) return { hasMedia: false, type: "none" };
+  const fromChatId = message.chat?.id;
+  const messageId = message.message_id;
+  if (message.document) {
+    return {
+      hasMedia: true,
+      type: "document",
+      fileId: message.document.file_id,
+      fileName: message.document.file_name || "dokumen.txt",
+      mimeType: message.document.mime_type,
+      fromChatId,
+      messageId
+    };
+  }
+  if (message.photo && Array.isArray(message.photo) && message.photo.length > 0) {
+    const largest = message.photo[message.photo.length - 1];
+    return {
+      hasMedia: true,
+      type: "photo",
+      fileId: largest.file_id,
+      fileName: "foto.jpg",
+      fromChatId,
+      messageId
+    };
+  }
+  if (message.video) {
+    return {
+      hasMedia: true,
+      type: "video",
+      fileId: message.video.file_id,
+      fileName: message.video.file_name || "video.mp4",
+      mimeType: message.video.mime_type,
+      fromChatId,
+      messageId
+    };
+  }
+  if (message.audio) {
+    return {
+      hasMedia: true,
+      type: "audio",
+      fileId: message.audio.file_id,
+      fileName: message.audio.file_name || "audio.mp3",
+      mimeType: message.audio.mime_type,
+      fromChatId,
+      messageId
+    };
+  }
+  if (message.voice) {
+    return {
+      hasMedia: true,
+      type: "voice",
+      fileId: message.voice.file_id,
+      fileName: "voice.ogg",
+      fromChatId,
+      messageId
+    };
+  }
+  if (message.animation) {
+    return {
+      hasMedia: true,
+      type: "animation",
+      fileId: message.animation.file_id,
+      fileName: message.animation.file_name || "animasi.gif",
+      fromChatId,
+      messageId
+    };
+  }
+  if (message.sticker) {
+    return {
+      hasMedia: true,
+      type: "sticker",
+      fileId: message.sticker.file_id,
+      fromChatId,
+      messageId
+    };
+  }
+  return { hasMedia: false, type: "none", fromChatId, messageId };
+}
 function registerHandlers(botInstance) {
   botInstance.command("start", async (ctx) => {
     const status = await getBotStatus();
@@ -46472,7 +46726,7 @@ function registerHandlers(botInstance) {
     const { sendAdminPanel: sendAdminPanel2 } = await Promise.resolve().then(() => (init_menu(), menu_exports));
     await sendAdminPanel2(ctx, botInstance);
   });
-  botInstance.command("kirim", async (ctx) => {
+  const handleKirimCommand = async (ctx) => {
     const { isAdmin: isAdmin2 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
     if (ctx.from?.id && !isAdmin2(ctx.from?.id)) {
       await sendSafeMessage(
@@ -46488,15 +46742,18 @@ function registerHandlers(botInstance) {
       );
       return;
     }
-    const text = ctx.message?.text || "";
-    const parts = text.trim().split(/\s+/);
+    const rawText = ctx.message?.text || ctx.message?.caption || "";
+    const parts = rawText.trim().split(/\s+/);
     const orderCode = parts[1];
     const credentials = parts.slice(2).join(" ");
-    if (!orderCode || !credentials) {
+    const replyMsg = ctx.message?.reply_to_message;
+    const mediaSource = replyMsg && extractMediaFromMessage(replyMsg).hasMedia ? replyMsg : ctx.message;
+    const mediaData = extractMediaFromMessage(mediaSource);
+    if (!orderCode || !credentials && !mediaData.hasMedia) {
       await sendSafeMessage(
         ctx,
         botInstance,
-        "\u26A1 Format pengiriman admin: <code>/kirim &lt;order_code&gt; &lt;username/akun&gt;</code>",
+        "\u26A1 <b>PANDUAN PENGIRIMAN KREDENSIAL MANUAL (/kirim)</b>\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n<b>1. Kirim File / Dokumen (contoh: .txt):</b>\n\u2022 Upload file <code>.txt</code> / dokumen / foto dengan caption:\n  <code>/kirim &lt;order_code&gt; [keterangan opsional]</code>\n\u2022 Atau balas (reply) file yang sudah ada dengan perintah:\n  <code>/kirim &lt;order_code&gt; [keterangan opsional]</code>\n\n<b>2. Kirim Teks Biasa:</b>\n\u2022 <code>/kirim &lt;order_code&gt; &lt;email:password&gt;</code>",
         {
           parse_mode: "HTML",
           reply_markup: {
@@ -46507,9 +46764,10 @@ function registerHandlers(botInstance) {
       return;
     }
     const { adminManualFulfill: adminManualFulfill2 } = await Promise.resolve().then(() => (init_fulfillment(), fulfillment_exports));
-    const result = await adminManualFulfill2(orderCode, credentials, botInstance);
+    const result = await adminManualFulfill2(orderCode, credentials, botInstance, mediaData);
     await sendSafeMessage(ctx, botInstance, result.message, { parse_mode: "HTML" });
-  });
+  };
+  botInstance.command("kirim", handleKirimCommand);
   botInstance.command("konfirmasi", async (ctx) => {
     if (!isAdmin(ctx.from?.id)) {
       await sendSafeMessage(
@@ -46782,38 +47040,64 @@ Pembeli telah menerima notifikasi dan broadcast channel telah dikirim.`,
       );
       return;
     }
-    const text = ctx.message?.text || "";
-    const parts = text.trim().split(/\s+/);
+    const rawText = ctx.message?.text || ctx.message?.caption || "";
+    const parts = rawText.trim().split(/\s+/);
     const broadcastBody = parts.slice(1).join(" ").trim();
-    if (!broadcastBody) {
+    const media = extractMediaFromMessage(ctx.message);
+    if (!broadcastBody && !media.hasMedia) {
       const { sendAdminBroadcastMenu: sendAdminBroadcastMenu2 } = await Promise.resolve().then(() => (init_menu(), menu_exports));
       await sendAdminBroadcastMenu2(ctx, botInstance);
       return;
     }
     const { sendAdminBroadcastPreview: sendAdminBroadcastPreview2 } = await Promise.resolve().then(() => (init_menu(), menu_exports));
-    await sendAdminBroadcastPreview2(ctx, botInstance, broadcastBody);
+    await sendAdminBroadcastPreview2(ctx, botInstance, {
+      chatId: ctx.message?.chat?.id || ctx.from?.id,
+      fromChatId: ctx.message?.chat?.id || ctx.from?.id,
+      messageId: ctx.message?.message_id,
+      type: media.type,
+      fileId: media.fileId,
+      fileName: media.fileName,
+      text: broadcastBody
+    });
   };
   botInstance.command("broadcast", handleBroadcastCommand);
   botInstance.command("bc", handleBroadcastCommand);
   botInstance.on("message", async (ctx) => {
-    const text = ctx.message?.text?.trim();
+    const rawText = ctx.message?.text?.trim() || ctx.message?.caption?.trim() || "";
+    if (rawText.startsWith("/kirim")) {
+      await handleKirimCommand(ctx);
+      return;
+    }
+    if (rawText.startsWith("/broadcast") || rawText.startsWith("/bc")) {
+      await handleBroadcastCommand(ctx);
+      return;
+    }
     const chatId = ctx.chatId || ctx.message?.chat?.id || ctx.from?.id;
-    if (chatId && text && isAdmin(ctx.from?.id)) {
+    if (chatId && isAdmin(ctx.from?.id)) {
       const { getAdminWaitingBroadcast: getAdminWaitingBroadcast2, clearAdminBroadcastState: clearAdminBroadcastState2, sendAdminBroadcastPreview: sendAdminBroadcastPreview2, sendAdminBroadcastMenu: sendAdminBroadcastMenu2 } = await Promise.resolve().then(() => (init_menu(), menu_exports));
       if (getAdminWaitingBroadcast2(chatId)) {
         clearAdminBroadcastState2(chatId);
-        if (text === "/cancel" || text.toLowerCase() === "batal") {
+        if (rawText === "/cancel" || rawText.toLowerCase() === "batal") {
           await sendAdminBroadcastMenu2(ctx, botInstance);
           return;
         }
-        await sendAdminBroadcastPreview2(ctx, botInstance, text);
+        const media = extractMediaFromMessage(ctx.message);
+        await sendAdminBroadcastPreview2(ctx, botInstance, {
+          chatId,
+          fromChatId: chatId,
+          messageId: ctx.message?.message_id,
+          type: media.type,
+          fileId: media.fileId,
+          fileName: media.fileName,
+          text: rawText
+        });
         return;
       }
     }
-    if (text && text.startsWith("/")) {
+    if (rawText && rawText.startsWith("/")) {
       return;
     }
-    if (text) {
+    if (rawText) {
       const status = await getBotStatus();
       if (status === "maintenance" && !isAdmin(ctx.from?.id)) {
         await sendMaintenanceMessage(ctx, botInstance);

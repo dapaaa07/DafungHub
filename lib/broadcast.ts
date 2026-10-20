@@ -182,7 +182,7 @@ export function buildOrderBroadcastMessage(order: {
 /**
  * Send HTTP request directly to Telegram API (works across serverless & persistent runtimes)
  */
-async function sendTelegramApi(
+export async function sendTelegramApi(
   method: string,
   payload: Record<string, unknown>
 ): Promise<{ ok: boolean; result?: any; description?: string; error_code?: number }> {
@@ -199,6 +199,17 @@ async function sendTelegramApi(
   });
 
   const data = await response.json();
+  // If parsing error (e.g. malformed HTML entities in caption), retry without parse_mode
+  if (!data.ok && payload.parse_mode && data.description?.toLowerCase().includes('can\'t parse entities')) {
+    const fallbackPayload = { ...payload };
+    delete fallbackPayload.parse_mode;
+    const retryRes = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fallbackPayload),
+    });
+    return retryRes.json();
+  }
   return data;
 }
 
@@ -324,84 +335,158 @@ export async function broadcastOrderSuccess(
   }
 }
 
+export interface BroadcastDraft {
+  chatId?: number | string;
+  fromChatId?: number | string;
+  messageId?: number;
+  type?: 'text' | 'photo' | 'document' | 'video' | 'audio' | 'voice' | 'sticker' | 'animation' | 'none';
+  text?: string;
+  fileId?: string;
+  fileName?: string;
+}
+
 /**
- * Send manual broadcast message from admin to the target channel
+ * Send manual broadcast message (text or any media) from admin to the target channel
  */
 export async function sendManualBroadcast(
-  messageText: string,
+  input: string | BroadcastDraft,
   botInstance?: ExtendedBot,
   options?: { photoUrl?: string }
 ): Promise<{ success: boolean; messageId?: number; channel?: string; error?: string }> {
   try {
     const channel = await getBroadcastChannel();
-    const cleanText = messageText?.trim();
+    const draft: BroadcastDraft =
+      typeof input === 'string'
+        ? { type: options?.photoUrl ? 'photo' : 'text', text: input, fileId: options?.photoUrl }
+        : input;
 
-    if (!cleanText) {
-      return { success: false, error: 'Pesan broadcast tidak boleh kosong.' };
+    const cleanText = draft.text?.trim() || '';
+    const hasMedia = draft.type && draft.type !== 'text' && draft.type !== 'none';
+
+    if (!cleanText && !hasMedia) {
+      return { success: false, error: 'Pesan atau media broadcast tidak boleh kosong.' };
     }
 
-    let sentOk = false;
-    let messageId: number | undefined;
+    const replyMarkup = {
+      inline_keyboard: [
+        [
+          {
+            text: '🛍️ Order via Bot',
+            url: `https://t.me/${BOT_USERNAME}`,
+          },
+        ],
+      ],
+    };
 
-    // If photo is provided
-    if (options?.photoUrl) {
-      if (botInstance && typeof botInstance.sendPhoto === 'function') {
-        try {
-          const res = (await botInstance.sendPhoto(channel, options.photoUrl, {
-            caption: cleanText,
-            parse_mode: 'HTML',
-          })) as { message_id?: number };
-          if (res?.message_id) {
-            sentOk = true;
-            messageId = res.message_id;
-          }
-        } catch {}
+    // 1. Try copyMessage first if original message was received from an admin chat
+    const fromChatId = draft.fromChatId || draft.chatId;
+    if (draft.messageId && fromChatId) {
+      const copyRes = await sendTelegramApi('copyMessage', {
+        chat_id: channel,
+        from_chat_id: fromChatId,
+        message_id: draft.messageId,
+        reply_markup: replyMarkup,
+      });
+      if (copyRes.ok && copyRes.result?.message_id) {
+        return { success: true, messageId: copyRes.result.message_id, channel };
       }
+    }
 
-      if (!sentOk) {
-        const apiRes = await sendTelegramApi('sendPhoto', {
-          chat_id: channel,
-          photo: options.photoUrl,
-          caption: cleanText,
-          parse_mode: 'HTML',
-        });
-        if (apiRes.ok) {
-          sentOk = true;
-          messageId = apiRes.result?.message_id;
-        } else {
-          return { success: false, channel, error: apiRes.description };
-        }
+    // 2. Direct methods based on media type
+    if (draft.type === 'document' && draft.fileId) {
+      const docRes = await sendTelegramApi('sendDocument', {
+        chat_id: channel,
+        document: draft.fileId,
+        caption: cleanText,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+      if (docRes.ok && docRes.result?.message_id) {
+        return { success: true, messageId: docRes.result.message_id, channel };
+      }
+    } else if (draft.type === 'photo' && draft.fileId) {
+      const photoRes = await sendTelegramApi('sendPhoto', {
+        chat_id: channel,
+        photo: draft.fileId,
+        caption: cleanText,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+      if (photoRes.ok && photoRes.result?.message_id) {
+        return { success: true, messageId: photoRes.result.message_id, channel };
+      }
+    } else if (draft.type === 'video' && draft.fileId) {
+      const vidRes = await sendTelegramApi('sendVideo', {
+        chat_id: channel,
+        video: draft.fileId,
+        caption: cleanText,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+      if (vidRes.ok && vidRes.result?.message_id) {
+        return { success: true, messageId: vidRes.result.message_id, channel };
+      }
+    } else if (draft.type === 'audio' && draft.fileId) {
+      const audRes = await sendTelegramApi('sendAudio', {
+        chat_id: channel,
+        audio: draft.fileId,
+        caption: cleanText,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+      if (audRes.ok && audRes.result?.message_id) {
+        return { success: true, messageId: audRes.result.message_id, channel };
+      }
+    } else if (draft.type === 'voice' && draft.fileId) {
+      const voiceRes = await sendTelegramApi('sendVoice', {
+        chat_id: channel,
+        voice: draft.fileId,
+        caption: cleanText,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+      if (voiceRes.ok && voiceRes.result?.message_id) {
+        return { success: true, messageId: voiceRes.result.message_id, channel };
+      }
+    } else if (draft.type === 'animation' && draft.fileId) {
+      const animRes = await sendTelegramApi('sendAnimation', {
+        chat_id: channel,
+        animation: draft.fileId,
+        caption: cleanText,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+      if (animRes.ok && animRes.result?.message_id) {
+        return { success: true, messageId: animRes.result.message_id, channel };
+      }
+    } else if (draft.type === 'sticker' && draft.fileId) {
+      const stickRes = await sendTelegramApi('sendSticker', {
+        chat_id: channel,
+        sticker: draft.fileId,
+        reply_markup: replyMarkup,
+      });
+      if (stickRes.ok && stickRes.result?.message_id) {
+        return { success: true, messageId: stickRes.result.message_id, channel };
       }
     } else {
-      // Text message
-      if (botInstance && typeof botInstance.sendMessage === 'function') {
-        try {
-          const res = (await botInstance.sendMessage(channel, cleanText, {
-            parse_mode: 'HTML',
-          })) as { message_id?: number };
-          if (res?.message_id) {
-            sentOk = true;
-            messageId = res.message_id;
-          }
-        } catch {}
+      // Plain text message
+      const textRes = await sendTelegramApi('sendMessage', {
+        chat_id: channel,
+        text: cleanText,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup,
+      });
+      if (textRes.ok && textRes.result?.message_id) {
+        return { success: true, messageId: textRes.result.message_id, channel };
       }
-
-      if (!sentOk) {
-        const apiRes = await sendTelegramApi('sendMessage', {
-          chat_id: channel,
-          text: cleanText,
-          parse_mode: 'HTML',
-        });
-        if (apiRes.ok) {
-          sentOk = true;
-          messageId = apiRes.result?.message_id;
-        } else {
-          return { success: false, channel, error: apiRes.description };
-        }
-      }
+      return {
+        success: false,
+        channel,
+        error: textRes.description || 'Gagal mengirim pesan ke channel',
+      };
     }
 
-    return { success: true, messageId, channel };
+    return { success: false, channel, error: 'Gagal menyiarkan media ke channel' };
   } catch (err) {
     const errorMsg = (err as Error).message || String(err);
     return { success: false, error: errorMsg };

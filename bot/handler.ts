@@ -277,6 +277,100 @@ export async function sendSafePhoto(
 }
 
 /**
+ * Extract media information from any Telegram message (document, photo, video, audio, etc.)
+ */
+export function extractMediaFromMessage(message: any): {
+  hasMedia: boolean;
+  type: 'document' | 'photo' | 'video' | 'audio' | 'voice' | 'sticker' | 'animation' | 'none';
+  fileId?: string;
+  fileName?: string;
+  mimeType?: string;
+  fromChatId?: number | string;
+  messageId?: number;
+} {
+  if (!message) return { hasMedia: false, type: 'none' };
+
+  const fromChatId = message.chat?.id;
+  const messageId = message.message_id;
+
+  if (message.document) {
+    return {
+      hasMedia: true,
+      type: 'document',
+      fileId: message.document.file_id,
+      fileName: message.document.file_name || 'dokumen.txt',
+      mimeType: message.document.mime_type,
+      fromChatId,
+      messageId,
+    };
+  }
+  if (message.photo && Array.isArray(message.photo) && message.photo.length > 0) {
+    const largest = message.photo[message.photo.length - 1];
+    return {
+      hasMedia: true,
+      type: 'photo',
+      fileId: largest.file_id,
+      fileName: 'foto.jpg',
+      fromChatId,
+      messageId,
+    };
+  }
+  if (message.video) {
+    return {
+      hasMedia: true,
+      type: 'video',
+      fileId: message.video.file_id,
+      fileName: message.video.file_name || 'video.mp4',
+      mimeType: message.video.mime_type,
+      fromChatId,
+      messageId,
+    };
+  }
+  if (message.audio) {
+    return {
+      hasMedia: true,
+      type: 'audio',
+      fileId: message.audio.file_id,
+      fileName: message.audio.file_name || 'audio.mp3',
+      mimeType: message.audio.mime_type,
+      fromChatId,
+      messageId,
+    };
+  }
+  if (message.voice) {
+    return {
+      hasMedia: true,
+      type: 'voice',
+      fileId: message.voice.file_id,
+      fileName: 'voice.ogg',
+      fromChatId,
+      messageId,
+    };
+  }
+  if (message.animation) {
+    return {
+      hasMedia: true,
+      type: 'animation',
+      fileId: message.animation.file_id,
+      fileName: message.animation.file_name || 'animasi.gif',
+      fromChatId,
+      messageId,
+    };
+  }
+  if (message.sticker) {
+    return {
+      hasMedia: true,
+      type: 'sticker',
+      fileId: message.sticker.file_id,
+      fromChatId,
+      messageId,
+    };
+  }
+
+  return { hasMedia: false, type: 'none', fromChatId, messageId };
+}
+
+/**
  * Register all command handlers and default text responders to the bot instance
  */
 export function registerHandlers(botInstance: ExtendedBot): void {
@@ -390,7 +484,7 @@ export function registerHandlers(botInstance: ExtendedBot): void {
     await sendAdminPanel(ctx, botInstance);
   });
 
-  botInstance.command('kirim', async (ctx: Context) => {
+  const handleKirimCommand = async (ctx: Context) => {
     const { isAdmin } = await import('../lib/pricing');
     if (ctx.from?.id && !isAdmin(ctx.from?.id)) {
       await sendSafeMessage(
@@ -407,16 +501,31 @@ export function registerHandlers(botInstance: ExtendedBot): void {
       return;
     }
 
-    const text = ctx.message?.text || '';
-    const parts = text.trim().split(/\s+/);
+    const rawText = ctx.message?.text || ctx.message?.caption || '';
+    const parts = rawText.trim().split(/\s+/);
     const orderCode = parts[1];
     const credentials = parts.slice(2).join(' ');
 
-    if (!orderCode || !credentials) {
+    // Check if media is attached directly to the message or via reply_to_message
+    const replyMsg = ctx.message?.reply_to_message;
+    const mediaSource = (replyMsg && extractMediaFromMessage(replyMsg).hasMedia)
+      ? replyMsg
+      : ctx.message;
+    const mediaData = extractMediaFromMessage(mediaSource);
+
+    if (!orderCode || (!credentials && !mediaData.hasMedia)) {
       await sendSafeMessage(
         ctx,
         botInstance,
-        '⚡ Format pengiriman admin: <code>/kirim &lt;order_code&gt; &lt;username/akun&gt;</code>',
+        '⚡ <b>PANDUAN PENGIRIMAN KREDENSIAL MANUAL (/kirim)</b>\n' +
+        '━━━━━━━━━━━━━━━━━━━\n' +
+        '<b>1. Kirim File / Dokumen (contoh: .txt):</b>\n' +
+        '• Upload file <code>.txt</code> / dokumen / foto dengan caption:\n' +
+        '  <code>/kirim &lt;order_code&gt; [keterangan opsional]</code>\n' +
+        '• Atau balas (reply) file yang sudah ada dengan perintah:\n' +
+        '  <code>/kirim &lt;order_code&gt; [keterangan opsional]</code>\n\n' +
+        '<b>2. Kirim Teks Biasa:</b>\n' +
+        '• <code>/kirim &lt;order_code&gt; &lt;email:password&gt;</code>',
         {
           parse_mode: 'HTML',
           reply_markup: {
@@ -428,9 +537,11 @@ export function registerHandlers(botInstance: ExtendedBot): void {
     }
 
     const { adminManualFulfill } = await import('../lib/fulfillment');
-    const result = await adminManualFulfill(orderCode, credentials, botInstance);
+    const result = await adminManualFulfill(orderCode, credentials, botInstance, mediaData);
     await sendSafeMessage(ctx, botInstance, result.message, { parse_mode: 'HTML' });
-  });
+  };
+
+  botInstance.command('kirim', handleKirimCommand);
 
   botInstance.command('konfirmasi', async (ctx: Context) => {
     if (!isAdmin(ctx.from?.id)) {
@@ -734,48 +845,79 @@ export function registerHandlers(botInstance: ExtendedBot): void {
       return;
     }
 
-    const text = ctx.message?.text || '';
-    const parts = text.trim().split(/\s+/);
+    const rawText = ctx.message?.text || ctx.message?.caption || '';
+    const parts = rawText.trim().split(/\s+/);
     const broadcastBody = parts.slice(1).join(' ').trim();
+    const media = extractMediaFromMessage(ctx.message);
 
-    if (!broadcastBody) {
+    if (!broadcastBody && !media.hasMedia) {
       const { sendAdminBroadcastMenu } = await import('./menu');
       await sendAdminBroadcastMenu(ctx, botInstance);
       return;
     }
 
     const { sendAdminBroadcastPreview } = await import('./menu');
-    await sendAdminBroadcastPreview(ctx, botInstance, broadcastBody);
+    await sendAdminBroadcastPreview(ctx, botInstance, {
+      chatId: ctx.message?.chat?.id || ctx.from?.id,
+      fromChatId: ctx.message?.chat?.id || ctx.from?.id,
+      messageId: ctx.message?.message_id,
+      type: media.type,
+      fileId: media.fileId,
+      fileName: media.fileName,
+      text: broadcastBody,
+    });
   };
 
   botInstance.command('broadcast', handleBroadcastCommand);
   botInstance.command('bc', handleBroadcastCommand);
 
-  // Fallback for general non-command text messages (interactive panel, no typing required)
+  // Fallback for general non-command text & media messages (interactive panel, no typing required)
   botInstance.on('message', async (ctx: Context) => {
-    const text = ctx.message?.text?.trim();
+    const rawText = ctx.message?.text?.trim() || ctx.message?.caption?.trim() || '';
 
-    // Check if admin is currently in waiting_broadcast_text state
+    // Handle /kirim sent as caption on media attachments
+    if (rawText.startsWith('/kirim')) {
+      await handleKirimCommand(ctx);
+      return;
+    }
+
+    // Handle /broadcast or /bc sent as caption on media attachments
+    if (rawText.startsWith('/broadcast') || rawText.startsWith('/bc')) {
+      await handleBroadcastCommand(ctx);
+      return;
+    }
+
+    // Check if admin is currently in waiting_broadcast state (accepts ANY media or text)
     const chatId = ctx.chatId || ctx.message?.chat?.id || ctx.from?.id;
-    if (chatId && text && isAdmin(ctx.from?.id)) {
+    if (chatId && isAdmin(ctx.from?.id)) {
       const { getAdminWaitingBroadcast, clearAdminBroadcastState, sendAdminBroadcastPreview, sendAdminBroadcastMenu } = await import('./menu');
       if (getAdminWaitingBroadcast(chatId)) {
         clearAdminBroadcastState(chatId);
-        if (text === '/cancel' || text.toLowerCase() === 'batal') {
+        if (rawText === '/cancel' || rawText.toLowerCase() === 'batal') {
           await sendAdminBroadcastMenu(ctx, botInstance);
           return;
         }
-        await sendAdminBroadcastPreview(ctx, botInstance, text);
+
+        const media = extractMediaFromMessage(ctx.message);
+        await sendAdminBroadcastPreview(ctx, botInstance, {
+          chatId,
+          fromChatId: chatId,
+          messageId: ctx.message?.message_id,
+          type: media.type,
+          fileId: media.fileId,
+          fileName: media.fileName,
+          text: rawText,
+        });
         return;
       }
     }
 
     // Ignore commands as they are handled by command handlers
-    if (text && text.startsWith('/')) {
+    if (rawText && rawText.startsWith('/')) {
       return;
     }
 
-    if (text) {
+    if (rawText) {
       const status = await getBotStatus();
       if (status === 'maintenance' && !isAdmin(ctx.from?.id)) {
         await sendMaintenanceMessage(ctx, botInstance);
