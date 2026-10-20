@@ -639,7 +639,7 @@ export async function checkAndProcessUnpaidShopeeOrders(
       `SELECT o.*
        FROM orders o
        WHERE o.payment_status = 'unpaid'
-         AND o.created_at >= NOW() - INTERVAL '60 minutes'
+         AND o.created_at >= NOW() - INTERVAL '24 hours'
        ORDER BY o.created_at DESC
        LIMIT 10`
     );

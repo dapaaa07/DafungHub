@@ -245,7 +245,7 @@ setInterval(async () => {
        FROM orders o
        LEFT JOIN products p ON o.product_id = p.id
        WHERE o.payment_status = 'unpaid'
-         AND o.created_at >= NOW() - INTERVAL '60 minutes'
+         AND o.created_at >= NOW() - INTERVAL '24 hours'
        ORDER BY o.created_at DESC LIMIT 10`
     );
 
