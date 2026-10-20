@@ -621,8 +621,11 @@ export async function getPendingQueueOrders(limit: number = 50): Promise<
   return res.rows;
 }
 
+let lastSessionExpiredAlert = 0;
+
 /**
  * Periodically or on-demand checks all recent unpaid ShopeePay orders against incoming transactions.
+ * Also performs continuous session keep-alive pings to prevent ShopeePay idle timeouts.
  */
 export async function checkAndProcessUnpaidShopeeOrders(
   botInstance: ExtendedBot
@@ -640,6 +643,42 @@ export async function checkAndProcessUnpaidShopeeOrders(
        ORDER BY o.created_at DESC
        LIMIT 10`
     );
+
+    // If no unpaid orders in queue, perform lightweight keep-alive heartbeat ping to Shopee gateway
+    if (unpaidOrders.rows.length === 0) {
+      try {
+        const { SHOPEEPAY_BASE_URL, SHOPEEPAY_API_KEY } = await import('./shopeepay');
+        const baseUrl = SHOPEEPAY_BASE_URL.replace(/\/+$/, '');
+        const pingRes = await fetch(`${baseUrl}/transactions?page_size=1`, {
+          method: 'GET',
+          headers: {
+            'x-api-key': SHOPEEPAY_API_KEY,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!pingRes.ok) {
+          const errData = await pingRes.json().catch(() => null);
+          const errMsg = errData?.error || '';
+          if (errMsg.includes('login timeout') || errData?.code === 200020) {
+            const now = Date.now();
+            if (now - lastSessionExpiredAlert > 2 * 60 * 60 * 1000) {
+              lastSessionExpiredAlert = now;
+              const { ADMIN_TELEGRAM_ID } = await import('./pricing');
+              const { sendSafeMessage } = await import('../bot/handler');
+              await sendSafeMessage(
+                { chatId: ADMIN_TELEGRAM_ID } as never,
+                botInstance,
+                `🚨 <b>PERINGATAN GATEWAY: Sesi ShopeePay Kedaluwarsa!</b>\n━━━━━━━━━━━━━━━━━━━\nGateway melaporkan: <code>login timeout, please login again (code 200020)</code>.\n\n⚠️ <i>Mutasi QRIS tidak dapat dibaca otomatis sampai Anda login ulang di bot penyedia gateway (prastyaaneki). Untuk sementara gunakan menu <b>⏳ Konfirmasi Order Belum Bayar</b> atau perintah <code>/konfirmasi &lt;kode_order&gt;</code>.</i>`,
+                { parse_mode: 'HTML' }
+              ).catch(() => {});
+            }
+          }
+        }
+      } catch {
+        // Suppress ping error
+      }
+      return 0;
+    }
 
     for (const ord of unpaidOrders.rows) {
       const invData =
@@ -665,6 +704,19 @@ export async function checkAndProcessUnpaidShopeeOrders(
           console.log(`[Auto-Check] Payment confirmed for order: ${ord.order_code}`);
           await processOrderPayment(ord.order_code, botInstance, checkResult.transaction as any);
           confirmedCount++;
+        } else if (checkResult.status === 'gateway_session_expired') {
+          const now = Date.now();
+          if (now - lastSessionExpiredAlert > 2 * 60 * 60 * 1000) {
+            lastSessionExpiredAlert = now;
+            const { ADMIN_TELEGRAM_ID } = await import('./pricing');
+            const { sendSafeMessage } = await import('../bot/handler');
+            await sendSafeMessage(
+              { chatId: ADMIN_TELEGRAM_ID } as never,
+              botInstance,
+              `🚨 <b>PERINGATAN GATEWAY: Sesi ShopeePay Kedaluwarsa!</b>\n━━━━━━━━━━━━━━━━━━━\nGateway melaporkan: <code>login timeout, please login again (code 200020)</code>.\n\n⚠️ <i>Mutasi QRIS tidak dapat dibaca otomatis sampai Anda login ulang di bot penyedia gateway (prastyaaneki). Untuk sementara gunakan menu <b>⏳ Konfirmasi Order Belum Bayar</b> atau perintah <code>/konfirmasi &lt;kode_order&gt;</code>.</i>`,
+              { parse_mode: 'HTML' }
+            ).catch(() => {});
+          }
         }
       }
     }

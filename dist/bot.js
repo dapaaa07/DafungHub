@@ -19056,6 +19056,44 @@ async function checkAndProcessUnpaidShopeeOrders(botInstance) {
        ORDER BY o.created_at DESC
        LIMIT 10`
     );
+    if (unpaidOrders.rows.length === 0) {
+      try {
+        const { SHOPEEPAY_BASE_URL: SHOPEEPAY_BASE_URL2, SHOPEEPAY_API_KEY: SHOPEEPAY_API_KEY2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
+        const baseUrl = SHOPEEPAY_BASE_URL2.replace(/\/+$/, "");
+        const pingRes = await fetch(`${baseUrl}/transactions?page_size=1`, {
+          method: "GET",
+          headers: {
+            "x-api-key": SHOPEEPAY_API_KEY2,
+            "Content-Type": "application/json"
+          }
+        });
+        if (!pingRes.ok) {
+          const errData = await pingRes.json().catch(() => null);
+          const errMsg = errData?.error || "";
+          if (errMsg.includes("login timeout") || errData?.code === 200020) {
+            const now = Date.now();
+            if (now - lastSessionExpiredAlert > 2 * 60 * 60 * 1e3) {
+              lastSessionExpiredAlert = now;
+              const { ADMIN_TELEGRAM_ID: ADMIN_TELEGRAM_ID3 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
+              const { sendSafeMessage: sendSafeMessage2 } = await Promise.resolve().then(() => (init_handler(), handler_exports));
+              await sendSafeMessage2(
+                { chatId: ADMIN_TELEGRAM_ID3 },
+                botInstance,
+                `\u{1F6A8} <b>PERINGATAN GATEWAY: Sesi ShopeePay Kedaluwarsa!</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Gateway melaporkan: <code>login timeout, please login again (code 200020)</code>.
+
+\u26A0\uFE0F <i>Mutasi QRIS tidak dapat dibaca otomatis sampai Anda login ulang di bot penyedia gateway (prastyaaneki). Untuk sementara gunakan menu <b>\u23F3 Konfirmasi Order Belum Bayar</b> atau perintah <code>/konfirmasi &lt;kode_order&gt;</code>.</i>`,
+                { parse_mode: "HTML" }
+              ).catch(() => {
+              });
+            }
+          }
+        }
+      } catch {
+      }
+      return 0;
+    }
     for (const ord of unpaidOrders.rows) {
       const invData = typeof ord.invoice_data === "string" ? JSON.parse(ord.invoice_data || "{}") : ord.invoice_data || {};
       const actualAmount = Number(invData.payable_amount) || Number(invData.amount) || 0;
@@ -19071,6 +19109,24 @@ async function checkAndProcessUnpaidShopeeOrders(botInstance) {
           console.log(`[Auto-Check] Payment confirmed for order: ${ord.order_code}`);
           await processOrderPayment(ord.order_code, botInstance, checkResult.transaction);
           confirmedCount++;
+        } else if (checkResult.status === "gateway_session_expired") {
+          const now = Date.now();
+          if (now - lastSessionExpiredAlert > 2 * 60 * 60 * 1e3) {
+            lastSessionExpiredAlert = now;
+            const { ADMIN_TELEGRAM_ID: ADMIN_TELEGRAM_ID3 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
+            const { sendSafeMessage: sendSafeMessage2 } = await Promise.resolve().then(() => (init_handler(), handler_exports));
+            await sendSafeMessage2(
+              { chatId: ADMIN_TELEGRAM_ID3 },
+              botInstance,
+              `\u{1F6A8} <b>PERINGATAN GATEWAY: Sesi ShopeePay Kedaluwarsa!</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Gateway melaporkan: <code>login timeout, please login again (code 200020)</code>.
+
+\u26A0\uFE0F <i>Mutasi QRIS tidak dapat dibaca otomatis sampai Anda login ulang di bot penyedia gateway (prastyaaneki). Untuk sementara gunakan menu <b>\u23F3 Konfirmasi Order Belum Bayar</b> atau perintah <code>/konfirmasi &lt;kode_order&gt;</code>.</i>`,
+              { parse_mode: "HTML" }
+            ).catch(() => {
+            });
+          }
         }
       }
     }
@@ -19079,6 +19135,7 @@ async function checkAndProcessUnpaidShopeeOrders(botInstance) {
   }
   return confirmedCount;
 }
+var lastSessionExpiredAlert;
 var init_fulfillment = __esm({
   "lib/fulfillment.ts"() {
     "use strict";
@@ -19088,6 +19145,7 @@ var init_fulfillment = __esm({
     init_handler();
     init_pricing();
     init_broadcast();
+    lastSessionExpiredAlert = 0;
   }
 });
 
@@ -46159,6 +46217,19 @@ var init_buy = __esm({
 });
 
 // bot/handler.ts
+var handler_exports = {};
+__export(handler_exports, {
+  bot: () => bot,
+  cleanupChatMessages: () => cleanupChatMessages,
+  clearPreviousBotMessages: () => clearPreviousBotMessages,
+  default: () => handler_default,
+  handleWebhookUpdate: () => handleWebhookUpdate,
+  initBot: () => initBot,
+  recordBotMessage: () => recordBotMessage,
+  registerHandlers: () => registerHandlers,
+  sendSafeMessage: () => sendSafeMessage,
+  sendSafePhoto: () => sendSafePhoto
+});
 function escapeHtml6(str) {
   if (!str) return "";
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -46825,7 +46896,7 @@ async function initBot(options) {
 async function handleWebhookUpdate(update) {
   await bot.handleUpdate(update);
 }
-var import_node_telegram_bot_api, activeBotMessages, bot;
+var import_node_telegram_bot_api, activeBotMessages, bot, handler_default;
 var init_handler = __esm({
   "bot/handler.ts"() {
     "use strict";
@@ -46845,6 +46916,7 @@ var init_handler = __esm({
     if (process.env.NODE_ENV !== "production") {
       globalThis.telegramBotGlobal = bot;
     }
+    handler_default = bot;
   }
 });
 
