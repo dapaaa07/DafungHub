@@ -503,12 +503,28 @@ export async function adminManualFulfill(
 
   await query(
     `UPDATE orders
-     SET fulfillment_status = 'delivered',
+     SET payment_status = 'paid',
+         fulfillment_status = 'delivered',
          credential_encrypted = $1,
          delivered_at = CURRENT_TIMESTAMP
      WHERE id = $2`,
     [encryptedKey, order.id]
   );
+
+  // If order was unpaid, apply voucher usage now
+  if (order.payment_status !== 'paid') {
+    const invData = (order.invoice_data as Record<string, unknown>) || {};
+    if (invData.voucher_id) {
+      const { applyVoucherUsage } = await import('./voucher');
+      const discountAmount = Number(invData.voucher_discount || invData.voucher_cashback || 0);
+      await applyVoucherUsage({
+        voucherId: String(invData.voucher_id),
+        userId: order.user_id,
+        orderId: order.id,
+        discountAmount,
+      }).catch(() => {});
+    }
+  }
 
   // Send account credentials to the buyer
   const buyerMessage =

@@ -4,6 +4,16 @@ import { sendMainMenu, sendMaintenanceMessage, registerMenuHandlers } from './me
 import { getBotStatus } from '../lib/settings';
 import { isAdmin } from '../lib/pricing';
 
+function escapeHtml(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Auto-load .env for standalone scripts / bot runners outside Next.js runtime
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   try {
@@ -420,6 +430,77 @@ export function registerHandlers(botInstance: ExtendedBot): void {
     const { adminManualFulfill } = await import('../lib/fulfillment');
     const result = await adminManualFulfill(orderCode, credentials, botInstance);
     await sendSafeMessage(ctx, botInstance, result.message, { parse_mode: 'HTML' });
+  });
+
+  botInstance.command('konfirmasi', async (ctx: Context) => {
+    if (!isAdmin(ctx.from?.id)) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '⛔ <b>Akses Ditolak:</b> Perintah ini hanya dapat dijalankan oleh Owner DaFung Hub.',
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [[{ text: '🔙 Menu Utama', callback_data: 'menu_main' }]],
+          },
+        }
+      );
+      return;
+    }
+
+    const text = ctx.message?.text || '';
+    const parts = text.trim().split(/\s+/);
+    const orderCode = parts[1];
+
+    if (!orderCode) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '⚡ <b>Format Konfirmasi Pembayaran Manual:</b>\n<code>/konfirmasi &lt;order_code&gt;</code>\n\nContoh:\n<code>/konfirmasi ORD-1792344112-6ZAWS</code>',
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [[{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }]],
+          },
+        }
+      );
+      return;
+    }
+
+    try {
+      const { processOrderPayment } = await import('../lib/fulfillment');
+      const result = await processOrderPayment(orderCode, botInstance);
+      if (result.success) {
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `✅ <b>PEMBAYARAN BERHASIL DIKONFIRMASI!</b>\n━━━━━━━━━━━━━━━━━━━\n• <b>Kode Order:</b> <code>${escapeHtml(orderCode)}</code>\n• <b>Status Fulfillment:</b> ${result.mode}\n• <b>Pesan:</b> ${escapeHtml(result.message)}\n\nPembeli telah menerima notifikasi dan broadcast channel telah dikirim.`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '📦 Buka Antrean Pesanan', callback_data: 'admin_queue' }],
+                [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+              ],
+            },
+          }
+        );
+      } else {
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `❌ <b>Gagal Konfirmasi:</b> ${escapeHtml(result.message)}`,
+          { parse_mode: 'HTML' }
+        );
+      }
+    } catch (err) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        `❌ Terjadi kesalahan saat memproses order: ${(err as Error).message}`,
+        { parse_mode: 'HTML' }
+      );
+    }
   });
 
   botInstance.command('addstock', async (ctx: Context) => {

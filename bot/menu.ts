@@ -1195,6 +1195,23 @@ export async function sendOrderStatus(
           if (updatedOrd.rows.length > 0) {
             o = updatedOrd.rows[0];
           }
+        } else if (checkResult.status === 'gateway_session_expired') {
+          await sendSafeMessage(
+            ctx,
+            botInstance,
+            `⏳ <b>STATUS PEMBAYARAN: MENUNGGU VERIFIKASI</b>\n━━━━━━━━━━━━━━━━━━━\n• <b>Kode Order:</b> <code>${escapeHtml(o.order_code)}</code>\n• <b>Total Tagihan:</b> <b>Rp ${actualAmount.toLocaleString('id-ID')}</b>\n\n💡 <i>Catatan: Sinkronisasi mutasi otomatis gateway sedang mengalami jeda. Jika Anda sudah transfer / scan QRIS, silakan kirim bukti bayar ke Admin agar pesanan langsung diaktifkan secara instan!</i>`,
+            {
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '🔄 Cek Ulang Status', callback_data: `check_order_${o.order_code}` }],
+                  [{ text: '💬 Hubungi Owner / Admin ↗', url: 'https://t.me/DappaSecc' }],
+                  [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+                ],
+              },
+            }
+          );
+          return;
         }
       }
     } catch (checkErr) {
@@ -1354,6 +1371,9 @@ export async function sendAdminPanel(ctx: Context, botInstance: ExtendedBot): Pr
           callback_data: 'admin_queue',
         },
         { text: '📊 Riwayat Penjualan', callback_data: 'admin_orders' },
+      ],
+      [
+        { text: '⏳ Konfirmasi Order Belum Bayar', callback_data: 'admin_unpaid_orders' },
       ],
       [
         { text: '👥 Tampilan Pembeli (Preview)', callback_data: 'menu_main' },
@@ -1860,6 +1880,76 @@ export async function sendAdminAddVoucherMenu(
 }
 
 /**
+ * Send Admin Unpaid Orders Menu (orders waiting for payment with 1-click confirmation)
+ */
+export async function sendAdminUnpaidOrdersMenu(
+  ctx: Context,
+  botInstance: ExtendedBot
+): Promise<void> {
+  if (!isAdmin(ctx.from?.id)) return;
+
+  const res = await query<Order & { telegram_id: string; product_name: string; product_price: number }>(
+    `SELECT o.*, u.telegram_id, p.name as product_name, COALESCE(p.price, 0) as product_price
+     FROM orders o
+     JOIN users u ON o.user_id = u.id
+     LEFT JOIN products p ON o.product_id = p.id
+     WHERE o.payment_status = 'unpaid'
+       AND o.created_at >= NOW() - INTERVAL '48 hours'
+     ORDER BY o.created_at DESC
+     LIMIT 10`
+  );
+
+  const unpaidOrders = res.rows;
+  let text =
+    `⏳ <b>DAFTAR ORDER MENUNGGU PEMBAYARAN (48 JAM TERAKHIR)</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `Jika pelanggan sudah transfer namun sesi gateway ShopeePay sedang timeout, klik tombol konfirmasi di bawah untuk mengaktifkan order secara instan:\n\n`;
+
+  const buttons = [];
+
+  if (unpaidOrders.length === 0) {
+    text += `<i>Tidak ada order yang sedang menunggu pembayaran saat ini.</i>\n`;
+  } else {
+    for (const ord of unpaidOrders) {
+      const invData =
+        typeof ord.invoice_data === 'string'
+          ? JSON.parse(ord.invoice_data || '{}')
+          : (ord.invoice_data || {});
+      const actualAmount =
+        Number(invData.payable_amount) ||
+        Number(invData.amount) ||
+        Number(ord.product_price) ||
+        0;
+
+      const buyerName = invData.customer_username ? `@${invData.customer_username}` : ord.telegram_id;
+
+      text +=
+        `• <b>Kode:</b> <code>${escapeHtml(ord.order_code)}</code>\n` +
+        `  📦 <b>${escapeHtml(ord.product_name || 'Produk')}</b>\n` +
+        `  💰 Tagihan: <b>Rp ${actualAmount.toLocaleString('id-ID')}</b>\n` +
+        `  👤 Pembeli: <b>${escapeHtml(String(buyerName))}</b>\n\n`;
+
+      buttons.push([
+        {
+          text: `✅ Konfirmasi: ${ord.order_code} (Rp ${actualAmount.toLocaleString('id-ID')})`,
+          callback_data: `admin_confirm_pay_${ord.order_code}`,
+        },
+      ]);
+    }
+  }
+
+  buttons.push([
+    { text: '🔄 Refresh', callback_data: 'admin_unpaid_orders' },
+    { text: '🔙 Panel Owner', callback_data: 'admin_panel' },
+  ]);
+
+  await sendSafeMessage(ctx, botInstance, text, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: buttons },
+  });
+}
+
+/**
  * Register all menu button and callback handlers
  */
 export function registerMenuHandlers(botInstance: ExtendedBot): void {
@@ -1909,6 +1999,28 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
         await sendAdminBalanceMenu(ctx, botInstance);
       } else if (data === 'admin_orders') {
         await sendAdminOrdersMenu(ctx, botInstance);
+      } else if (data === 'admin_unpaid_orders') {
+        await sendAdminUnpaidOrdersMenu(ctx, botInstance);
+      } else if (data.startsWith('admin_confirm_pay_')) {
+        if (!isAdmin(ctx.from?.id)) return;
+        const ordCode = data.replace('admin_confirm_pay_', '');
+        const { processOrderPayment } = await import('../lib/fulfillment');
+        const res = await processOrderPayment(ordCode, botInstance);
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `✅ <b>Order ${escapeHtml(ordCode)} Berhasil Dikonfirmasi!</b>\n━━━━━━━━━━━━━━━━━━━\n• <b>Mode:</b> ${res.mode}\n• <b>Keterangan:</b> ${escapeHtml(res.message)}\n\nPembeli telah otomatis menerima notifikasi dan broadcast pembayaran telah dikirim ke channel.`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '⏳ Cek Order Belum Bayar', callback_data: 'admin_unpaid_orders' }],
+                [{ text: '📦 Buka Antrean Pesanan', callback_data: 'admin_queue' }],
+                [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+              ],
+            },
+          }
+        );
       } else if (data === 'admin_vouchers') {
         await sendAdminVouchersMenu(ctx, botInstance);
       } else if (data === 'admin_voucher_add') {

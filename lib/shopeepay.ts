@@ -242,7 +242,7 @@ export async function checkShopeePayPayment(params: {
   orderCode?: string;
   amount?: number;
   orderCreatedAt?: string | Date;
-}): Promise<{ paid: boolean; status: string; transaction?: unknown }> {
+}): Promise<{ paid: boolean; status: string; transaction?: unknown; error?: string }> {
   const baseUrl = SHOPEEPAY_BASE_URL.replace(/\/+$/, '');
 
   // 1. If a valid gateway token exists (not our internal `shopee_` fallback), query POST /v1/payment/check
@@ -360,6 +360,17 @@ export async function checkShopeePayPayment(params: {
             transaction: match,
           };
         }
+      }
+    } else {
+      const errJson = await txRes.json().catch(() => null);
+      const errMsg = errJson?.error || errJson?.message || '';
+      console.warn(`[ShopeePay Gateway] GET /transactions returned ${txRes.status}:`, errJson || errMsg);
+      if (errMsg.includes('login timeout') || errJson?.code === 200020) {
+        return {
+          paid: false,
+          status: 'gateway_session_expired',
+          error: 'Sesi ShopeePay di gateway kedaluwarsa (login timeout). Harap login ulang akun Shopee di gateway.',
+        };
       }
     }
   } catch (txErr) {

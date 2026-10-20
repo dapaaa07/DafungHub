@@ -18516,6 +18516,17 @@ async function checkShopeePayPayment(params) {
           };
         }
       }
+    } else {
+      const errJson = await txRes.json().catch(() => null);
+      const errMsg = errJson?.error || errJson?.message || "";
+      console.warn(`[ShopeePay Gateway] GET /transactions returned ${txRes.status}:`, errJson || errMsg);
+      if (errMsg.includes("login timeout") || errJson?.code === 200020) {
+        return {
+          paid: false,
+          status: "gateway_session_expired",
+          error: "Sesi ShopeePay di gateway kedaluwarsa (login timeout). Harap login ulang akun Shopee di gateway."
+        };
+      }
     }
   } catch (txErr) {
     console.warn("[ShopeePay] /transactions error:", txErr);
@@ -18940,12 +18951,27 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance) {
   const encryptedKey = encrypt(cleanKey);
   await query(
     `UPDATE orders
-     SET fulfillment_status = 'delivered',
+     SET payment_status = 'paid',
+         fulfillment_status = 'delivered',
          credential_encrypted = $1,
          delivered_at = CURRENT_TIMESTAMP
      WHERE id = $2`,
     [encryptedKey, order.id]
   );
+  if (order.payment_status !== "paid") {
+    const invData = order.invoice_data || {};
+    if (invData.voucher_id) {
+      const { applyVoucherUsage: applyVoucherUsage2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+      const discountAmount = Number(invData.voucher_discount || invData.voucher_cashback || 0);
+      await applyVoucherUsage2({
+        voucherId: String(invData.voucher_id),
+        userId: order.user_id,
+        orderId: order.id,
+        discountAmount
+      }).catch(() => {
+      });
+    }
+  }
   const buyerMessage = `\u{1F389} <b>PESANAN ANDA TELAH SELESAI!</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u{1F4E6} <b>Produk:</b> ${escapeHtml2(order.product_name)}
@@ -19289,6 +19315,7 @@ __export(menu_exports, {
   sendAdminPanel: () => sendAdminPanel,
   sendAdminPricesMenu: () => sendAdminPricesMenu,
   sendAdminQueueMenu: () => sendAdminQueueMenu,
+  sendAdminUnpaidOrdersMenu: () => sendAdminUnpaidOrdersMenu,
   sendAdminVoucherDetail: () => sendAdminVoucherDetail,
   sendAdminVouchersMenu: () => sendAdminVouchersMenu,
   sendApiMenu: () => sendApiMenu,
@@ -20178,6 +20205,28 @@ async function sendOrderStatus(ctx, botInstance, orderCode) {
           if (updatedOrd.rows.length > 0) {
             o = updatedOrd.rows[0];
           }
+        } else if (checkResult.status === "gateway_session_expired") {
+          await sendSafeMessage(
+            ctx,
+            botInstance,
+            `\u23F3 <b>STATUS PEMBAYARAN: MENUNGGU VERIFIKASI</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u2022 <b>Kode Order:</b> <code>${escapeHtml4(o.order_code)}</code>
+\u2022 <b>Total Tagihan:</b> <b>Rp ${actualAmount.toLocaleString("id-ID")}</b>
+
+\u{1F4A1} <i>Catatan: Sinkronisasi mutasi otomatis gateway sedang mengalami jeda. Jika Anda sudah transfer / scan QRIS, silakan kirim bukti bayar ke Admin agar pesanan langsung diaktifkan secara instan!</i>`,
+            {
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "\u{1F504} Cek Ulang Status", callback_data: `check_order_${o.order_code}` }],
+                  [{ text: "\u{1F4AC} Hubungi Owner / Admin \u2197", url: "https://t.me/DappaSecc" }],
+                  [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+                ]
+              }
+            }
+          );
+          return;
         }
       }
     } catch (checkErr) {
@@ -20301,6 +20350,9 @@ Gunakan panel kontrol di bawah untuk mengelola bisnis:`;
           callback_data: "admin_queue"
         },
         { text: "\u{1F4CA} Riwayat Penjualan", callback_data: "admin_orders" }
+      ],
+      [
+        { text: "\u23F3 Konfirmasi Order Belum Bayar", callback_data: "admin_unpaid_orders" }
       ],
       [
         { text: "\u{1F465} Tampilan Pembeli (Preview)", callback_data: "menu_main" }
@@ -20704,6 +20756,56 @@ Atau klik salah satu <b>Preset Siap Pakai</b> di bawah untuk langsung generate:`
     reply_markup: { inline_keyboard: buttons }
   });
 }
+async function sendAdminUnpaidOrdersMenu(ctx, botInstance) {
+  if (!isAdmin(ctx.from?.id)) return;
+  const res = await query(
+    `SELECT o.*, u.telegram_id, p.name as product_name, COALESCE(p.price, 0) as product_price
+     FROM orders o
+     JOIN users u ON o.user_id = u.id
+     LEFT JOIN products p ON o.product_id = p.id
+     WHERE o.payment_status = 'unpaid'
+       AND o.created_at >= NOW() - INTERVAL '48 hours'
+     ORDER BY o.created_at DESC
+     LIMIT 10`
+  );
+  const unpaidOrders = res.rows;
+  let text = `\u23F3 <b>DAFTAR ORDER MENUNGGU PEMBAYARAN (48 JAM TERAKHIR)</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Jika pelanggan sudah transfer namun sesi gateway ShopeePay sedang timeout, klik tombol konfirmasi di bawah untuk mengaktifkan order secara instan:
+
+`;
+  const buttons = [];
+  if (unpaidOrders.length === 0) {
+    text += `<i>Tidak ada order yang sedang menunggu pembayaran saat ini.</i>
+`;
+  } else {
+    for (const ord of unpaidOrders) {
+      const invData = typeof ord.invoice_data === "string" ? JSON.parse(ord.invoice_data || "{}") : ord.invoice_data || {};
+      const actualAmount = Number(invData.payable_amount) || Number(invData.amount) || Number(ord.product_price) || 0;
+      const buyerName = invData.customer_username ? `@${invData.customer_username}` : ord.telegram_id;
+      text += `\u2022 <b>Kode:</b> <code>${escapeHtml4(ord.order_code)}</code>
+  \u{1F4E6} <b>${escapeHtml4(ord.product_name || "Produk")}</b>
+  \u{1F4B0} Tagihan: <b>Rp ${actualAmount.toLocaleString("id-ID")}</b>
+  \u{1F464} Pembeli: <b>${escapeHtml4(String(buyerName))}</b>
+
+`;
+      buttons.push([
+        {
+          text: `\u2705 Konfirmasi: ${ord.order_code} (Rp ${actualAmount.toLocaleString("id-ID")})`,
+          callback_data: `admin_confirm_pay_${ord.order_code}`
+        }
+      ]);
+    }
+  }
+  buttons.push([
+    { text: "\u{1F504} Refresh", callback_data: "admin_unpaid_orders" },
+    { text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }
+  ]);
+  await sendSafeMessage(ctx, botInstance, text, {
+    parse_mode: "HTML",
+    reply_markup: { inline_keyboard: buttons }
+  });
+}
 function registerMenuHandlers(botInstance) {
   botInstance.on("callback_query", async (ctx) => {
     const data = ctx.callbackQuery?.data || "";
@@ -20744,6 +20846,33 @@ function registerMenuHandlers(botInstance) {
         await sendAdminBalanceMenu(ctx, botInstance);
       } else if (data === "admin_orders") {
         await sendAdminOrdersMenu(ctx, botInstance);
+      } else if (data === "admin_unpaid_orders") {
+        await sendAdminUnpaidOrdersMenu(ctx, botInstance);
+      } else if (data.startsWith("admin_confirm_pay_")) {
+        if (!isAdmin(ctx.from?.id)) return;
+        const ordCode = data.replace("admin_confirm_pay_", "");
+        const { processOrderPayment: processOrderPayment2 } = await Promise.resolve().then(() => (init_fulfillment(), fulfillment_exports));
+        const res = await processOrderPayment2(ordCode, botInstance);
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `\u2705 <b>Order ${escapeHtml4(ordCode)} Berhasil Dikonfirmasi!</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u2022 <b>Mode:</b> ${res.mode}
+\u2022 <b>Keterangan:</b> ${escapeHtml4(res.message)}
+
+Pembeli telah otomatis menerima notifikasi dan broadcast pembayaran telah dikirim ke channel.`,
+          {
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "\u23F3 Cek Order Belum Bayar", callback_data: "admin_unpaid_orders" }],
+                [{ text: "\u{1F4E6} Buka Antrean Pesanan", callback_data: "admin_queue" }],
+                [{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]
+              ]
+            }
+          }
+        );
       } else if (data === "admin_vouchers") {
         await sendAdminVouchersMenu(ctx, botInstance);
       } else if (data === "admin_voucher_add") {
@@ -46030,6 +46159,10 @@ var init_buy = __esm({
 });
 
 // bot/handler.ts
+function escapeHtml6(str) {
+  if (!str) return "";
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
 function recordBotMessage(chatId, messageId) {
   const key = String(chatId);
   if (!activeBotMessages.has(key)) {
@@ -46305,6 +46438,79 @@ function registerHandlers(botInstance) {
     const { adminManualFulfill: adminManualFulfill2 } = await Promise.resolve().then(() => (init_fulfillment(), fulfillment_exports));
     const result = await adminManualFulfill2(orderCode, credentials, botInstance);
     await sendSafeMessage(ctx, botInstance, result.message, { parse_mode: "HTML" });
+  });
+  botInstance.command("konfirmasi", async (ctx) => {
+    if (!isAdmin(ctx.from?.id)) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        "\u26D4 <b>Akses Ditolak:</b> Perintah ini hanya dapat dijalankan oleh Owner DaFung Hub.",
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [[{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]]
+          }
+        }
+      );
+      return;
+    }
+    const text = ctx.message?.text || "";
+    const parts = text.trim().split(/\s+/);
+    const orderCode = parts[1];
+    if (!orderCode) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        "\u26A1 <b>Format Konfirmasi Pembayaran Manual:</b>\n<code>/konfirmasi &lt;order_code&gt;</code>\n\nContoh:\n<code>/konfirmasi ORD-1792344112-6ZAWS</code>",
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [[{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]]
+          }
+        }
+      );
+      return;
+    }
+    try {
+      const { processOrderPayment: processOrderPayment2 } = await Promise.resolve().then(() => (init_fulfillment(), fulfillment_exports));
+      const result = await processOrderPayment2(orderCode, botInstance);
+      if (result.success) {
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `\u2705 <b>PEMBAYARAN BERHASIL DIKONFIRMASI!</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u2022 <b>Kode Order:</b> <code>${escapeHtml6(orderCode)}</code>
+\u2022 <b>Status Fulfillment:</b> ${result.mode}
+\u2022 <b>Pesan:</b> ${escapeHtml6(result.message)}
+
+Pembeli telah menerima notifikasi dan broadcast channel telah dikirim.`,
+          {
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "\u{1F4E6} Buka Antrean Pesanan", callback_data: "admin_queue" }],
+                [{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]
+              ]
+            }
+          }
+        );
+      } else {
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `\u274C <b>Gagal Konfirmasi:</b> ${escapeHtml6(result.message)}`,
+          { parse_mode: "HTML" }
+        );
+      }
+    } catch (err) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        `\u274C Terjadi kesalahan saat memproses order: ${err.message}`,
+        { parse_mode: "HTML" }
+      );
+    }
   });
   botInstance.command("addstock", async (ctx) => {
     await sendSafeMessage(
