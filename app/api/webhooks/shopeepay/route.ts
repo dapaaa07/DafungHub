@@ -27,11 +27,42 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const orderId =
+    let targetOrderCode =
       data.order_id || data.order_code || data.merchant_ref || data.token;
     const status = String(
-      data.status || data.payment_status || ''
+      data.status || data.payment_status || 'paid'
     ).toLowerCase();
+
+    // 2. If no direct order code, extract amount from data or notification text (for MacroDroid / Notification Listeners)
+    if (!targetOrderCode) {
+      let detectedAmount = Number((data as Record<string, unknown>).amount || (data as Record<string, unknown>).nominal || 0);
+      if (!detectedAmount) {
+        const fullText = `${(data as Record<string, unknown>).text || ''} ${(data as Record<string, unknown>).message || ''} ${(data as Record<string, unknown>).body || ''} ${rawBody}`;
+        const match = fullText.match(/(?:rp\.?|idr)\s*([0-9.,]+)/i) || fullText.match(/([0-9]{3,7})/);
+        if (match) {
+          const clean = match[1].replace(/[^0-9]/g, '');
+          detectedAmount = parseInt(clean, 10);
+        }
+      }
+
+      if (detectedAmount > 0) {
+        const { query } = await import('../../../../lib/db');
+        const matchOrd = await query<{ order_code: string }>(
+          `SELECT order_code FROM orders
+           WHERE payment_status = 'unpaid'
+             AND (
+               (invoice_data->>'payable_amount')::numeric = $1
+               OR (invoice_data->>'amount')::numeric = $1
+             )
+             AND created_at >= NOW() - INTERVAL '60 minutes'
+           ORDER BY created_at DESC LIMIT 1`,
+          [detectedAmount]
+        );
+        if (matchOrd.rows.length > 0) {
+          targetOrderCode = matchOrd.rows[0].order_code;
+        }
+      }
+    }
 
     const isPaid =
       status === 'success' ||
@@ -39,21 +70,21 @@ export async function POST(req: NextRequest) {
       status === 'settlement' ||
       status === 'completed';
 
-    if (isPaid && orderId) {
-      console.log(`[ShopeePay Webhook] Payment confirmed for order: ${orderId}`);
-      await processOrderPayment(orderId, bot);
+    if (isPaid && targetOrderCode) {
+      console.log(`[ShopeePay Webhook] Payment confirmed for order: ${targetOrderCode}`);
+      await processOrderPayment(targetOrderCode, bot);
 
       return NextResponse.json({
         success: true,
         message: 'ShopeePay payment successfully confirmed',
-        order_id: orderId,
+        order_code: targetOrderCode,
       });
     }
 
     return NextResponse.json({
       success: true,
       message: `ShopeePay status received: ${status || 'unknown'}`,
-      order_id: orderId,
+      order_id: targetOrderCode,
     });
   } catch (error) {
     console.error('[ShopeePay Webhook Error]:', error);
