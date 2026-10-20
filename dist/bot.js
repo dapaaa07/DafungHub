@@ -2543,23 +2543,23 @@ var require_serializer = __commonJS({
         /* code.startup */
       );
     };
-    var query2 = (text) => {
+    var query3 = (text) => {
       return writer.addCString(text).flush(
         81
         /* code.query */
       );
     };
     var emptyArray = [];
-    var parse = (query3) => {
-      const name = query3.name || "";
+    var parse = (query4) => {
+      const name = query4.name || "";
       if (name.length > 63) {
         console.error("Warning! Postgres only supports 63 characters for query names.");
         console.error("You supplied %s (%s)", name, name.length);
         console.error("This can cause conflicts and silent errors executing queries");
       }
-      const types2 = query3.types || emptyArray;
+      const types2 = query4.types || emptyArray;
       const len = types2.length;
-      const buffer = writer.addCString(name).addCString(query3.text).addInt16(len);
+      const buffer = writer.addCString(name).addCString(query4.text).addInt16(len);
       for (let i = 0; i < len; i++) {
         buffer.addInt32(types2[i]);
       }
@@ -2696,7 +2696,7 @@ var require_serializer = __commonJS({
       requestSsl,
       sendSASLInitialResponseMessage,
       sendSCRAMClientFinalMessage,
-      query: query2,
+      query: query3,
       parse,
       bind,
       execute,
@@ -3326,8 +3326,8 @@ var require_connection = __commonJS({
         this._send(serialize.query(text));
       }
       // send parse message
-      parse(query2) {
-        this._send(serialize.parse(query2));
+      parse(query3) {
+        this._send(serialize.parse(query3));
       }
       // send bind message
       bind(config) {
@@ -3788,9 +3788,9 @@ var require_client = __commonJS({
         return this._activeQuery;
       }
       _errorAllQueries(err) {
-        const enqueueError = (query2) => {
+        const enqueueError = (query3) => {
           process.nextTick(() => {
-            query2.handleError(err, this.connection);
+            query3.handleError(err, this.connection);
           });
         };
         const activeQuery = this._getActiveQuery();
@@ -4155,8 +4155,8 @@ var require_client = __commonJS({
         }
         return data;
       }
-      cancel(client, query2) {
-        if (client.activeQuery === query2) {
+      cancel(client, query3) {
+        if (client.activeQuery === query3) {
           const con = this.connection;
           if (this.host && this.host.indexOf("/") === 0) {
             con.connect(this.host + "/.s.PGSQL." + this.port);
@@ -4166,10 +4166,10 @@ var require_client = __commonJS({
           con.on("connect", function() {
             con.cancel(client.processID, client.secretKey);
           });
-        } else if (client._queryQueue.indexOf(query2) !== -1) {
-          client._queryQueue.splice(client._queryQueue.indexOf(query2), 1);
-        } else if (client._sentQueryQueue.indexOf(query2) !== -1) {
-          query2.callback = () => {
+        } else if (client._queryQueue.indexOf(query3) !== -1) {
+          client._queryQueue.splice(client._queryQueue.indexOf(query3), 1);
+        } else if (client._sentQueryQueue.indexOf(query3) !== -1) {
+          query3.callback = () => {
           };
         }
       }
@@ -4218,16 +4218,16 @@ var require_client = __commonJS({
           return;
         }
         while (this._queryQueue.length > 0) {
-          const query2 = this._queryQueue.shift();
+          const query3 = this._queryQueue.shift();
           this.hasExecuted = true;
-          const queryError = query2.submit(this.connection);
+          const queryError = query3.submit(this.connection);
           if (queryError) {
             process.nextTick(() => {
-              query2.handleError(queryError, this.connection);
+              query3.handleError(queryError, this.connection);
             });
             continue;
           }
-          this._sentQueryQueue.push(query2);
+          this._sentQueryQueue.push(query3);
         }
         if (this.readyForQuery && !this._activeQuery && this._sentQueryQueue.length > 0) {
           this._activeQuery = this._sentQueryQueue.shift();
@@ -4238,46 +4238,46 @@ var require_client = __commonJS({
         }
       }
       query(config, values, callback) {
-        let query2;
+        let query3;
         let result;
         if (config == null) {
           throw new TypeError("Client was passed a null or undefined query");
         }
         if (typeof config.submit === "function") {
-          result = query2 = config;
-          if (!query2.callback) {
+          result = query3 = config;
+          if (!query3.callback) {
             if (typeof values === "function") {
-              query2.callback = values;
+              query3.callback = values;
             } else if (callback) {
-              query2.callback = callback;
+              query3.callback = callback;
             }
           }
         } else {
-          query2 = new Query2(config, values, callback);
-          if (!query2.callback) {
+          query3 = new Query2(config, values, callback);
+          if (!query3.callback) {
             result = new this._Promise((resolve, reject) => {
-              query2.callback = (err, res) => err ? reject(err) : resolve(res);
+              query3.callback = (err, res) => err ? reject(err) : resolve(res);
             }).catch((err) => {
               Error.captureStackTrace(err);
               throw err;
             });
-          } else if (typeof query2.callback !== "function") {
+          } else if (typeof query3.callback !== "function") {
             throw new TypeError("callback is not a function");
           }
         }
         const readTimeout = config.query_timeout || this.connectionParameters.query_timeout;
         if (readTimeout) {
-          const queryCallback = query2.callback || (() => {
+          const queryCallback = query3.callback || (() => {
           });
           const readTimeoutTimer = setTimeout(() => {
             const error = new Error("Query read timeout");
             process.nextTick(() => {
-              query2.handleError(error, this.connection);
+              query3.handleError(error, this.connection);
             });
             queryCallback(error);
-            query2.callback = () => {
+            query3.callback = () => {
             };
-            const index = this._queryQueue.indexOf(query2);
+            const index = this._queryQueue.indexOf(query3);
             if (index > -1) {
               this._queryQueue.splice(index, 1);
             } else if (this.pipeline) {
@@ -4286,42 +4286,42 @@ var require_client = __commonJS({
             }
             this._pulseQueryQueue();
           }, readTimeout);
-          query2.callback = (err, res) => {
+          query3.callback = (err, res) => {
             clearTimeout(readTimeoutTimer);
             queryCallback(err, res);
           };
         }
-        if (this.binary && !query2.binary) {
-          query2.binary = true;
+        if (this.binary && !query3.binary) {
+          query3.binary = true;
         }
-        if (query2._result && !query2._result._types) {
-          query2._result._types = this._types;
+        if (query3._result && !query3._result._types) {
+          query3._result._types = this._types;
         }
         if (this.pipeline) {
-          const portalQuery = typeof config.submit === "function" && !(query2 instanceof Query2) ? "Custom query classes such as pg-cursor and pg-query-stream are" : query2.rows ? "The `rows` option is" : null;
+          const portalQuery = typeof config.submit === "function" && !(query3 instanceof Query2) ? "Custom query classes such as pg-cursor and pg-query-stream are" : query3.rows ? "The `rows` option is" : null;
           if (portalQuery) {
             process.nextTick(() => {
-              query2.handleError(new Error(`${portalQuery} not supported in pipeline mode`), this.connection);
+              query3.handleError(new Error(`${portalQuery} not supported in pipeline mode`), this.connection);
             });
             return result;
           }
         }
         if (!this._queryable) {
           process.nextTick(() => {
-            query2.handleError(new Error("Client has encountered a connection error and is not queryable"), this.connection);
+            query3.handleError(new Error("Client has encountered a connection error and is not queryable"), this.connection);
           });
           return result;
         }
         if (this._ending) {
           process.nextTick(() => {
-            query2.handleError(new Error("Client was closed and is not queryable"), this.connection);
+            query3.handleError(new Error("Client was closed and is not queryable"), this.connection);
           });
           return result;
         }
         if (this._queryQueue.length > 0 && !this.pipeline) {
           queryQueueLengthDeprecationNotice();
         }
-        this._queryQueue.push(query2);
+        this._queryQueue.push(query3);
         this._pulseQueryQueue();
         return result;
       }
@@ -4992,10 +4992,10 @@ var require_client2 = __commonJS({
     Client2.Query = NativeQuery;
     util.inherits(Client2, EventEmitter);
     Client2.prototype._errorAllQueries = function(err) {
-      const enqueueError = (query2) => {
+      const enqueueError = (query3) => {
         process.nextTick(() => {
-          query2.native = this.native;
-          query2.handleError(err);
+          query3.native = this.native;
+          query3.handleError(err);
         });
       };
       if (this._hasActiveQuery()) {
@@ -5054,7 +5054,7 @@ var require_client2 = __commonJS({
       });
     };
     Client2.prototype.query = function(config, values, callback) {
-      let query2;
+      let query3;
       let result;
       let readTimeout;
       let readTimeoutTimer;
@@ -5063,14 +5063,14 @@ var require_client2 = __commonJS({
         throw new TypeError("Client was passed a null or undefined query");
       } else if (typeof config.submit === "function") {
         readTimeout = config.query_timeout || this.connectionParameters.query_timeout;
-        result = query2 = config;
+        result = query3 = config;
         if (typeof values === "function") {
           config.callback = values;
         }
       } else {
         readTimeout = config.query_timeout || this.connectionParameters.query_timeout;
-        query2 = new NativeQuery(config, values, callback);
-        if (!query2.callback) {
+        query3 = new NativeQuery(config, values, callback);
+        if (!query3.callback) {
           let resolveOut, rejectOut;
           result = new this._Promise((resolve, reject) => {
             resolveOut = resolve;
@@ -5079,49 +5079,49 @@ var require_client2 = __commonJS({
             Error.captureStackTrace(err);
             throw err;
           });
-          query2.callback = (err, res) => err ? rejectOut(err) : resolveOut(res);
+          query3.callback = (err, res) => err ? rejectOut(err) : resolveOut(res);
         }
       }
       if (readTimeout) {
-        queryCallback = query2.callback || (() => {
+        queryCallback = query3.callback || (() => {
         });
         readTimeoutTimer = setTimeout(() => {
           const error = new Error("Query read timeout");
           process.nextTick(() => {
-            query2.handleError(error, this.connection);
+            query3.handleError(error, this.connection);
           });
           queryCallback(error);
-          query2.callback = () => {
+          query3.callback = () => {
           };
-          const index = this._queryQueue.indexOf(query2);
+          const index = this._queryQueue.indexOf(query3);
           if (index > -1) {
             this._queryQueue.splice(index, 1);
           }
           this._pulseQueryQueue();
         }, readTimeout);
-        query2.callback = (err, res) => {
+        query3.callback = (err, res) => {
           clearTimeout(readTimeoutTimer);
           queryCallback(err, res);
         };
       }
       if (!this._queryable) {
-        query2.native = this.native;
+        query3.native = this.native;
         process.nextTick(() => {
-          query2.handleError(new Error("Client has encountered a connection error and is not queryable"));
+          query3.handleError(new Error("Client has encountered a connection error and is not queryable"));
         });
         return result;
       }
       if (this._ending) {
-        query2.native = this.native;
+        query3.native = this.native;
         process.nextTick(() => {
-          query2.handleError(new Error("Client was closed and is not queryable"));
+          query3.handleError(new Error("Client was closed and is not queryable"));
         });
         return result;
       }
       if (this._queryQueue.length > 0 && !this.pipeline) {
         queryQueueLengthDeprecationNotice();
       }
-      this._queryQueue.push(query2);
+      this._queryQueue.push(query3);
       this._pulseQueryQueue();
       return result;
     };
@@ -5170,17 +5170,17 @@ var require_client2 = __commonJS({
       if (this._hasActiveQuery()) {
         return;
       }
-      const query2 = this._queryQueue.shift();
-      if (!query2) {
+      const query3 = this._queryQueue.shift();
+      if (!query3) {
         if (!initialConnection) {
           this.emit("drain");
         }
         return;
       }
-      this._activeQuery = query2;
-      query2.submit(this);
+      this._activeQuery = query3;
+      query3.submit(this);
       const self2 = this;
-      query2.once("_done", function() {
+      query3.once("_done", function() {
         self2._pulseQueryQueue();
       });
     };
@@ -5200,15 +5200,15 @@ var require_client2 = __commonJS({
       const nativeQueries = [];
       const utils = require_utils();
       while (this._queryQueue.length > 0) {
-        const query2 = this._queryQueue.shift();
+        const query3 = this._queryQueue.shift();
         this.hasExecuted = true;
-        nativeQueries.push(query2);
-        const values = query2.values ? query2.values.map(utils.prepareValue) : null;
-        const pipelineEntry = { text: query2.text, name: query2.name, arrayMode: query2._arrayMode };
+        nativeQueries.push(query3);
+        const values = query3.values ? query3.values.map(utils.prepareValue) : null;
+        const pipelineEntry = { text: query3.text, name: query3.name, arrayMode: query3._arrayMode };
         if (values) {
           pipelineEntry.values = values;
         }
-        if (query2.name && this.namedQueries[query2.name]) {
+        if (query3.name && this.namedQueries[query3.name]) {
           pipelineEntry._alreadyPrepared = true;
         }
         queries.push(pipelineEntry);
@@ -5251,12 +5251,12 @@ var require_client2 = __commonJS({
         self2._pulsePipelinedQueryQueue();
       });
     };
-    Client2.prototype.cancel = function(query2) {
-      if (this._activeQuery === query2) {
+    Client2.prototype.cancel = function(query3) {
+      if (this._activeQuery === query3) {
         this.native.cancel(function() {
         });
-      } else if (this._queryQueue.indexOf(query2) !== -1) {
-        this._queryQueue.splice(this._queryQueue.indexOf(query2), 1);
+      } else if (this._queryQueue.indexOf(query3) !== -1) {
+        this._queryQueue.splice(this._queryQueue.indexOf(query3), 1);
       }
     };
     Client2.prototype.ref = function() {
@@ -5378,7 +5378,7 @@ __export(db_exports, {
   getClient: () => getClient,
   getPool: () => getPool,
   pool: () => pool,
-  query: () => query,
+  query: () => query2,
   testConnection: () => testConnection
 });
 function createPool() {
@@ -5395,7 +5395,7 @@ function createPool() {
 function getPool() {
   return pool;
 }
-async function query(text, params) {
+async function query2(text, params) {
   const start2 = Date.now();
   const res = await pool.query(text, params);
   const duration = Date.now() - start2;
@@ -5448,7 +5448,7 @@ async function getBotStatus() {
     return cachedStatus;
   }
   try {
-    const res = await query(
+    const res = await query2(
       "SELECT value FROM bot_settings WHERE key = $1 LIMIT 1",
       ["bot_status"]
     );
@@ -5467,7 +5467,7 @@ async function getBotStatus() {
 }
 async function setBotStatus(status) {
   try {
-    await query(
+    await query2(
       `INSERT INTO bot_settings (key, value, updated_at)
        VALUES ('bot_status', $1, CURRENT_TIMESTAMP)
        ON CONFLICT (key) DO UPDATE
@@ -5636,7 +5636,7 @@ async function getCustomPrices() {
   }
   const priceMap = /* @__PURE__ */ new Map();
   try {
-    await query(`
+    await query2(`
       CREATE TABLE IF NOT EXISTS product_prices (
         product_id VARCHAR(100) PRIMARY KEY,
         product_name VARCHAR(255),
@@ -5645,7 +5645,7 @@ async function getCustomPrices() {
       )
     `).catch(() => {
     });
-    const res = await query(
+    const res = await query2(
       "SELECT product_id, custom_price FROM product_prices"
     );
     for (const row of res.rows) {
@@ -5668,7 +5668,7 @@ async function setCustomPrice(productId, price, productName) {
   cachedCustomPrices.set(cleanId, cleanPrice);
   customPricesExpiry = Date.now() + PRICES_CACHE_TTL_MS;
   try {
-    await query(`
+    await query2(`
       CREATE TABLE IF NOT EXISTS product_prices (
         product_id VARCHAR(100) PRIMARY KEY,
         product_name VARCHAR(255),
@@ -5677,7 +5677,7 @@ async function setCustomPrice(productId, price, productName) {
       )
     `).catch(() => {
     });
-    await query(
+    await query2(
       `INSERT INTO product_prices (product_id, product_name, custom_price, updated_at)
        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
        ON CONFLICT (product_id) DO UPDATE
@@ -5686,7 +5686,7 @@ async function setCustomPrice(productId, price, productName) {
            updated_at = CURRENT_TIMESTAMP`,
       [cleanId, productName || null, cleanPrice]
     );
-    await query(
+    await query2(
       `UPDATE products SET price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 OR name = $3`,
       [cleanPrice, cleanId, productName || cleanId]
     ).catch(() => {
@@ -5703,7 +5703,7 @@ async function deleteCustomPrice(productId) {
     customPricesExpiry = 0;
   }
   try {
-    await query("DELETE FROM product_prices WHERE product_id = $1 OR product_name = $1", [cleanId]);
+    await query2("DELETE FROM product_prices WHERE product_id = $1 OR product_name = $1", [cleanId]);
   } catch (err) {
     console.error("[CustomPrices] Failed to delete custom price from DB:", err);
   }
@@ -12919,7 +12919,7 @@ function formatWibDateTime(dateInput) {
 }
 async function getBroadcastChannel() {
   try {
-    const res = await query(
+    const res = await query2(
       `SELECT value FROM bot_settings WHERE key = 'broadcast_channel' LIMIT 1`
     );
     if (res.rows.length > 0 && res.rows[0].value?.trim()) {
@@ -12932,7 +12932,7 @@ async function getBroadcastChannel() {
 async function setBroadcastChannel(channel) {
   const clean = channel.trim();
   const formatted = clean.startsWith("@") || clean.startsWith("-100") ? clean : `@${clean}`;
-  await query(
+  await query2(
     `INSERT INTO bot_settings (key, value, updated_at)
      VALUES ('broadcast_channel', $1, CURRENT_TIMESTAMP)
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
@@ -12941,7 +12941,7 @@ async function setBroadcastChannel(channel) {
 }
 async function isAutoOrderBroadcastEnabled() {
   try {
-    const res = await query(
+    const res = await query2(
       `SELECT value FROM bot_settings WHERE key = 'broadcast_auto_order' LIMIT 1`
     );
     if (res.rows.length > 0) {
@@ -12952,7 +12952,7 @@ async function isAutoOrderBroadcastEnabled() {
   return true;
 }
 async function setAutoOrderBroadcastEnabled(enabled) {
-  await query(
+  await query2(
     `INSERT INTO bot_settings (key, value, updated_at)
      VALUES ('broadcast_auto_order', $1, CURRENT_TIMESTAMP)
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
@@ -13013,7 +13013,7 @@ async function broadcastOrderSuccess(orderCode, botInstance) {
     if (!isEnabled) {
       return { success: true, error: "Auto-broadcast is disabled in settings" };
     }
-    const orderRes = await query(
+    const orderRes = await query2(
       `SELECT o.id, o.order_code, o.is_broadcasted, o.delivered_at, o.created_at, o.invoice_data,
               p.name as product_name, p.price as product_price,
               u.username, u.first_name
@@ -13079,7 +13079,7 @@ async function broadcastOrderSuccess(orderCode, botInstance) {
         return { success: false, error: errMsg };
       }
     }
-    await query(
+    await query2(
       `UPDATE orders SET is_broadcasted = true WHERE id = $1`,
       [ord.id]
     ).catch(() => {
@@ -13247,7 +13247,7 @@ async function createVoucher(params) {
   const discountType = params.discountType || "nominal";
   const minOrder = Math.max(0, params.minOrderAmount || 0);
   const maxUses = Math.max(1, params.maxUses || 10);
-  const res = await query(
+  const res = await query2(
     `INSERT INTO vouchers (
        code,
        type,
@@ -13277,7 +13277,7 @@ async function createVoucher(params) {
   return res.rows[0];
 }
 async function getAllVouchers() {
-  const res = await query(
+  const res = await query2(
     `SELECT 
        v.id,
        v.code,
@@ -13301,7 +13301,7 @@ async function getAllVouchers() {
 async function getVoucherByCode(code) {
   if (!code) return null;
   const cleanCode = code.trim().toUpperCase();
-  const res = await query(
+  const res = await query2(
     `SELECT 
        v.id,
        v.code,
@@ -13324,18 +13324,18 @@ async function getVoucherByCode(code) {
   return res.rows[0] || null;
 }
 async function deleteVoucher(voucherId) {
-  const res = await query(`DELETE FROM vouchers WHERE id = $1 RETURNING id`, [voucherId]);
+  const res = await query2(`DELETE FROM vouchers WHERE id = $1 RETURNING id`, [voucherId]);
   return res.rowCount !== null && res.rowCount > 0;
 }
 async function toggleVoucherStatus(voucherId, isActive) {
-  const res = await query(
+  const res = await query2(
     `UPDATE vouchers SET is_active = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id`,
     [isActive, voucherId]
   );
   return res.rowCount !== null && res.rowCount > 0;
 }
 async function hasUserUsedVoucher(voucherId, userId) {
-  const res = await query(
+  const res = await query2(
     `SELECT id FROM voucher_usages WHERE voucher_id = $1 AND user_id = $2 LIMIT 1`,
     [voucherId, userId]
   );
@@ -13358,7 +13358,7 @@ async function validateVoucherForTransaction(params) {
   }
   let resolvedUserId = params.userId;
   if (!resolvedUserId && params.telegramId) {
-    const userRes = await query(
+    const userRes = await query2(
       `SELECT id FROM users WHERE telegram_id = $1 LIMIT 1`,
       [params.telegramId]
     );
@@ -13496,13 +13496,13 @@ async function validateVoucherForTransaction(params) {
 }
 async function applyVoucherUsage(params) {
   try {
-    await query(
+    await query2(
       `INSERT INTO voucher_usages (voucher_id, user_id, order_id, discount_amount, created_at)
        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
        ON CONFLICT (voucher_id, user_id) DO NOTHING`,
       [params.voucherId, params.userId, params.orderId || null, params.discountAmount]
     );
-    await query(
+    await query2(
       `UPDATE vouchers
        SET used_count = (SELECT COUNT(*)::int FROM voucher_usages WHERE voucher_id = $1),
            updated_at = CURRENT_TIMESTAMP
@@ -13583,7 +13583,7 @@ function formatWibDate(dateInput) {
   return `${day} ${month} ${year}, ${hours}:${minutes} WIB`;
 }
 async function getUserMembership(telegramIdOrUserId) {
-  const userRes = await query(
+  const userRes = await query2(
     `SELECT id, telegram_id, membership_tier, membership_expires_at,
             weekly_discount_used, weekly_discount_reset_at
      FROM users
@@ -13618,7 +13618,7 @@ async function getUserMembership(telegramIdOrUserId) {
   if (!resetAt || now.getTime() >= resetAt.getTime()) {
     weeklyUsed = 0;
     resetAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1e3);
-    await query(
+    await query2(
       `UPDATE users
        SET weekly_discount_used = 0,
            weekly_discount_reset_at = $1
@@ -13667,7 +13667,7 @@ async function calculateCheckoutPrice(telegramIdOrUserId, product) {
 }
 async function recordDiscountUsage(userId, discountAmount) {
   if (discountAmount <= 0) return;
-  await query(
+  await query2(
     `UPDATE users
      SET weekly_discount_used = weekly_discount_used + $1
      WHERE id = $2`,
@@ -13678,7 +13678,7 @@ async function recordDiscountUsage(userId, discountAmount) {
 }
 async function activateOrExtendMembership(userId, durationDays) {
   try {
-    const userRes = await query(
+    const userRes = await query2(
       `SELECT membership_expires_at, weekly_discount_reset_at FROM users WHERE id = $1 LIMIT 1`,
       [userId]
     );
@@ -13701,7 +13701,7 @@ async function activateOrExtendMembership(userId, durationDays) {
     if (!resetAt) {
       resetAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1e3);
     }
-    await query(
+    await query2(
       `UPDATE users
        SET membership_tier = 'vip',
            membership_expires_at = $1,
@@ -18476,8 +18476,8 @@ async function checkShopeePayPayment(params) {
         const orderTime = params.orderCreatedAt ? new Date(params.orderCreatedAt).getTime() : 0;
         let claimedTxIds = /* @__PURE__ */ new Set();
         try {
-          const { query: query2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-          const claimedRes = await query2(
+          const { query: query3 } = await Promise.resolve().then(() => (init_db(), db_exports));
+          const claimedRes = await query3(
             `SELECT invoice_data->>'shopeepay_tx_id' as tx_id
              FROM orders
              WHERE payment_status = 'paid'
@@ -18563,7 +18563,7 @@ function escapeHtml2(str) {
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 async function processOrderPayment(orderCode, botInstance, transactionMeta) {
-  const orderRes = await query(
+  const orderRes = await query2(
     `SELECT o.*, u.telegram_id, p.name as product_name, p.price as product_price
      FROM orders o
      JOIN users u ON o.user_id = u.id
@@ -18589,7 +18589,7 @@ async function processOrderPayment(orderCode, botInstance, transactionMeta) {
   }
   if (transactionMeta?.transactionId) {
     const txId = String(transactionMeta.transactionId).trim();
-    await query(
+    await query2(
       `UPDATE orders
        SET payment_status = 'paid',
            invoice_data = jsonb_set(
@@ -18600,10 +18600,10 @@ async function processOrderPayment(orderCode, botInstance, transactionMeta) {
        WHERE id = $2`,
       [txId, order.id]
     ).catch(() => {
-      return query(`UPDATE orders SET payment_status = 'paid' WHERE id = $1`, [order.id]);
+      return query2(`UPDATE orders SET payment_status = 'paid' WHERE id = $1`, [order.id]);
     });
   } else {
-    await query(
+    await query2(
       `UPDATE orders SET payment_status = 'paid' WHERE id = $1`,
       [order.id]
     );
@@ -18636,7 +18636,7 @@ async function processOrderPayment(orderCode, botInstance, transactionMeta) {
     const act = await activateOrExtendMembership2(order.user_id, durationDays);
     const note = `Membership VIP diaktifkan hingga ${act.newExpiresAt.toISOString()}`;
     const encryptedNote = encrypt(note);
-    await query(
+    await query2(
       `UPDATE orders
        SET fulfillment_status = 'delivered',
            credential_encrypted = $1,
@@ -18698,14 +18698,14 @@ async function processOrderPayment(orderCode, botInstance, transactionMeta) {
     const depositAmount = order.product_price;
     const cashback = Number(invData.voucher_cashback || 0);
     const totalCredit = depositAmount + cashback;
-    await query(
+    await query2(
       `UPDATE users SET balance = balance + $1 WHERE id = $2`,
       [totalCredit, order.user_id]
     );
     const cashbackNote = cashback > 0 ? ` (+Bonus Cashback Voucher Rp ${cashback.toLocaleString("id-ID")})` : "";
     const confirmationMsg = `Top-up saldo akun sebesar Rp ${depositAmount.toLocaleString("id-ID")}${cashbackNote} berhasil.`;
     const encryptedNote = encrypt(confirmationMsg);
-    await query(
+    await query2(
       `UPDATE orders
        SET fulfillment_status = 'delivered',
            credential_encrypted = $1,
@@ -18790,7 +18790,7 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
       const deliveredKey = orderResp.delivered_key || orderResp.delivered_keys?.[0];
       if (deliveredKey) {
         const encryptedKey = encrypt(deliveredKey);
-        await query(
+        await query2(
           `UPDATE orders
            SET fulfillment_status = 'delivered',
                credential_encrypted = $1,
@@ -18853,7 +18853,7 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
       console.warn("[Fulfillment] Supplier order attempt failed, switching to Queue Mode:", suppErr);
     }
   }
-  await query(
+  await query2(
     `UPDATE orders SET fulfillment_status = 'processing' WHERE id = $1`,
     [order.id]
   );
@@ -18936,7 +18936,7 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance) {
   if (!cleanKey) {
     return { success: false, message: "Kredensial akun tidak boleh kosong." };
   }
-  const orderRes = await query(
+  const orderRes = await query2(
     `SELECT o.*, u.telegram_id, p.name as product_name
      FROM orders o
      JOIN users u ON o.user_id = u.id
@@ -18949,7 +18949,7 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance) {
   }
   const order = orderRes.rows[0];
   const encryptedKey = encrypt(cleanKey);
-  await query(
+  await query2(
     `UPDATE orders
      SET payment_status = 'paid',
          fulfillment_status = 'delivered',
@@ -19031,7 +19031,7 @@ Silakan top up di supplier terlebih dahulu, lalu klik tombol ini lagi, atau guna
   };
 }
 async function getPendingQueueOrders(limit = 50) {
-  const res = await query(
+  const res = await query2(
     `SELECT o.*, p.name as product_name, p.price as product_price, u.telegram_id
      FROM orders o
      JOIN products p ON o.product_id = p.id
@@ -19048,7 +19048,7 @@ async function checkAndProcessUnpaidShopeeOrders(botInstance) {
   if (gateway !== "shopeepay") return 0;
   let confirmedCount = 0;
   try {
-    const unpaidOrders = await query(
+    const unpaidOrders = await query2(
       `SELECT o.*
        FROM orders o
        WHERE o.payment_status = 'unpaid'
@@ -19169,7 +19169,7 @@ async function isForceChannelJoinEnabled() {
     return cachedGateEnabled;
   }
   try {
-    const res = await query(
+    const res = await query2(
       `SELECT value FROM bot_settings WHERE key = 'force_channel_join' LIMIT 1`
     );
     if (res.rows.length > 0) {
@@ -19185,7 +19185,7 @@ async function isForceChannelJoinEnabled() {
 }
 async function setForceChannelJoinEnabled(enabled) {
   try {
-    await query(
+    await query2(
       `INSERT INTO bot_settings (key, value, updated_at)
        VALUES ('force_channel_join', $1, CURRENT_TIMESTAMP)
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
@@ -19800,7 +19800,7 @@ async function sendProductDetail(ctx, botInstance, productId, platformId = "all"
     }
     if (!prod) {
       try {
-        const dbRes = await query("SELECT * FROM products WHERE id = $1 LIMIT 1", [productId]);
+        const dbRes = await query2("SELECT * FROM products WHERE id = $1 LIMIT 1", [productId]);
         if (dbRes.rows.length > 0) {
           const dbProd = dbRes.rows[0];
           prod = {
@@ -19925,14 +19925,14 @@ async function sendProfileMenu(ctx, botInstance) {
   let balance = 0;
   if (ctx.from?.id) {
     try {
-      const userRes = await query(
+      const userRes = await query2(
         `SELECT balance FROM users WHERE telegram_id = $1 LIMIT 1`,
         [String(ctx.from.id)]
       );
       if (userRes.rows.length > 0 && typeof userRes.rows[0].balance === "number") {
         balance = userRes.rows[0].balance;
       } else {
-        await query(
+        await query2(
           `INSERT INTO users (telegram_id, role, balance)
            VALUES ($1, $2, 0)
            ON CONFLICT (telegram_id) DO UPDATE SET telegram_id = EXCLUDED.telegram_id`,
@@ -20051,7 +20051,7 @@ async function sendOrdersMenu(ctx, botInstance) {
   const telegramId = ctx.from?.id ? String(ctx.from.id) : String(chatId);
   let ordersList = [];
   try {
-    const res = await query(
+    const res = await query2(
       `SELECT o.*, p.name as product_name
        FROM orders o
        JOIN users u ON o.user_id = u.id
@@ -20211,7 +20211,7 @@ async function sendOrderInvoice(ctx, botInstance, order) {
   });
 }
 async function sendOrderStatus(ctx, botInstance, orderCode) {
-  const ordRes = await query(
+  const ordRes = await query2(
     `SELECT o.*, p.name as product_name, p.price as product_price
      FROM orders o
      LEFT JOIN products p ON o.product_id = p.id
@@ -20253,7 +20253,7 @@ async function sendOrderStatus(ctx, botInstance, orderCode) {
           console.log(`[ShopeePay] Payment confirmed upon manual status refresh for order: ${o.order_code}`);
           const { processOrderPayment: processOrderPayment2 } = await Promise.resolve().then(() => (init_fulfillment(), fulfillment_exports));
           await processOrderPayment2(o.order_code, botInstance, checkResult.transaction);
-          const updatedOrd = await query(
+          const updatedOrd = await query2(
             `SELECT o.*, p.name as product_name, p.price as product_price
              FROM orders o
              LEFT JOIN products p ON o.product_id = p.id
@@ -20498,7 +20498,7 @@ async function sendAdminOrdersMenu(ctx, botInstance) {
   if (!isAdmin(ctx.from?.id)) return;
   let recentOrders = [];
   try {
-    const res = await query(
+    const res = await query2(
       `SELECT o.*, p.name as product_name, p.price as product_price, u.telegram_id
        FROM orders o
        JOIN products p ON o.product_id = p.id
@@ -20816,7 +20816,7 @@ Atau klik salah satu <b>Preset Siap Pakai</b> di bawah untuk langsung generate:`
 }
 async function sendAdminUnpaidOrdersMenu(ctx, botInstance) {
   if (!isAdmin(ctx.from?.id)) return;
-  const res = await query(
+  const res = await query2(
     `SELECT o.*, u.telegram_id, p.name as product_name, COALESCE(p.price, 0) as product_price
      FROM orders o
      JOIN users u ON o.user_id = u.id
@@ -21285,14 +21285,14 @@ Pesan telah diposting live di https://t.me/DafungHub.`,
       } else if (data.startsWith("dep_")) {
         const amount = parseInt(data.replace("dep_", ""), 10);
         const prodName = `Deposit Saldo Rp ${amount.toLocaleString("id-ID")}`;
-        const fakeProdRes = await query(
+        const fakeProdRes = await query2(
           `INSERT INTO products (name, price, stock, is_active)
            VALUES ($1, $2, 999, true)
            ON CONFLICT DO NOTHING
            RETURNING id`,
           [prodName, amount]
         );
-        const prodId = fakeProdRes.rows[0]?.id || (await query("SELECT id FROM products WHERE name = $1 LIMIT 1", [prodName])).rows[0]?.id;
+        const prodId = fakeProdRes.rows[0]?.id || (await query2("SELECT id FROM products WHERE name = $1 LIMIT 1", [prodName])).rows[0]?.id;
         if (prodId) {
           await handleBuy(ctx, prodId, botInstance);
         }
@@ -21504,7 +21504,7 @@ Contoh: <code>/voucher HEMAT5K</code>`,
       await sendSafeMessage(ctx, botInstance, `\u274C Kuota voucher "<b>${escapeHtml4(code)}</b>" telah habis (${v.used_count}/${v.max_uses} pengguna).`, { parse_mode: "HTML" });
       return;
     }
-    const userRes = await query("SELECT id FROM users WHERE telegram_id = $1 LIMIT 1", [String(ctx.from?.id)]);
+    const userRes = await query2("SELECT id FROM users WHERE telegram_id = $1 LIMIT 1", [String(ctx.from?.id)]);
     if (userRes.rows.length > 0) {
       const used = await hasUserUsedVoucher2(v.id, userRes.rows[0].id);
       if (used) {
@@ -21596,7 +21596,7 @@ __export(unique_code_exports, {
 });
 async function generateUniqueCheckoutAmount(baseAmount) {
   try {
-    const pendingOrders = await query(
+    const pendingOrders = await query2(
       `SELECT invoice_data FROM orders
        WHERE payment_status = 'unpaid'
          AND created_at >= NOW() - INTERVAL '60 minutes'`
@@ -45794,13 +45794,13 @@ function generateOrderCode() {
 async function ensureUser(telegramId, profile) {
   const cleanUsername = profile?.username ? profile.username.replace(/^@/, "") : null;
   const cleanFirstName = profile?.firstName || null;
-  const existingUser = await query(
+  const existingUser = await query2(
     "SELECT * FROM users WHERE telegram_id = $1",
     [telegramId]
   );
   if (existingUser.rows.length > 0) {
     if (cleanUsername || cleanFirstName) {
-      await query(
+      await query2(
         `UPDATE users
          SET username = COALESCE($1, username),
              first_name = COALESCE($2, first_name)
@@ -45811,7 +45811,7 @@ async function ensureUser(telegramId, profile) {
     }
     return existingUser.rows[0];
   }
-  const insertUser = await query(
+  const insertUser = await query2(
     `INSERT INTO users (telegram_id, role, username, first_name)
      VALUES ($1, 'buyer', $2, $3)
      ON CONFLICT (telegram_id) DO UPDATE SET
@@ -45860,7 +45860,7 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
   const { getCustomPrices: getCustomPrices2 } = await Promise.resolve().then(() => (init_custom_prices(), custom_prices_exports));
   const customPrices = await getCustomPrices2().catch(() => /* @__PURE__ */ new Map());
   try {
-    const res = await query(
+    const res = await query2(
       "SELECT * FROM products WHERE id = $1 AND is_active = true",
       [trimmedId]
     );
@@ -45876,7 +45876,7 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
       const pkgId = trimmedId.replace("membership_", "");
       const pkg = findMembershipPackage2(pkgId);
       if (pkg) {
-        const existingByName = await query(
+        const existingByName = await query2(
           "SELECT * FROM products WHERE name = $1 LIMIT 1",
           [pkg.name]
         );
@@ -45884,11 +45884,11 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
           product = existingByName.rows[0];
           if (product.price !== pkg.price) {
             product.price = pkg.price;
-            await query("UPDATE products SET price = $1 WHERE id = $2", [pkg.price, product.id]).catch(() => {
+            await query2("UPDATE products SET price = $1 WHERE id = $2", [pkg.price, product.id]).catch(() => {
             });
           }
         } else {
-          const ins = await query(
+          const ins = await query2(
             `INSERT INTO products (name, price, stock, is_active)
              VALUES ($1, $2, 9999, true)
              RETURNING *`,
@@ -45928,7 +45928,7 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
           return;
         }
         const effectivePrice = getEffectiveSellingPrice2(supp, customPrices);
-        const existingByName = await query(
+        const existingByName = await query2(
           "SELECT * FROM products WHERE name = $1 LIMIT 1",
           [supp.name]
         );
@@ -45936,14 +45936,14 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
           product = existingByName.rows[0];
           if (product.price !== effectivePrice) {
             product.price = effectivePrice;
-            await query(
+            await query2(
               "UPDATE products SET price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
               [effectivePrice, product.id]
             ).catch(() => {
             });
           }
         } else {
-          const ins = await query(
+          const ins = await query2(
             `INSERT INTO products (name, price, stock, is_active)
              VALUES ($1, $2, $3, true)
              RETURNING *`,
@@ -45978,7 +45978,7 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
       const customPrice = customPrices.get(product.id) ?? customPrices.get(product.name);
       if (customPrice && product.price !== customPrice) {
         product.price = customPrice;
-        await query(
+        await query2(
           "UPDATE products SET price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
           [customPrice, product.id]
         ).catch(() => {
@@ -46099,7 +46099,7 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
     );
     return;
   }
-  await query(
+  await query2(
     `INSERT INTO orders (
        user_id,
        product_id,
@@ -46978,15 +46978,57 @@ var server = import_http.default.createServer((req, res) => {
           return;
         }
         if (req.url?.includes("shopeepay")) {
-          const orderId = data.order_id || data.order_code || data.merchant_ref || data.token;
-          const status = String(data.status || data.payment_status || "").toLowerCase();
+          let orderId = data.order_id || data.order_code || data.merchant_ref || data.token;
+          const status = String(data.status || data.payment_status || "paid").toLowerCase();
+          let detectedAmount = Number(data.amount || data.nominal || 0);
+          if (!orderId) {
+            if (!detectedAmount) {
+              const fullText = `${data.notification || ""} ${data.text || ""} ${data.message || ""} ${data.body || ""} ${data.not_body || ""} ${rawBody}`;
+              const match = fullText.match(/(?:rp\.?|idr)\s*([0-9.,]+)/i) || fullText.match(/([0-9]{3,7})/);
+              if (match) {
+                const clean = match[1].replace(/[^0-9]/g, "");
+                detectedAmount = parseInt(clean, 10);
+              }
+            }
+            if (detectedAmount > 0) {
+              const matchOrd = await query(
+                `SELECT order_code FROM orders
+                 WHERE payment_status = 'unpaid'
+                   AND (
+                     (invoice_data->>'payable_amount')::numeric = $1
+                     OR (invoice_data->>'amount')::numeric = $1
+                   )
+                   AND created_at >= NOW() - INTERVAL '24 hours'
+                 ORDER BY created_at DESC LIMIT 1`,
+                [detectedAmount]
+              );
+              if (matchOrd.rows.length > 0) {
+                orderId = matchOrd.rows[0].order_code;
+              }
+            }
+          }
           const isPaid = status === "success" || status === "paid" || status === "settlement" || status === "completed";
           if (isPaid && orderId) {
             console.log(`[ShopeePay Webhook] Payment confirmed for order: ${orderId}`);
             await processOrderPayment(orderId, bot);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({
+              success: true,
+              message: "ShopeePay payment successfully confirmed",
+              order_id: orderId,
+              detected_amount: detectedAmount || null,
+              paid: true
+            }));
+            return;
           }
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ success: true, message: "ShopeePay callback processed", order_id: orderId, paid: isPaid }));
+          res.end(JSON.stringify({
+            success: true,
+            message: orderId ? `Status received: ${status || "unknown"}` : detectedAmount > 0 ? `Amount detected (Rp ${detectedAmount.toLocaleString("id-ID")}) but no unpaid order found within last 24h` : `Notification received, no amount or order found`,
+            order_id: orderId || null,
+            detected_amount: detectedAmount || null,
+            paid: false
+          }));
           return;
         }
         await initBot({ mode: "webhook" });
@@ -47083,9 +47125,9 @@ server.listen(port, () => {
 });
 setInterval(async () => {
   try {
-    const { query: query2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const { query: query3 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { checkShopeePayPayment: checkShopeePayPayment2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
-    const unpaidOrders = await query2(
+    const unpaidOrders = await query3(
       `SELECT o.*, p.price as product_price
        FROM orders o
        LEFT JOIN products p ON o.product_id = p.id

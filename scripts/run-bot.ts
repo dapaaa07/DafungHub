@@ -68,15 +68,67 @@ const server = http.createServer((req, res) => {
 
         // Check if ShopeePay webhook
         if (req.url?.includes('shopeepay')) {
-          const orderId = data.order_id || data.order_code || data.merchant_ref || data.token;
-          const status = String(data.status || data.payment_status || '').toLowerCase();
+          let orderId = data.order_id || data.order_code || data.merchant_ref || data.token;
+          const status = String(data.status || data.payment_status || 'paid').toLowerCase();
+
+          let detectedAmount = Number((data as Record<string, unknown>).amount || (data as Record<string, unknown>).nominal || 0);
+
+          if (!orderId) {
+            if (!detectedAmount) {
+              const fullText = `${(data as Record<string, unknown>).notification || ''} ${(data as Record<string, unknown>).text || ''} ${(data as Record<string, unknown>).message || ''} ${(data as Record<string, unknown>).body || ''} ${(data as Record<string, unknown>).not_body || ''} ${rawBody}`;
+              const match = fullText.match(/(?:rp\.?|idr)\s*([0-9.,]+)/i) || fullText.match(/([0-9]{3,7})/);
+              if (match) {
+                const clean = match[1].replace(/[^0-9]/g, '');
+                detectedAmount = parseInt(clean, 10);
+              }
+            }
+
+            if (detectedAmount > 0) {
+              const matchOrd = await query<{ order_code: string }>(
+                `SELECT order_code FROM orders
+                 WHERE payment_status = 'unpaid'
+                   AND (
+                     (invoice_data->>'payable_amount')::numeric = $1
+                     OR (invoice_data->>'amount')::numeric = $1
+                   )
+                   AND created_at >= NOW() - INTERVAL '24 hours'
+                 ORDER BY created_at DESC LIMIT 1`,
+                [detectedAmount]
+              );
+              if (matchOrd.rows.length > 0) {
+                orderId = matchOrd.rows[0].order_code;
+              }
+            }
+          }
+
           const isPaid = status === 'success' || status === 'paid' || status === 'settlement' || status === 'completed';
+
           if (isPaid && orderId) {
             console.log(`[ShopeePay Webhook] Payment confirmed for order: ${orderId}`);
             await processOrderPayment(orderId, bot);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              success: true,
+              message: 'ShopeePay payment successfully confirmed',
+              order_id: orderId,
+              detected_amount: detectedAmount || null,
+              paid: true,
+            }));
+            return;
           }
+
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true, message: 'ShopeePay callback processed', order_id: orderId, paid: isPaid }));
+          res.end(JSON.stringify({
+            success: true,
+            message: orderId
+              ? `Status received: ${status || 'unknown'}`
+              : (detectedAmount > 0
+                  ? `Amount detected (Rp ${detectedAmount.toLocaleString('id-ID')}) but no unpaid order found within last 24h`
+                  : `Notification received, no amount or order found`),
+            order_id: orderId || null,
+            detected_amount: detectedAmount || null,
+            paid: false,
+          }));
           return;
         }
 
