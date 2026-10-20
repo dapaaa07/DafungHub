@@ -33,11 +33,12 @@ export async function POST(req: NextRequest) {
       data.status || data.payment_status || 'paid'
     ).toLowerCase();
 
+    let detectedAmount = Number((data as Record<string, unknown>).amount || (data as Record<string, unknown>).nominal || 0);
+
     // 2. If no direct order code, extract amount from data or notification text (for MacroDroid / Notification Listeners)
     if (!targetOrderCode) {
-      let detectedAmount = Number((data as Record<string, unknown>).amount || (data as Record<string, unknown>).nominal || 0);
       if (!detectedAmount) {
-        const fullText = `${(data as Record<string, unknown>).text || ''} ${(data as Record<string, unknown>).message || ''} ${(data as Record<string, unknown>).body || ''} ${rawBody}`;
+        const fullText = `${(data as Record<string, unknown>).notification || ''} ${(data as Record<string, unknown>).text || ''} ${(data as Record<string, unknown>).message || ''} ${(data as Record<string, unknown>).body || ''} ${(data as Record<string, unknown>).not_body || ''} ${rawBody}`;
         const match = fullText.match(/(?:rp\.?|idr)\s*([0-9.,]+)/i) || fullText.match(/([0-9]{3,7})/);
         if (match) {
           const clean = match[1].replace(/[^0-9]/g, '');
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
                (invoice_data->>'payable_amount')::numeric = $1
                OR (invoice_data->>'amount')::numeric = $1
              )
-             AND created_at >= NOW() - INTERVAL '60 minutes'
+             AND created_at >= NOW() - INTERVAL '24 hours'
            ORDER BY created_at DESC LIMIT 1`,
           [detectedAmount]
         );
@@ -78,13 +79,19 @@ export async function POST(req: NextRequest) {
         success: true,
         message: 'ShopeePay payment successfully confirmed',
         order_code: targetOrderCode,
+        detected_amount: detectedAmount || null,
       });
     }
 
     return NextResponse.json({
       success: true,
-      message: `ShopeePay status received: ${status || 'unknown'}`,
-      order_id: targetOrderCode,
+      message: targetOrderCode
+        ? `Status received: ${status || 'unknown'}`
+        : (detectedAmount > 0
+            ? `Amount detected (Rp ${detectedAmount.toLocaleString('id-ID')}) but no unpaid order found within last 24h`
+            : `Notification received, no amount or order found`),
+      order_id: targetOrderCode || null,
+      detected_amount: detectedAmount || null,
     });
   } catch (error) {
     console.error('[ShopeePay Webhook Error]:', error);
