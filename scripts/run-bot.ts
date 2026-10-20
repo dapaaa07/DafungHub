@@ -1,6 +1,7 @@
 import http from 'http';
 import { bot, initBot, handleWebhookUpdate } from '../bot/handler';
 import { processOrderPayment } from '../lib/fulfillment';
+import { query } from '../lib/db';
 
 console.log('🤖 Starting DaFung Hub Telegram Bot Service...');
 
@@ -75,7 +76,7 @@ const server = http.createServer((req, res) => {
 
           if (!orderId) {
             if (!detectedAmount) {
-              const fullText = `${(data as Record<string, unknown>).notification || ''} ${(data as Record<string, unknown>).text || ''} ${(data as Record<string, unknown>).message || ''} ${(data as Record<string, unknown>).body || ''} ${(data as Record<string, unknown>).not_body || ''} ${rawBody}`;
+              const fullText = `${(data as Record<string, unknown>).notification || ''} ${(data as Record<string, unknown>).text || ''} ${(data as Record<string, unknown>).message || ''} ${(data as Record<string, unknown>).body || ''} ${(data as Record<string, unknown>).not_body || ''} ${body}`;
               const match = fullText.match(/(?:rp\.?|idr)\s*([0-9.,]+)/i) || fullText.match(/([0-9]{3,7})/);
               if (match) {
                 const clean = match[1].replace(/[^0-9]/g, '');
