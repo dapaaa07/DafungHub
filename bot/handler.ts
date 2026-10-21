@@ -505,6 +505,7 @@ export function registerHandlers(botInstance: ExtendedBot): void {
     const parts = rawText.trim().split(/\s+/);
     const orderCode = parts[1];
     const credentials = parts.slice(2).join(' ');
+    const chatId = ctx.chatId || ctx.message?.chat?.id || ctx.from?.id;
 
     // Check if media is attached directly to the message or via reply_to_message
     const replyMsg = ctx.message?.reply_to_message;
@@ -513,32 +514,47 @@ export function registerHandlers(botInstance: ExtendedBot): void {
       : ctx.message;
     const mediaData = extractMediaFromMessage(mediaSource);
 
-    if (!orderCode || (!credentials && !mediaData.hasMedia)) {
+    if (chatId && mediaData.hasMedia && mediaData.fileId) {
+      const { saveLastAdminMedia } = await import('../lib/admin-media');
+      await saveLastAdminMedia(chatId, {
+        type: mediaData.type,
+        fileId: mediaData.fileId,
+        fileName: mediaData.fileName || (mediaData.type === 'photo' ? 'foto.jpg' : 'file'),
+        mimeType: mediaData.mimeType,
+        fromChatId: chatId,
+        messageId: ctx.message?.message_id,
+        savedAt: Date.now(),
+      });
+    }
+
+    if (!orderCode) {
       await sendSafeMessage(
         ctx,
         botInstance,
         '⚡ <b>PANDUAN PENGIRIMAN KREDENSIAL MANUAL (/kirim)</b>\n' +
         '━━━━━━━━━━━━━━━━━━━\n' +
         '<b>1. Kirim File / Dokumen (contoh: .txt):</b>\n' +
-        '• Upload file <code>.txt</code> / dokumen / foto dengan caption:\n' +
-        '  <code>/kirim &lt;order_code&gt; [keterangan opsional]</code>\n' +
-        '• Atau balas (reply) file yang sudah ada dengan perintah:\n' +
-        '  <code>/kirim &lt;order_code&gt; [keterangan opsional]</code>\n\n' +
+        '• Upload file <code>.txt</code> / dokumen / foto ke bot.\n' +
+        '• Jalankan: <code>/kirim &lt;order_code&gt; [keterangan opsional]</code>\n' +
+        '• Bot akan menampilkan pilihan kirim dengan media atau teks saja!\n\n' +
         '<b>2. Kirim Teks Biasa:</b>\n' +
-        '• <code>/kirim &lt;order_code&gt; &lt;email:password&gt;</code>',
+        '• <code>/kirim &lt;order_code&gt; &lt;email:password&gt;</code>\n\n' +
+        '<i>Sentuh tombol di bawah untuk melihat antrean pesanan:</i>',
         {
           parse_mode: 'HTML',
           reply_markup: {
-            inline_keyboard: [[{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }]],
+            inline_keyboard: [
+              [{ text: '📦 Buka Antrean Pesanan', callback_data: 'admin_queue' }],
+              [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+            ],
           },
         }
       );
       return;
     }
 
-    const { adminManualFulfill } = await import('../lib/fulfillment');
-    const result = await adminManualFulfill(orderCode, credentials, botInstance, mediaData);
-    await sendSafeMessage(ctx, botInstance, result.message, { parse_mode: 'HTML' });
+    const { sendAdminFulfillChoice } = await import('./menu');
+    await sendAdminFulfillChoice(ctx, botInstance, orderCode, credentials);
   };
 
   botInstance.command('kirim', handleKirimCommand);
@@ -845,10 +861,24 @@ export function registerHandlers(botInstance: ExtendedBot): void {
       return;
     }
 
+    const chatId = ctx.chatId || ctx.message?.chat?.id || ctx.from?.id;
     const rawText = ctx.message?.text || ctx.message?.caption || '';
     const parts = rawText.trim().split(/\s+/);
     const broadcastBody = parts.slice(1).join(' ').trim();
     const media = extractMediaFromMessage(ctx.message);
+
+    if (chatId && media.hasMedia && media.fileId) {
+      const { saveLastAdminMedia } = await import('../lib/admin-media');
+      await saveLastAdminMedia(chatId, {
+        type: media.type,
+        fileId: media.fileId,
+        fileName: media.fileName || (media.type === 'photo' ? 'foto.jpg' : 'file'),
+        mimeType: media.mimeType,
+        fromChatId: chatId,
+        messageId: ctx.message?.message_id,
+        savedAt: Date.now(),
+      });
+    }
 
     if (!broadcastBody && !media.hasMedia) {
       const { sendAdminBroadcastMenu } = await import('./menu');
@@ -856,16 +886,8 @@ export function registerHandlers(botInstance: ExtendedBot): void {
       return;
     }
 
-    const { sendAdminBroadcastPreview } = await import('./menu');
-    await sendAdminBroadcastPreview(ctx, botInstance, {
-      chatId: ctx.message?.chat?.id || ctx.from?.id,
-      fromChatId: ctx.message?.chat?.id || ctx.from?.id,
-      messageId: ctx.message?.message_id,
-      type: media.type,
-      fileId: media.fileId,
-      fileName: media.fileName,
-      text: broadcastBody,
-    });
+    const { sendAdminBroadcastChoice } = await import('./menu');
+    await sendAdminBroadcastChoice(ctx, botInstance, broadcastBody || '<i>(Media Siaran)</i>');
   };
 
   botInstance.command('broadcast', handleBroadcastCommand);
@@ -874,6 +896,22 @@ export function registerHandlers(botInstance: ExtendedBot): void {
   // Fallback for general non-command text & media messages (interactive panel, no typing required)
   botInstance.on('message', async (ctx: Context) => {
     const rawText = ctx.message?.text?.trim() || ctx.message?.caption?.trim() || '';
+    const chatId = ctx.chatId || ctx.message?.chat?.id || ctx.from?.id;
+
+    // 1. If message contains media and sender is admin, record it as latest admin media!
+    const media = extractMediaFromMessage(ctx.message);
+    if (chatId && isAdmin(ctx.from?.id) && media.hasMedia && media.fileId) {
+      const { saveLastAdminMedia } = await import('../lib/admin-media');
+      await saveLastAdminMedia(chatId, {
+        type: media.type,
+        fileId: media.fileId,
+        fileName: media.fileName || (media.type === 'photo' ? 'foto.jpg' : 'file'),
+        mimeType: media.mimeType,
+        fromChatId: chatId,
+        messageId: ctx.message?.message_id,
+        savedAt: Date.now(),
+      });
+    }
 
     // Handle /kirim sent as caption on media attachments
     if (rawText.startsWith('/kirim')) {
@@ -887,10 +925,31 @@ export function registerHandlers(botInstance: ExtendedBot): void {
       return;
     }
 
-    // Check if admin is currently in waiting_broadcast state (accepts ANY media or text)
-    const chatId = ctx.chatId || ctx.message?.chat?.id || ctx.from?.id;
+    // Check if admin is currently in waiting_fulfill_notes state
     if (chatId && isAdmin(ctx.from?.id)) {
-      const { getAdminWaitingBroadcast, clearAdminBroadcastState, sendAdminBroadcastPreview, sendAdminBroadcastMenu } = await import('./menu');
+      const { getAdminWaitingFulfillNotes, clearAdminWaitingFulfillNotes, sendAdminFulfillPreview, sendAdminQueueMenu } = await import('./menu');
+      const waitingOrder = getAdminWaitingFulfillNotes(chatId);
+      if (waitingOrder) {
+        clearAdminWaitingFulfillNotes(chatId);
+        if (rawText === '/cancel' || rawText.toLowerCase() === 'batal') {
+          await sendAdminQueueMenu(ctx, botInstance);
+          return;
+        }
+        const { saveAdminFulfillDraft, getAdminFulfillDraft } = await import('../lib/admin-media');
+        const draft = await getAdminFulfillDraft(chatId);
+        await saveAdminFulfillDraft(chatId, {
+          orderCode: waitingOrder,
+          notes: rawText,
+          withMedia: draft?.withMedia || false,
+        });
+        await sendAdminFulfillPreview(ctx, botInstance, waitingOrder, draft?.withMedia || false);
+        return;
+      }
+    }
+
+    // Check if admin is currently in waiting_broadcast state (accepts ANY media or text)
+    if (chatId && isAdmin(ctx.from?.id)) {
+      const { getAdminWaitingBroadcast, clearAdminBroadcastState, sendAdminBroadcastChoice, sendAdminBroadcastMenu } = await import('./menu');
       if (getAdminWaitingBroadcast(chatId)) {
         clearAdminBroadcastState(chatId);
         if (rawText === '/cancel' || rawText.toLowerCase() === 'batal') {
@@ -898,18 +957,36 @@ export function registerHandlers(botInstance: ExtendedBot): void {
           return;
         }
 
-        const media = extractMediaFromMessage(ctx.message);
-        await sendAdminBroadcastPreview(ctx, botInstance, {
-          chatId,
-          fromChatId: chatId,
-          messageId: ctx.message?.message_id,
-          type: media.type,
-          fileId: media.fileId,
-          fileName: media.fileName,
-          text: rawText,
-        });
+        const draftText = rawText || '<i>(Media Siaran)</i>';
+        await sendAdminBroadcastChoice(ctx, botInstance, draftText);
         return;
       }
+    }
+
+    // Check if admin just sent a standalone media file directly in chat
+    if (chatId && isAdmin(ctx.from?.id) && media.hasMedia && !rawText) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        `📎 <b>MEDIA BERHASIL DITERIMA & DISIMPAN!</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━\n` +
+        `• <b>File / Nama:</b> <code>${escapeHtml(media.fileName || 'file')}</code>\n` +
+        `• <b>Tipe Media:</b> <code>${media.type.toUpperCase()}</code>\n` +
+        `━━━━━━━━━━━━━━━━━━━\n` +
+        `Media ini kini tersimpan sebagai <b>Media Terakhir</b> di bot.\n\n` +
+        `Saat Anda menjalankan <code>/kirim &lt;order_code&gt;</code> atau membuat <b>Broadcast</b>, bot akan menyediakan pilihan untuk mengirim dengan media ini atau teks saja.`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '📦 Buka Antrean Pesanan (/kirim)', callback_data: 'admin_queue' }],
+              [{ text: '📢 Buat Pesan Broadcast', callback_data: 'admin_create_broadcast' }],
+              [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+            ],
+          },
+        }
+      );
+      return;
     }
 
     // Ignore commands as they are handled by command handlers

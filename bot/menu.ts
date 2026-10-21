@@ -95,6 +95,20 @@ export function clearAdminBroadcastState(chatId: string | number): void {
   adminBroadcastPending.delete(key);
 }
 
+const adminWaitingFulfillNotes = new Map<string, string>(); // chatId -> orderCode
+
+export function setAdminWaitingFulfillNotes(chatId: string | number, orderCode: string): void {
+  adminWaitingFulfillNotes.set(String(chatId), orderCode);
+}
+
+export function getAdminWaitingFulfillNotes(chatId: string | number): string | undefined {
+  return adminWaitingFulfillNotes.get(String(chatId));
+}
+
+export function clearAdminWaitingFulfillNotes(chatId: string | number): void {
+  adminWaitingFulfillNotes.delete(String(chatId));
+}
+
 /**
  * Main Menu Inline Keyboard matching exact visual design reference.
  * If user is Owner (7133868769), displays the prominent Owner Panel button.
@@ -1419,8 +1433,8 @@ export async function sendAdminQueueMenu(ctx: Context, botInstance: ExtendedBot)
 
       buttons.push([
         {
-          text: `📋 Salin ${ord.order_code}`,
-          copy_text: { text: ord.order_code },
+          text: `📤 Kirim Kredensial`,
+          callback_data: `admin_fulfill_start_${ord.order_code}`,
         },
         {
           text: `🚀 Proses H2H`,
@@ -1428,7 +1442,7 @@ export async function sendAdminQueueMenu(ctx: Context, botInstance: ExtendedBot)
         },
       ]);
     }
-    text += `━━━━━━━━━━━━━━━━━━━\n💡 <i>Format kirim manual: <code>/kirim &lt;order_code&gt; &lt;kredensial&gt;</code></i>\n`;
+    text += `━━━━━━━━━━━━━━━━━━━\n💡 <i>Format cepat: <code>/kirim &lt;order_code&gt; [keterangan]</code></i>\n`;
   }
 
   buttons.push([
@@ -1582,6 +1596,68 @@ export async function sendAdminBroadcastMenu(
 }
 
 /**
+ * Send Broadcast Pre-Preview Selection:
+ * Allows admin to choose between "Dengan Media" (last media uploaded) vs "Tanpa Media" (text only)
+ */
+export async function sendAdminBroadcastChoice(
+  ctx: Context,
+  botInstance: ExtendedBot,
+  draftText: string
+): Promise<void> {
+  if (!isAdmin(ctx.from?.id)) return;
+
+  const adminChatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
+  if (!adminChatId) return;
+
+  const { getBroadcastChannel } = await import('../lib/broadcast');
+  const targetChannel = await getBroadcastChannel();
+  const { getLastAdminMedia } = await import('../lib/admin-media');
+  const lastMedia = await getLastAdminMedia(adminChatId);
+
+  setAdminPendingBroadcastText(adminChatId, draftText);
+
+  const cleanTextPreview = draftText.trim() || '<i>(Konten Siaran)</i>';
+  const choiceText =
+    `📢 <b>PILIH FORMAT PESAN SIARAN</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `• <b>Target Channel:</b> <code>${escapeHtml(targetChannel)}</code>\n` +
+    `• <b>Teks Siaran:</b>\n` +
+    `${cleanTextPreview}\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `📎 <b>Media Terakhir Bot:</b>\n` +
+    (lastMedia
+      ? `• <b>File:</b> <code>${escapeHtml(lastMedia.fileName)}</code>\n• <b>Tipe:</b> <code>${lastMedia.type.toUpperCase()}</code>\n`
+      : `<i>(Belum ada media dikirim ke bot)</i>\n`) +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `Pilih apakah pesan siaran ini dikirim <b>Dengan Media</b> terakhir atau <b>Tanpa Media</b> (Teks Saja):`;
+
+  const buttons = [];
+  if (lastMedia) {
+    buttons.push([
+      {
+        text: `📎 Broadcast DENGAN Media (${lastMedia.fileName})`,
+        callback_data: 'admin_bc_choose_with_media',
+      },
+    ]);
+  }
+  buttons.push([
+    {
+      text: '📝 Broadcast TANPA Media (Teks Saja)',
+      callback_data: 'admin_bc_choose_nomedia',
+    },
+  ]);
+  buttons.push([
+    { text: '✏️ Edit / Tulis Ulang Teks', callback_data: 'admin_create_broadcast' },
+    { text: '❌ Batalkan', callback_data: 'admin_broadcast' },
+  ]);
+
+  await sendSafeMessage(ctx, botInstance, choiceText, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: buttons },
+  });
+}
+
+/**
  * Send Broadcast Confirmation Preview to Admin
  */
 export async function sendAdminBroadcastPreview(
@@ -1607,7 +1683,7 @@ export async function sendAdminBroadcastPreview(
   const hasMedia = draft.type && draft.type !== 'text' && draft.type !== 'none';
   const mediaLabel = hasMedia
     ? `\n• <b>Tipe Media:</b> <code>${(draft.type || 'MEDIA').toUpperCase()}${draft.fileName ? ` (${escapeHtml(draft.fileName)})` : ''}</code>`
-    : '';
+    : '\n• <b>Tipe Media:</b> <i>Tidak Ada (Teks Saja)</i>';
 
   const previewText =
     `👁️ <b>PREVIEW PESAN SIARAN</b>\n` +
@@ -1622,8 +1698,214 @@ export async function sendAdminBroadcastPreview(
       { text: '🚀 Kirim ke Channel Sekarang', callback_data: 'admin_send_broadcast' },
     ],
     [
-      { text: '✏️ Ganti Pesan / Media', callback_data: 'admin_create_broadcast' },
+      { text: '🔄 Ubah Pilihan Media', callback_data: 'admin_bc_reselect' },
+      { text: '✏️ Ganti Pesan / Teks', callback_data: 'admin_create_broadcast' },
+    ],
+    [
       { text: '❌ Batalkan', callback_data: 'admin_broadcast' },
+    ],
+  ];
+
+  await sendSafeMessage(ctx, botInstance, previewText, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: buttons },
+  });
+}
+
+/**
+ * Send Fulfillment Pre-Preview Choice:
+ * Allows admin to choose between "Dengan Media" (last media uploaded) vs "Tanpa Media" (text only)
+ */
+export async function sendAdminFulfillChoice(
+  ctx: Context,
+  botInstance: ExtendedBot,
+  orderCode: string,
+  initialNotes?: string
+): Promise<void> {
+  if (!isAdmin(ctx.from?.id)) return;
+
+  const adminChatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
+  if (!adminChatId) return;
+
+  const orderRes = await query<Order & { telegram_id: string; product_name: string; username?: string; first_name?: string }>(
+    `SELECT o.*, u.telegram_id, u.username, u.first_name, p.name as product_name
+     FROM orders o
+     JOIN users u ON o.user_id = u.id
+     JOIN products p ON o.product_id = p.id
+     WHERE o.order_code = $1 LIMIT 1`,
+    [orderCode]
+  );
+
+  if (orderRes.rows.length === 0) {
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      `⚠️ <b>Order Tidak Ditemukan:</b> Kode order <code>${escapeHtml(orderCode)}</code> tidak terdaftar di sistem.`,
+      {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '📦 Buka Antrean Pesanan', callback_data: 'admin_queue' }],
+            [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+          ],
+        },
+      }
+    );
+    return;
+  }
+
+  const order = orderRes.rows[0];
+  const { getLastAdminMedia, saveAdminFulfillDraft } = await import('../lib/admin-media');
+  const lastMedia = await getLastAdminMedia(adminChatId);
+
+  await saveAdminFulfillDraft(adminChatId, {
+    orderCode,
+    notes: initialNotes || '',
+  });
+
+  const buyerInfo = order.username ? `@${order.username}` : (order.first_name || order.telegram_id);
+
+  let text =
+    `📦 <b>PILIH METODE PENGIRIMAN KREDENSIAL</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `• <b>Kode Order:</b> <code>${escapeHtml(orderCode)}</code>\n` +
+    `• <b>Produk:</b> ${escapeHtml(order.product_name)}\n` +
+    `• <b>Pembeli:</b> ${escapeHtml(buyerInfo)} (<code>${order.telegram_id}</code>)\n` +
+    (initialNotes ? `• <b>Keterangan / Teks:</b> <code>${escapeHtml(initialNotes)}</code>\n` : '') +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `📎 <b>Media Terakhir Bot:</b>\n` +
+    (lastMedia
+      ? `• <b>File:</b> <code>${escapeHtml(lastMedia.fileName)}</code>\n• <b>Tipe:</b> <code>${lastMedia.type.toUpperCase()}</code>\n`
+      : `<i>(Belum ada file/media yang pernah dikirim ke bot)</i>\n`) +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `Pilih apakah kredensial pesanan ini dikirim <b>Dengan Media</b> terakhir atau <b>Tanpa Media</b> (Teks Saja):`;
+
+  const buttons = [];
+  if (lastMedia) {
+    buttons.push([
+      {
+        text: `📎 Kirim DENGAN Media (${lastMedia.fileName})`,
+        callback_data: `admin_fulfill_choose_media_${orderCode}`,
+      },
+    ]);
+  }
+  buttons.push([
+    {
+      text: `📝 Kirim TANPA Media (Teks Saja)`,
+      callback_data: `admin_fulfill_choose_nomedia_${orderCode}`,
+    },
+  ]);
+  if (!lastMedia) {
+    buttons.push([
+      {
+        text: `📤 Ingin Kirim File? (Upload ke Bot)`,
+        callback_data: `admin_fulfill_need_media_${orderCode}`,
+      },
+    ]);
+  }
+  buttons.push([
+    { text: '❌ Batalkan', callback_data: 'admin_queue' },
+  ]);
+
+  await sendSafeMessage(ctx, botInstance, text, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: buttons },
+  });
+}
+
+/**
+ * Send Fulfillment Preview Screen:
+ * Displays summary of order & credentials/file before sending to the buyer.
+ */
+export async function sendAdminFulfillPreview(
+  ctx: Context,
+  botInstance: ExtendedBot,
+  orderCode: string,
+  withMedia: boolean
+): Promise<void> {
+  if (!isAdmin(ctx.from?.id)) return;
+
+  const adminChatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
+  if (!adminChatId) return;
+
+  const { getAdminFulfillDraft, saveAdminFulfillDraft, getLastAdminMedia } = await import('../lib/admin-media');
+  const draft = await getAdminFulfillDraft(adminChatId);
+  const notes = draft?.notes || '';
+
+  const lastMedia = withMedia ? await getLastAdminMedia(adminChatId) : null;
+
+  // If without media and no credentials entered yet, prompt admin to type credentials
+  if (!withMedia && !notes.trim()) {
+    setAdminWaitingFulfillNotes(adminChatId, orderCode);
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      `✍️ <b>MASUKKAN KREDENSIAL AKUN (TEKS)</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n` +
+      `• <b>Kode Order:</b> <code>${escapeHtml(orderCode)}</code>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n` +
+      `Silakan ketik atau tempel kredensial akun (contoh: <code>email:password</code> atau nomor lisensi) yang akan dikirimkan ke pembeli di chat ini:`,
+      {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🔄 Kembali ke Pilihan Media', callback_data: `admin_fulfill_start_${orderCode}` }],
+            [{ text: '❌ Batalkan', callback_data: 'admin_queue' }],
+          ],
+        },
+      }
+    );
+    return;
+  }
+
+  // Update draft with chosen media mode
+  await saveAdminFulfillDraft(adminChatId, {
+    orderCode,
+    notes,
+    withMedia,
+  });
+
+  const orderRes = await query<Order & { telegram_id: string; product_name: string; username?: string; first_name?: string }>(
+    `SELECT o.*, u.telegram_id, u.username, u.first_name, p.name as product_name
+     FROM orders o
+     JOIN users u ON o.user_id = u.id
+     JOIN products p ON o.product_id = p.id
+     WHERE o.order_code = $1 LIMIT 1`,
+    [orderCode]
+  );
+  const order = orderRes.rows[0];
+  const buyerInfo = order?.username ? `@${order.username}` : (order?.first_name || order?.telegram_id || '-');
+
+  const previewText =
+    `👁️ <b>PREVIEW PENGIRIMAN KREDENSIAL</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `• <b>Kode Order:</b> <code>${escapeHtml(orderCode)}</code>\n` +
+    `• <b>Produk:</b> ${escapeHtml(order?.product_name || '-')}\n` +
+    `• <b>Penerima:</b> ${escapeHtml(buyerInfo)} (<code>${order?.telegram_id}</code>)\n` +
+    `• <b>Metode Pengiriman:</b> ${withMedia ? `📎 <b>DENGAN MEDIA</b> (<code>${escapeHtml(lastMedia?.fileName || 'File')}</code>)` : '📝 <b>TANPA MEDIA</b> (Teks Saja)'}\n` +
+    `━━━━━━━━━━━━━━━━━━━\n\n` +
+    `🔑 <b>Rincian yang Akan Dikirim:</b>\n` +
+    (withMedia && lastMedia ? `📁 <b>File Lampiran:</b> <code>${escapeHtml(lastMedia.fileName)}</code> (${lastMedia.type.toUpperCase()})\n` : '') +
+    (notes ? `💬 <b>Keterangan / Kredensial:</b>\n<code>${escapeHtml(notes)}</code>\n` : (withMedia ? `💬 <i>(Kredensial ada di dalam file ${escapeHtml(lastMedia?.fileName || 'lampiran')})</i>\n` : '')) +
+    `\n━━━━━━━━━━━━━━━━━━━\n` +
+    `Apakah Anda yakin ingin mengirimkan kredensial ini ke pembeli sekarang?`;
+
+  const buttons = [
+    [
+      {
+        text: '🚀 Kirim ke Pembeli Sekarang',
+        callback_data: `admin_fulfill_confirm_${orderCode}`,
+      },
+    ],
+    [
+      {
+        text: '🔄 Ubah Pilihan Media',
+        callback_data: `admin_fulfill_start_${orderCode}`,
+      },
+      {
+        text: '❌ Batalkan',
+        callback_data: 'admin_queue',
+      },
     ],
   ];
 
@@ -2183,6 +2465,80 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
             ],
           },
         });
+      } else if (data.startsWith('admin_fulfill_start_')) {
+        if (!isAdmin(ctx.from?.id)) return;
+        const ordCode = data.replace('admin_fulfill_start_', '');
+        await sendAdminFulfillChoice(ctx, botInstance, ordCode);
+      } else if (data.startsWith('admin_fulfill_choose_media_')) {
+        if (!isAdmin(ctx.from?.id)) return;
+        const ordCode = data.replace('admin_fulfill_choose_media_', '');
+        await sendAdminFulfillPreview(ctx, botInstance, ordCode, true);
+      } else if (data.startsWith('admin_fulfill_choose_nomedia_')) {
+        if (!isAdmin(ctx.from?.id)) return;
+        const ordCode = data.replace('admin_fulfill_choose_nomedia_', '');
+        await sendAdminFulfillPreview(ctx, botInstance, ordCode, false);
+      } else if (data.startsWith('admin_fulfill_need_media_')) {
+        if (!isAdmin(ctx.from?.id)) return;
+        const ordCode = data.replace('admin_fulfill_need_media_', '');
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `📎 <b>UPLOAD FILE / MEDIA KREDENSIAL</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━\n` +
+          `• <b>Kode Order:</b> <code>${escapeHtml(ordCode)}</code>\n` +
+          `━━━━━━━━━━━━━━━━━━━\n` +
+          `Silakan upload file kredensial (contoh: <code>.txt</code>, foto, dokumen) langsung ke chat bot ini sekarang.\n\n` +
+          `Bot akan otomatis menyimpannya sebagai Media Terakhir. Setelah itu, sentuh tombol di bawah untuk melanjutkan:`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '🔄 Lanjut Kirim Kredensial', callback_data: `admin_fulfill_start_${ordCode}` }],
+                [{ text: '❌ Batalkan', callback_data: 'admin_queue' }],
+              ],
+            },
+          }
+        );
+      } else if (data.startsWith('admin_fulfill_confirm_')) {
+        if (!isAdmin(ctx.from?.id)) return;
+        const ordCode = data.replace('admin_fulfill_confirm_', '');
+        const adminChatId = ctx.chatId || ctx.from?.id;
+        if (!adminChatId) return;
+
+        const { getAdminFulfillDraft, clearAdminFulfillDraft, getLastAdminMedia } = await import('../lib/admin-media');
+        const draft = await getAdminFulfillDraft(adminChatId);
+        const lastMedia = draft?.withMedia ? await getLastAdminMedia(adminChatId) : undefined;
+
+        const fulfillMedia = lastMedia
+          ? {
+              ...lastMedia,
+              hasMedia: true as const,
+            }
+          : undefined;
+
+        const { adminManualFulfill } = await import('../lib/fulfillment');
+        const fulfillRes = await adminManualFulfill(
+          ordCode,
+          draft?.notes || '',
+          botInstance,
+          fulfillMedia
+        );
+        await clearAdminFulfillDraft(adminChatId);
+
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          fulfillRes.message,
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '📦 Antrean Pesanan', callback_data: 'admin_queue' }],
+                [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+              ],
+            },
+          }
+        );
       } else if (data === 'admin_broadcast') {
         if (!isAdmin(ctx.from?.id)) return;
         await sendAdminBroadcastMenu(ctx, botInstance);
@@ -2269,6 +2625,59 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
             }
           );
         }
+      } else if (data === 'admin_bc_choose_with_media') {
+        if (!isAdmin(ctx.from?.id)) return;
+        const adminChatId = ctx.chatId || ctx.from?.id;
+        if (!adminChatId) return;
+
+        const { getLastAdminMedia } = await import('../lib/admin-media');
+        const lastMedia = await getLastAdminMedia(adminChatId);
+        const draftText = getAdminPendingBroadcastText(adminChatId) || '';
+
+        if (!lastMedia) {
+          await sendSafeMessage(
+            ctx,
+            botInstance,
+            '⚠️ Belum ada file/media yang pernah dikirim ke bot. Silakan upload file terlebih dahulu ke bot.',
+            {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '📝 Kirim Tanpa Media (Teks Saja)', callback_data: 'admin_bc_choose_nomedia' }],
+                  [{ text: '❌ Batalkan', callback_data: 'admin_broadcast' }],
+                ],
+              },
+            }
+          );
+          return;
+        }
+
+        await sendAdminBroadcastPreview(ctx, botInstance, {
+          chatId: adminChatId,
+          fromChatId: lastMedia.fromChatId || adminChatId,
+          messageId: lastMedia.messageId,
+          type: lastMedia.type,
+          fileId: lastMedia.fileId,
+          fileName: lastMedia.fileName,
+          text: draftText,
+        });
+      } else if (data === 'admin_bc_choose_nomedia') {
+        if (!isAdmin(ctx.from?.id)) return;
+        const adminChatId = ctx.chatId || ctx.from?.id;
+        if (!adminChatId) return;
+
+        const draftText = getAdminPendingBroadcastText(adminChatId) || '';
+        await sendAdminBroadcastPreview(ctx, botInstance, {
+          chatId: adminChatId,
+          type: 'text',
+          text: draftText,
+        });
+      } else if (data === 'admin_bc_reselect') {
+        if (!isAdmin(ctx.from?.id)) return;
+        const adminChatId = ctx.chatId || ctx.from?.id;
+        if (!adminChatId) return;
+
+        const draftText = getAdminPendingBroadcastText(adminChatId) || '';
+        await sendAdminBroadcastChoice(ctx, botInstance, draftText);
       } else if (data === 'admin_test_product') {
         if (!isAdmin(ctx.from?.id)) return;
         const { getSupplierProducts, isTestProduct } = await import('../lib/supplier');

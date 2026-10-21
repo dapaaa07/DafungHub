@@ -378,13 +378,15 @@ export async function sendManualBroadcast(
       ],
     };
 
-    // 1. Try copyMessage first if original message was received from an admin chat
+    // 1. Try copyMessage first if media is present and original message was received from an admin chat
     const fromChatId = draft.fromChatId || draft.chatId;
-    if (draft.messageId && fromChatId) {
+    if (hasMedia && draft.messageId && fromChatId) {
       const copyRes = await sendTelegramApi('copyMessage', {
         chat_id: channel,
         from_chat_id: fromChatId,
         message_id: draft.messageId,
+        caption: cleanText || undefined,
+        parse_mode: 'HTML',
         reply_markup: replyMarkup,
       });
       if (copyRes.ok && copyRes.result?.message_id) {
