@@ -97,6 +97,7 @@ test('Admin Chat: standalone media sent by admin is automatically saved with con
       from: { id: Number(ADMIN_TELEGRAM_ID), is_bot: false, first_name: 'Owner' },
       document: {
         file_id: 'file_netflix_txt',
+        file_unique_id: 'uniq_file_netflix_txt',
         file_name: 'netflix_premium.txt',
         mime_type: 'text/plain',
       },
