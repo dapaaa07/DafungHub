@@ -298,10 +298,17 @@ export async function processOrderPayment(
     currentBalance = 0;
   }
 
+  // 4b. Check if product is manual / non-supplier
+  const prodCheck = await query<{ is_manual: boolean }>(
+    'SELECT is_manual FROM products WHERE id = $1 LIMIT 1',
+    [order.product_id]
+  ).catch(() => ({ rows: [] as Array<{ is_manual: boolean }> }));
+  const isManualProduct = Boolean(prodCheck.rows?.[0]?.is_manual);
+
   const buyerChatId = order.telegram_id;
 
   // 5. DECISION: Instant H2H vs Queue Mode
-  if (currentBalance >= modalPrice && modalPrice > 0) {
+  if (!isManualProduct && currentBalance >= modalPrice && modalPrice > 0) {
     // --- MODE 1: INSTANT H2H AUTO-FULFILLMENT ---
     try {
       const orderResp = await createSupplierOrder(supplierProductId, 1);

@@ -134,6 +134,7 @@ export async function createSupplierOrder(
 import { EnrichedProduct, PlatformConfig, ProductCategory } from './types';
 import { calculateSellingPrice, calculateOriginalPrice, getEffectiveSellingPrice } from './pricing';
 import { getCustomPrices } from './custom-prices';
+import { query, Product } from './db';
 
 export const PLATFORMS: PlatformConfig[] = [
   {
@@ -626,19 +627,52 @@ export const FALLBACK_PRODUCTS: SupplierProduct[] = [
   },
 ];
 
+export function enrichManualProduct(product: Product): EnrichedProduct {
+  const platform = matchProductPlatform(product.name);
+  return {
+    id: product.id,
+    name: product.name,
+    availability: (product.stock ?? 0) > 0 ? 'in_stock' : 'out_of_stock',
+    price_idr: product.price,
+    description: product.description || '',
+    requires_email: Boolean(product.requires_email),
+    platformId: platform ? platform.id : 'manual',
+    platformName: platform ? platform.name : 'Produk Khusus',
+    platformIcon: platform ? platform.icon : '✨',
+    logoUrl: platform?.logoFile || '',
+    category: (platform ? platform.category : 'other') as ProductCategory,
+    sellingPrice: product.price,
+    originalPrice: Math.round(product.price * 1.25),
+    durationText: 'Produk Manual',
+    warrantyText: 'Garansi Dafung Hub',
+    features: ['Kredensial dikirim via sistem Dafung Hub', 'Garansi resmi admin'],
+    isPopular: false,
+    is_manual: true,
+    stock: product.stock,
+  };
+}
+
 export async function getAllEnrichedProducts(includeTest: boolean = false): Promise<EnrichedProduct[]> {
   try {
-    const [rawProducts, customPrices] = await Promise.all([
+    const [rawProducts, customPrices, manualDbResult] = await Promise.all([
       getSupplierProducts(includeTest).catch(() => FALLBACK_PRODUCTS),
       getCustomPrices().catch(() => new Map<string, number>()),
+      query<Product>(
+        'SELECT * FROM products WHERE is_manual = true AND is_active = true ORDER BY created_at DESC'
+      ).catch(() => ({ rows: [] as Product[], rowCount: 0, command: '', oid: 0, fields: [] })),
     ]);
     const productsToEnrich = !rawProducts || rawProducts.length === 0 ? FALLBACK_PRODUCTS : rawProducts;
-    return productsToEnrich
+    const enrichedSupplier = productsToEnrich
       .filter((p) => includeTest || !isTestProduct(p))
       .map((p) => enrichProduct(p, customPrices));
+
+    const enrichedManual = (manualDbResult?.rows || []).map(enrichManualProduct);
+
+    return [...enrichedManual, ...enrichedSupplier];
   } catch (err) {
     console.error('[Supplier] Error fetching products for catalogue, using fallbacks:', err);
     return FALLBACK_PRODUCTS.filter((p) => includeTest || !isTestProduct(p)).map((p) => enrichProduct(p));
   }
 }
+
 

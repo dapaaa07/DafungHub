@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Dafung Hub Admin",
+    "slug": "dafung-admin-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#008CFF",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#008CFF"
+      },
+      "package": "com.dafunghub.admin"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

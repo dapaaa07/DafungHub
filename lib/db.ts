@@ -25,6 +25,9 @@ export interface Product {
   stock: number;
   category_id: string | null;
   is_active: boolean;
+  description?: string | null;
+  is_manual?: boolean;
+  requires_email?: boolean;
   created_at: Date;
   updated_at: Date;
 }

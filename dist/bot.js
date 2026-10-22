@@ -5729,6 +5729,7 @@ __export(supplier_exports, {
   FALLBACK_PRODUCTS: () => FALLBACK_PRODUCTS,
   PLATFORMS: () => PLATFORMS,
   createSupplierOrder: () => createSupplierOrder,
+  enrichManualProduct: () => enrichManualProduct,
   enrichProduct: () => enrichProduct,
   extractDuration: () => extractDuration,
   extractFeatures: () => extractFeatures,
@@ -5891,14 +5892,43 @@ function enrichProduct(product, customPricesMap) {
     isPopular
   };
 }
+function enrichManualProduct(product) {
+  const platform = matchProductPlatform(product.name);
+  return {
+    id: product.id,
+    name: product.name,
+    availability: (product.stock ?? 0) > 0 ? "in_stock" : "out_of_stock",
+    price_idr: product.price,
+    description: product.description || "",
+    requires_email: Boolean(product.requires_email),
+    platformId: platform ? platform.id : "manual",
+    platformName: platform ? platform.name : "Produk Khusus",
+    platformIcon: platform ? platform.icon : "\u2728",
+    logoUrl: platform?.logoFile || "",
+    category: platform ? platform.category : "other",
+    sellingPrice: product.price,
+    originalPrice: Math.round(product.price * 1.25),
+    durationText: "Produk Manual",
+    warrantyText: "Garansi Dafung Hub",
+    features: ["Kredensial dikirim via sistem Dafung Hub", "Garansi resmi admin"],
+    isPopular: false,
+    is_manual: true,
+    stock: product.stock
+  };
+}
 async function getAllEnrichedProducts(includeTest = false) {
   try {
-    const [rawProducts, customPrices] = await Promise.all([
+    const [rawProducts, customPrices, manualDbResult] = await Promise.all([
       getSupplierProducts(includeTest).catch(() => FALLBACK_PRODUCTS),
-      getCustomPrices().catch(() => /* @__PURE__ */ new Map())
+      getCustomPrices().catch(() => /* @__PURE__ */ new Map()),
+      query(
+        "SELECT * FROM products WHERE is_manual = true AND is_active = true ORDER BY created_at DESC"
+      ).catch(() => ({ rows: [], rowCount: 0, command: "", oid: 0, fields: [] }))
     ]);
     const productsToEnrich = !rawProducts || rawProducts.length === 0 ? FALLBACK_PRODUCTS : rawProducts;
-    return productsToEnrich.filter((p) => includeTest || !isTestProduct(p)).map((p) => enrichProduct(p, customPrices));
+    const enrichedSupplier = productsToEnrich.filter((p) => includeTest || !isTestProduct(p)).map((p) => enrichProduct(p, customPrices));
+    const enrichedManual = (manualDbResult?.rows || []).map(enrichManualProduct);
+    return [...enrichedManual, ...enrichedSupplier];
   } catch (err) {
     console.error("[Supplier] Error fetching products for catalogue, using fallbacks:", err);
     return FALLBACK_PRODUCTS.filter((p) => includeTest || !isTestProduct(p)).map((p) => enrichProduct(p));
@@ -5910,6 +5940,7 @@ var init_supplier = __esm({
     "use strict";
     init_pricing();
     init_custom_prices();
+    init_db();
     if (!process.env.SUPPLIER_API_KEY) {
       try {
         process.loadEnvFile?.();
@@ -18854,8 +18885,13 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
   } catch {
     currentBalance = 0;
   }
+  const prodCheck = await query(
+    "SELECT is_manual FROM products WHERE id = $1 LIMIT 1",
+    [order.product_id]
+  ).catch(() => ({ rows: [] }));
+  const isManualProduct = Boolean(prodCheck.rows?.[0]?.is_manual);
   const buyerChatId = order.telegram_id;
-  if (currentBalance >= modalPrice && modalPrice > 0) {
+  if (!isManualProduct && currentBalance >= modalPrice && modalPrice > 0) {
     try {
       const orderResp = await createSupplierOrder(supplierProductId, 1);
       const deliveredKey = orderResp.delivered_key || orderResp.delivered_keys?.[0];

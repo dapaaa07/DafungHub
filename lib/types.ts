@@ -28,6 +28,8 @@ export interface EnrichedProduct extends SupplierProduct {
   warrantyText: string;
   features: string[];
   isPopular?: boolean;
+  is_manual?: boolean;
+  stock?: number;
 }
 
 export interface PlatformConfig {
