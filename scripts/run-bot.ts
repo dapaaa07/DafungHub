@@ -19,8 +19,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Route /api/admin requests
-  if (req.url?.startsWith('/api/admin')) {
+  // Route admin requests (supports /api/admin/* and /admin/*)
+  if (req.url?.includes('admin')) {
     if (req.method === 'GET') {
       handleAdminHttpRequest(req, res, '').catch((err) => {
         console.error('[Admin HTTP Handler Error]:', err);

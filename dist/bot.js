@@ -54959,8 +54959,9 @@ function verifyRequestAuth(req, parsedUrl) {
 }
 async function handleAdminHttpRequest(req, res, bodyStr) {
   const parsedUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
-  const pathname = parsedUrl.pathname.replace(/\/+$/, "") || "/";
-  if (!pathname.startsWith("/api/admin")) {
+  const rawPath = parsedUrl.pathname.replace(/\/+$/, "") || "/";
+  const pathname = rawPath.startsWith("/api") ? rawPath : `/api${rawPath}`;
+  if (!pathname.startsWith("/api/admin") && !rawPath.includes("admin")) {
     return false;
   }
   if (req.method === "OPTIONS") {
@@ -55584,7 +55585,7 @@ var server = import_http.default.createServer((req, res) => {
     res.end();
     return;
   }
-  if (req.url?.startsWith("/api/admin")) {
+  if (req.url?.includes("admin")) {
     if (req.method === "GET") {
       handleAdminHttpRequest(req, res, "").catch((err) => {
         console.error("[Admin HTTP Handler Error]:", err);

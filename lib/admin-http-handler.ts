@@ -41,10 +41,11 @@ export async function handleAdminHttpRequest(
   bodyStr: string
 ): Promise<boolean> {
   const parsedUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-  const pathname = parsedUrl.pathname.replace(/\/+$/, '') || '/';
+  const rawPath = parsedUrl.pathname.replace(/\/+$/, '') || '/';
+  const pathname = rawPath.startsWith('/api') ? rawPath : `/api${rawPath}`;
 
-  // Only handle /api/admin/* paths
-  if (!pathname.startsWith('/api/admin')) {
+  // Only handle admin paths
+  if (!pathname.startsWith('/api/admin') && !rawPath.includes('admin')) {
     return false;
   }
 
