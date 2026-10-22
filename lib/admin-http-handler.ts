@@ -574,7 +574,7 @@ export async function handleAdminHttpRequest(
 
       const recentOrders = reconciliationRes.rows;
 
-      const reconciledTransactions = rawTransactions.map((tx: any) => {
+      const reconciledTransactions = rawTransactions.map((tx: any, idx: number) => {
         const txAmount = Number(tx.amount || 0);
         const txTime = new Date(tx.time || tx.created_at || Date.now()).getTime();
 
@@ -587,7 +587,7 @@ export async function handleAdminHttpRequest(
         });
 
         return {
-          transactionId: tx.transaction_id || tx.id || `TX-${Date.now()}`,
+          transactionId: tx.transaction_id || tx.id || `TX-${Date.now()}-${idx}`,
           amount: txAmount,
           formattedAmount: `Rp ${txAmount.toLocaleString('id-ID')}`,
           status: tx.status || 'Berhasil',

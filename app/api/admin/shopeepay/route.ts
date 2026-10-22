@@ -84,8 +84,8 @@ export async function GET(req: Request) {
 
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    const correlatedTransactions = rawList.map((tx) => {
-      const txId = String(tx.transactionId || tx.id || '').trim();
+    const correlatedTransactions = rawList.map((tx, idx) => {
+      const txId = String(tx.transactionId || tx.id || '').trim() || `TX-${Date.now()}-${idx}`;
       const amount = Math.round(Number(tx.amount || tx.nominal || tx.total || 0));
       const rawTime = String(tx.time || tx.created_at || tx.timestamp || tx.date || '').trim();
       const isToday = rawTime.startsWith(todayStr);

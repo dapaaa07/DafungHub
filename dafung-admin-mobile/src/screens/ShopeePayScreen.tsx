@@ -90,7 +90,7 @@ export const ShopeePayScreen: React.FC = () => {
       ) : (
         <FlatList
           data={data?.transactions || []}
-          keyExtractor={(item, index) => item.transactionId || String(index)}
+          keyExtractor={(item, index) => `${item.transactionId || 'tx'}_${index}`}
           renderItem={({ item }) => <ShopeePayRow transaction={item} />}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.blue} />

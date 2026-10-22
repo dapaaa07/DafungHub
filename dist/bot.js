@@ -55421,7 +55421,7 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
          ORDER BY o.created_at DESC LIMIT 200`
       );
       const recentOrders = reconciliationRes.rows;
-      const reconciledTransactions = rawTransactions.map((tx) => {
+      const reconciledTransactions = rawTransactions.map((tx, idx) => {
         const txAmount = Number(tx.amount || 0);
         const txTime = new Date(tx.time || tx.created_at || Date.now()).getTime();
         const matchedOrder = recentOrders.find((ord) => {
@@ -55432,7 +55432,7 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
           return diffMinutes <= 180;
         });
         return {
-          transactionId: tx.transaction_id || tx.id || `TX-${Date.now()}`,
+          transactionId: tx.transaction_id || tx.id || `TX-${Date.now()}-${idx}`,
           amount: txAmount,
           formattedAmount: `Rp ${txAmount.toLocaleString("id-ID")}`,
           status: tx.status || "Berhasil",
