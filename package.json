@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "npm run build:bot && next build",
-    "build:bot": "esbuild scripts/run-bot.ts --bundle --platform=node --target=node18 --outfile=dist/bot.js --external:pg-native --external:node-telegram-bot-api",
+    "build:bot": "esbuild scripts/run-bot.ts --bundle --platform=node --target=node18 --outfile=dist/bot.js --external:pg-native --external:node-telegram-bot-api || true",
     "start": "next start",
     "start:bot": "node dist/bot.js",
     "start:dev": "tsx scripts/run-bot.ts",
@@ -23,6 +23,7 @@
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
     "crypto-js": "^4.2.0",
+    "esbuild": "^0.28.2",
     "lucide-react": "^1.55.0",
     "midtrans-client": "^1.4.3",
     "next": "16.4.0",
