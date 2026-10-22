@@ -55787,6 +55787,7 @@ var server = import_http.default.createServer((req, res) => {
       status: "ok",
       service: "DaFung Hub Telegram Bot & Webhook Service",
       mode: process.env.TELEGRAM_BOT_MODE || "webhook",
+      requested_url: req.url,
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
     })
   );
