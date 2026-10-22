@@ -10,9 +10,11 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { colors } from '../theme/colors';
@@ -32,29 +34,61 @@ export const FulfillModal: React.FC<FulfillModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const [mode, setMode] = useState<'text' | 'file'>('text');
+  const [mode, setMode] = useState<'text' | 'image' | 'file'>('text');
   const [credentials, setCredentials] = useState('');
-  const [selectedFile, setSelectedFile] = useState<{ name: string; content: string } | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<{
+    name: string;
+    content: string;
+    isPhoto?: boolean;
+    uri?: string;
+  } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!order) return null;
 
+  const handlePickImage = async () => {
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        const asset = res.assets[0];
+        const name = asset.fileName || `voucher_${Date.now()}.jpg`;
+        setSelectedMedia({
+          name,
+          content: asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : '',
+          isPhoto: true,
+          uri: asset.uri,
+        });
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      }
+    } catch (err) {
+      Alert.alert('Gagal Memilih Gambar', (err as Error).message);
+    }
+  };
+
   const handlePickDocument = async () => {
     try {
       const res = await DocumentPicker.getDocumentAsync({
-        type: ['text/plain', '*/*'],
+        type: ['*/*'],
         copyToCacheDirectory: true,
       });
 
       if (!res.canceled && res.assets && res.assets.length > 0) {
         const file = res.assets[0];
-        const content = await FileSystem.readAsStringAsync(file.uri, {
-          encoding: FileSystem.EncodingType.UTF8,
+        const base64Content = await FileSystem.readAsStringAsync(file.uri, {
+          encoding: FileSystem.EncodingType.Base64,
         });
 
-        setSelectedFile({
+        setSelectedMedia({
           name: file.name,
-          content,
+          content: `data:application/octet-stream;base64,${base64Content}`,
+          isPhoto: false,
+          uri: file.uri,
         });
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       }
@@ -64,12 +98,8 @@ export const FulfillModal: React.FC<FulfillModalProps> = ({
   };
 
   const handleSend = async () => {
-    if (mode === 'text' && !credentials.trim()) {
-      Alert.alert('Perhatian', 'Kredensial teks tidak boleh kosong.');
-      return;
-    }
-    if (mode === 'file' && !selectedFile) {
-      Alert.alert('Perhatian', 'Pilih file (.txt dll) terlebih dahulu.');
+    if (!credentials.trim() && !selectedMedia) {
+      Alert.alert('Perhatian', 'Kredensial teks atau lampiran media wajib diisi.');
       return;
     }
 
@@ -78,13 +108,13 @@ export const FulfillModal: React.FC<FulfillModalProps> = ({
       await api.fulfillOrder(
         order.orderCode,
         credentials.trim(),
-        mode === 'file' && selectedFile ? selectedFile : undefined
+        selectedMedia ? selectedMedia : undefined
       );
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert('Berhasil', `Pesanan ${order.orderCode} berhasil dikirim ke pembeli.`);
+      Alert.alert('Berhasil', `Pesanan ${order.orderCode} berhasil dipenuhi dan dikirim.`);
       setCredentials('');
-      setSelectedFile(null);
+      setSelectedMedia(null);
       onSuccess();
       onClose();
     } catch (err) {
@@ -104,7 +134,7 @@ export const FulfillModal: React.FC<FulfillModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <View>
-              <Text style={styles.title}>Kirim Kredensial</Text>
+              <Text style={styles.title}>Kirim Kredensial & Media</Text>
               <Text style={styles.subtitle}>{order.orderCode} · {order.productName}</Text>
             </View>
             <Pressable onPress={onClose} hitSlop={12} style={styles.closeBtn}>
@@ -129,7 +159,15 @@ export const FulfillModal: React.FC<FulfillModalProps> = ({
               onPress={() => setMode('text')}
             >
               <Text style={[styles.modeTabText, mode === 'text' && styles.modeTabTextActive]}>
-                Teks Kredensial
+                Teks Saja
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.modeTab, mode === 'image' && styles.modeTabActive]}
+              onPress={() => setMode('image')}
+            >
+              <Text style={[styles.modeTabText, mode === 'image' && styles.modeTabTextActive]}>
+                Foto / Gambar
               </Text>
             </Pressable>
             <Pressable
@@ -137,55 +175,60 @@ export const FulfillModal: React.FC<FulfillModalProps> = ({
               onPress={() => setMode('file')}
             >
               <Text style={[styles.modeTabText, mode === 'file' && styles.modeTabTextActive]}>
-                Upload Dokumen (.txt)
+                Berkas (.txt dll)
               </Text>
             </Pressable>
           </View>
 
-          {/* Mode 1: Text */}
-          {mode === 'text' ? (
-            <View style={styles.inputBox}>
-              <TextInput
-                value={credentials}
-                onChangeText={setCredentials}
-                placeholder="Format: email@domain.com | password123"
-                placeholderTextColor={colors.textTertiary}
-                multiline
-                numberOfLines={4}
-                style={styles.textArea}
-              />
-            </View>
-          ) : (
-            /* Mode 2: File */
-            <View style={styles.fileBox}>
-              {selectedFile ? (
+          {/* Media Attach Preview if any */}
+          {mode !== 'text' && (
+            <View style={{ marginBottom: 12 }}>
+              {selectedMedia ? (
                 <View style={styles.fileSelectedRow}>
-                  <Ionicons name="document-text" size={32} color={colors.blue} />
+                  {selectedMedia.isPhoto && selectedMedia.uri ? (
+                    <Image source={{ uri: selectedMedia.uri }} style={{ width: 42, height: 42, borderRadius: 6 }} />
+                  ) : (
+                    <Ionicons name="document-text" size={32} color={colors.blue} />
+                  )}
                   <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={styles.fileName} numberOfLines={1}>{selectedFile.name}</Text>
+                    <Text style={styles.fileName} numberOfLines={1}>{selectedMedia.name}</Text>
                     <Text style={styles.fileSize}>Siap dikirim ke Telegram</Text>
                   </View>
-                  <Pressable onPress={() => setSelectedFile(null)}>
+                  <Pressable onPress={() => setSelectedMedia(null)}>
                     <Ionicons name="trash-outline" size={20} color={colors.chargeRed} />
                   </Pressable>
                 </View>
               ) : (
-                <Pressable style={styles.pickFileBtn} onPress={handlePickDocument}>
-                  <Ionicons name="cloud-upload-outline" size={28} color={colors.blue} />
-                  <Text style={styles.pickFileText}>Sentuh untuk Pilih File .txt</Text>
-                  <Text style={styles.pickFileSub}>Akan dikirim sebagai dokumen Telegram</Text>
+                <Pressable
+                  style={styles.pickFileBtn}
+                  onPress={mode === 'image' ? handlePickImage : handlePickDocument}
+                >
+                  <Ionicons
+                    name={mode === 'image' ? 'image-outline' : 'cloud-upload-outline'}
+                    size={28}
+                    color={colors.blue}
+                  />
+                  <Text style={styles.pickFileText}>
+                    {mode === 'image' ? 'Sentuh untuk Pilih Foto / Screenshot' : 'Sentuh untuk Pilih Berkas / Dokumen'}
+                  </Text>
+                  <Text style={styles.pickFileSub}>Akan dikirim langsung ke chat pembeli</Text>
                 </Pressable>
               )}
-
-              <TextInput
-                value={credentials}
-                onChangeText={setCredentials}
-                placeholder="Catatan tambahan untuk pembeli (opsional)"
-                placeholderTextColor={colors.textTertiary}
-                style={styles.captionInput}
-              />
             </View>
           )}
+
+          {/* Text Input for Credentials / Note */}
+          <View style={styles.inputBox}>
+            <TextInput
+              value={credentials}
+              onChangeText={setCredentials}
+              placeholder={mode === 'text' ? 'Format: email@domain.com | password123' : 'Catatan / petunjuk akun (opsional)'}
+              placeholderTextColor={colors.textTertiary}
+              multiline
+              numberOfLines={4}
+              style={styles.textArea}
+            />
+          </View>
 
           {/* Action Button */}
           <Pressable

@@ -117,7 +117,28 @@ export async function DELETE(
   const productId = decodeURIComponent(id).trim();
 
   try {
-    // Soft toggle or deactivate product
+    const url = new URL(req.url);
+    const permanent = url.searchParams.get('permanent') === 'true';
+
+    if (permanent) {
+      // Hard delete from products table if manual
+      const delRes = await query<{ id: string; name: string }>(
+        'DELETE FROM products WHERE id::text = $1 AND is_manual = true RETURNING id, name',
+        [productId]
+      );
+      if (delRes.rowCount && delRes.rowCount > 0) {
+        return NextResponse.json(
+          {
+            success: true,
+            message: `Produk manual "${delRes.rows[0]?.name || productId}" berhasil dihapus permanen.`,
+            productId,
+          },
+          { status: 200, headers: CORS_HEADERS }
+        );
+      }
+    }
+
+    // Toggle active status
     await query(
       `UPDATE products SET is_active = NOT is_active, updated_at = CURRENT_TIMESTAMP WHERE id::text = $1`,
       [productId]

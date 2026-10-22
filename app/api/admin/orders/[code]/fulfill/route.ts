@@ -52,10 +52,10 @@ export async function POST(
 
     // 1. Find Order and Buyer
     const orderRes = await query<Order & { telegram_id: string; product_name: string }>(
-      `SELECT o.*, u.telegram_id, p.name as product_name
+      `SELECT o.*, COALESCE(u.telegram_id, '') as telegram_id, COALESCE(p.name, 'Produk Khusus') as product_name
        FROM orders o
-       JOIN users u ON o.user_id = u.id
-       JOIN products p ON o.product_id = p.id
+       LEFT JOIN users u ON o.user_id = u.id
+       LEFT JOIN products p ON o.product_id = p.id
        WHERE o.order_code = $1 LIMIT 1`,
       [orderCode]
     );
@@ -74,24 +74,32 @@ export async function POST(
     const buyerChatId = order.telegram_id;
     const token = process.env.TELEGRAM_BOT_TOKEN;
 
-    const storedCredential = file?.name
-      ? `[FILE: ${file.name}] ${credentials || 'Dikirim via berkas'}`
+    const mediaObj = body.media || body.file;
+    const storedCredential = mediaObj?.name
+      ? `[MEDIA: ${mediaObj.name}] ${credentials || 'Dikirim via lampiran media'}`
       : credentials;
     const encryptedKey = encrypt(storedCredential);
 
     // 2. Send delivery to Telegram Buyer
     let sentToTelegram = false;
 
-    if (file?.content && token) {
-      // Send as document file (.txt or specified filename)
-      const fileName = file.name || `${orderCode}_kredensial.txt`;
+    if (mediaObj?.content && token && buyerChatId && buyerChatId !== 'Guest') {
+      const fileName = mediaObj.name || (mediaObj.isPhoto ? `${orderCode}_voucher.jpg` : `${orderCode}_kredensial.txt`);
       let fileBuffer: Buffer;
-      if (file.content.startsWith('data:') && file.content.includes('base64,')) {
-        const base64Data = file.content.split('base64,')[1];
+      if (mediaObj.content.startsWith('data:') && mediaObj.content.includes('base64,')) {
+        const base64Data = mediaObj.content.split('base64,')[1];
         fileBuffer = Buffer.from(base64Data, 'base64');
       } else {
-        fileBuffer = Buffer.from(file.content, 'utf-8');
+        fileBuffer = Buffer.from(mediaObj.content, 'base64');
+        if (fileBuffer.length === 0) {
+          fileBuffer = Buffer.from(mediaObj.content, 'utf-8');
+        }
       }
+
+      const isPhoto = Boolean(
+        mediaObj.isPhoto ||
+        /\.(jpe?g|png|webp|gif)$/i.test(fileName)
+      );
 
       const caption =
         `🎉 <b>PESANAN ANDA TELAH SELESAI!</b>\n` +
@@ -99,16 +107,23 @@ export async function POST(
         `📦 <b>Produk:</b> ${escapeHtml(order.product_name)}\n` +
         `🆔 <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>\n` +
         `━━━━━━━━━━━━━━━━━━━\n\n` +
-        (credentials ? `📝 <b>Catatan / Petunjuk:</b>\n<code>${escapeHtml(credentials)}</code>\n\n` : '') +
-        `📎 <i>Kredensial lengkap terlampir pada dokumen di atas. Simpan baik-baik!</i>\n` +
+        (credentials ? `🔑 <b>Kredensial / Petunjuk:</b>\n<code>${escapeHtml(credentials)}</code>\n\n` : '') +
+        `📎 <i>Lampiran akun digital terlampir di atas. Simpan baik-baik!</i>\n` +
         `<i>Terima kasih telah berbelanja di DaFung Hub!</i>`;
 
       const formData = new FormData();
       formData.append('chat_id', buyerChatId);
       formData.append('caption', caption);
       formData.append('parse_mode', 'HTML');
-      const blob = new Blob([new Uint8Array(fileBuffer)], { type: 'application/octet-stream' });
-      formData.append('document', blob, fileName);
+
+      const mimeType = isPhoto ? 'image/jpeg' : 'application/octet-stream';
+      const blob = new Blob([new Uint8Array(fileBuffer)], { type: mimeType });
+
+      if (isPhoto) {
+        formData.append('photo', blob, fileName);
+      } else {
+        formData.append('document', blob, fileName);
+      }
 
       formData.append(
         'reply_markup',
@@ -120,13 +135,14 @@ export async function POST(
         })
       );
 
-      const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+      const endpoint = isPhoto ? 'sendPhoto' : 'sendDocument';
+      const tgRes = await fetch(`https://api.telegram.org/bot${token}/${endpoint}`, {
         method: 'POST',
         body: formData,
       });
       const tgJson = await tgRes.json().catch(() => null);
       sentToTelegram = Boolean(tgJson?.ok);
-    } else {
+    } else if (credentials && buyerChatId && buyerChatId !== 'Guest') {
       // Send as clean text message
       const textMessage =
         `🎉 <b>PESANAN ANDA TELAH SELESAI!</b>\n` +

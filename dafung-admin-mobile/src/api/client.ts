@@ -224,14 +224,14 @@ export const api = {
 
   fulfillOrder: (
     orderCode: string,
-    credentials: string,
-    file?: { name: string; content: string }
+    credentials?: string,
+    media?: { name: string; content: string; isPhoto?: boolean }
   ) =>
-    request<{ success: boolean; message: string }>(
+    request<{ success: boolean; message: string; sentToTelegram?: boolean }>(
       `/api/admin/orders/${encodeURIComponent(orderCode)}/fulfill`,
       {
         method: 'POST',
-        body: JSON.stringify({ credentials, file }),
+        body: JSON.stringify({ credentials, media, file: media }),
       }
     ),
 
@@ -281,6 +281,14 @@ export const api = {
       }
     ),
 
+  deleteProduct: (id: string, permanent: boolean = true) =>
+    request<{ success: boolean; message: string }>(
+      `/api/admin/products/${encodeURIComponent(id)}${permanent ? '?permanent=true' : ''}`,
+      {
+        method: 'DELETE',
+      }
+    ),
+
   getUsers: (params?: { search?: string; page?: number }) => {
     const sp = new URLSearchParams();
     if (params?.search) sp.set('search', params.search);
@@ -303,12 +311,15 @@ export const api = {
     return request<NotificationCheckData>(`/api/admin/notifications${qs}`);
   },
 
-  sendBroadcast: (text: string) =>
+  sendBroadcast: (
+    text: string,
+    media?: { name: string; content: string; isPhoto?: boolean }
+  ) =>
     request<{ success: boolean; message: string; channel: string }>(
       '/api/admin/broadcast',
       {
         method: 'POST',
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, media }),
       }
     ),
 

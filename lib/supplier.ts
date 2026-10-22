@@ -90,13 +90,43 @@ export function isTestProduct(product: { id?: string; name?: string; description
 }
 
 /**
- * Fetch available products catalogue from supplier (excluding testing/sandbox products unless includeTest is true)
+ * Fetch available products catalogue from supplier + database manual products
  */
-export async function getSupplierProducts(includeTest: boolean = false): Promise<SupplierProduct[]> {
-  const data = await supplierRequest<{ products: SupplierProduct[] }>('/v1/products');
-  const products = data.products || [];
-  if (includeTest) return products;
-  return products.filter((p) => !isTestProduct(p));
+export async function getSupplierProducts(
+  includeTest: boolean = false,
+  includeManual: boolean = true
+): Promise<SupplierProduct[]> {
+  let supplierProducts: SupplierProduct[] = [];
+  try {
+    const data = await supplierRequest<{ products: SupplierProduct[] }>('/v1/products');
+    supplierProducts = data.products || [];
+  } catch (err) {
+    supplierProducts = FALLBACK_PRODUCTS;
+  }
+
+  const filteredSupplier = includeTest ? supplierProducts : supplierProducts.filter((p) => !isTestProduct(p));
+
+  if (!includeManual) {
+    return filteredSupplier;
+  }
+
+  try {
+    const dbRes = await query<Product>(
+      'SELECT * FROM products WHERE is_manual = true AND is_active = true ORDER BY created_at DESC'
+    );
+    const manualProducts: SupplierProduct[] = (dbRes?.rows || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      availability: (p.stock ?? 0) > 0 ? 'in_stock' : 'out_of_stock',
+      price_idr: p.price,
+      description: p.description || '',
+      requires_email: Boolean(p.requires_email),
+      is_manual: true,
+    }));
+    return [...manualProducts, ...filteredSupplier];
+  } catch {
+    return filteredSupplier;
+  }
 }
 
 /**
@@ -655,7 +685,7 @@ export function enrichManualProduct(product: Product): EnrichedProduct {
 export async function getAllEnrichedProducts(includeTest: boolean = false): Promise<EnrichedProduct[]> {
   try {
     const [rawProducts, customPrices, manualDbResult] = await Promise.all([
-      getSupplierProducts(includeTest).catch(() => FALLBACK_PRODUCTS),
+      getSupplierProducts(includeTest, false).catch(() => FALLBACK_PRODUCTS),
       getCustomPrices().catch(() => new Map<string, number>()),
       query<Product>(
         'SELECT * FROM products WHERE is_manual = true AND is_active = true ORDER BY created_at DESC'

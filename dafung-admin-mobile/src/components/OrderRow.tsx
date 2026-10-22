@@ -82,18 +82,20 @@ export const OrderRow: React.FC<OrderRowProps> = ({ order, onFulfill, onPress })
         </View>
       </View>
 
-      {/* 1-Tap Quick Fulfill CTA for pending orders */}
-      {isPending && onFulfill && (
+      {/* 1-Tap Quick Fulfill CTA for undelivered orders */}
+      {!isDelivered && onFulfill && (
         <View style={styles.fulfillBar}>
           <Pressable
-            style={styles.fulfillButton}
+            style={[styles.fulfillButton, !isPaid && { backgroundColor: colors.blue }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
               onFulfill(order);
             }}
           >
             <Ionicons name="send" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.fulfillButtonText}>Kirim Kredensial / Berkas</Text>
+            <Text style={styles.fulfillButtonText}>
+              {isPaid ? 'Kirim Kredensial / Berkas' : 'Kirim Kredensial (Tandai Lunas)'}
+            </Text>
           </Pressable>
         </View>
       )}

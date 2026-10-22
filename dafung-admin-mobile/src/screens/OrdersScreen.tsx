@@ -32,6 +32,12 @@ export const OrdersScreen: React.FC<{ route?: any }> = ({ route }) => {
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [showFulfillModal, setShowFulfillModal] = useState(false);
 
+  useEffect(() => {
+    if (route?.params?.status) {
+      setStatusFilter(route?.params?.status);
+    }
+  }, [route?.params?.status]);
+
   const loadOrders = useCallback(async () => {
     try {
       const res = await api.getOrders({

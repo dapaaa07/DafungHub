@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { colors } from '../theme/colors';
 import { typography, formatIDR } from '../theme/typography';
 import { AddProductModal } from '../components/AddProductModal';
+import { EditProductModal } from '../components/EditProductModal';
 import { api, EnrichedProductItem } from '../api/client';
 
 export const ProductsScreen: React.FC = () => {
@@ -24,6 +25,8 @@ export const ProductsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<EnrichedProductItem | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const loadProducts = useCallback(async () => {
     try {
@@ -145,7 +148,14 @@ export const ProductsScreen: React.FC = () => {
           data={filteredProducts}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <View style={styles.productRow}>
+            <Pressable
+              style={({ pressed }) => [styles.productRow, pressed && { backgroundColor: colors.surfaceMuted }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                setSelectedProduct(item);
+                setShowEditModal(true);
+              }}
+            >
               <View style={styles.prodLeft}>
                 <View style={styles.titleRow}>
                   <Text style={typography.feedName} numberOfLines={1}>
@@ -167,7 +177,7 @@ export const ProductsScreen: React.FC = () => {
                 </Text>
 
                 <Text style={typography.timestamp}>
-                  Stok: {item.availability === 'in_stock' ? item.stock || 'Tersedia' : 'Habis'}
+                  Stok: {item.availability === 'in_stock' ? item.stock || 'Tersedia' : 'Habis'} · Sentuh untuk kelola
                 </Text>
               </View>
 
@@ -176,16 +186,29 @@ export const ProductsScreen: React.FC = () => {
                   {formatIDR(item.sellingPrice || item.price_idr)}
                 </Text>
 
-                <Pressable
-                  style={styles.toggleBtn}
-                  onPress={() => handleToggleProduct(item)}
-                >
-                  <Text style={styles.toggleText}>
-                    {item.availability === 'in_stock' ? 'Aktif' : 'Nonaktif'}
-                  </Text>
-                </Pressable>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
+                  <Pressable
+                    style={styles.toggleBtn}
+                    onPress={() => handleToggleProduct(item)}
+                  >
+                    <Text style={styles.toggleText}>
+                      {item.availability === 'in_stock' ? 'Aktif' : 'Off'}
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.toggleBtn, { backgroundColor: colors.blueTint, borderColor: 'rgba(0, 140, 255, 0.25)' }]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      setSelectedProduct(item);
+                      setShowEditModal(true);
+                    }}
+                  >
+                    <Ionicons name="pencil" size={13} color={colors.blue} />
+                  </Pressable>
+                </View>
               </View>
-            </View>
+            </Pressable>
           )}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.blue} />
@@ -206,6 +229,14 @@ export const ProductsScreen: React.FC = () => {
       <AddProductModal
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
+        onSuccess={loadProducts}
+      />
+
+      {/* Edit / Manage Product Modal */}
+      <EditProductModal
+        visible={showEditModal}
+        product={selectedProduct}
+        onClose={() => setShowEditModal(false)}
         onSuccess={loadProducts}
       />
     </View>

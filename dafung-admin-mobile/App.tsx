@@ -6,6 +6,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { colors } from './src/theme/colors';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { NotificationProvider, useNotifications } from './src/context/NotificationContext';
@@ -24,6 +26,8 @@ const Stack = createNativeStackNavigator();
 
 function MainTabs() {
   const { pendingCount } = useNotifications();
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 12);
 
   return (
     <Tab.Navigator
@@ -35,8 +39,8 @@ function MainTabs() {
           backgroundColor: colors.canvas,
           borderTopColor: colors.divider,
           borderTopWidth: 0.5,
-          height: 60,
-          paddingBottom: 8,
+          height: 54 + bottomInset,
+          paddingBottom: bottomInset,
           paddingTop: 6,
         },
         tabBarLabelStyle: {
@@ -142,11 +146,13 @@ function RootNavigator() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <RootNavigator />
-      </NotificationProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <NotificationProvider>
+          <RootNavigator />
+        </NotificationProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 

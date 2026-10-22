@@ -29,8 +29,6 @@ export async function GET(req: Request) {
     const params: unknown[] = [];
 
     if (status === 'pending') {
-      params.push('paid');
-      whereClause += ` AND o.payment_status = $${params.length}`;
       whereClause += ` AND o.fulfillment_status IN ('pending', 'processing')`;
     } else if (status === 'paid') {
       params.push('paid');
@@ -46,15 +44,15 @@ export async function GET(req: Request) {
     if (search.trim()) {
       params.push(`%${search.trim()}%`);
       const pIdx = params.length;
-      whereClause += ` AND (o.order_code ILIKE $${pIdx} OR u.telegram_id ILIKE $${pIdx} OR u.username ILIKE $${pIdx} OR p.name ILIKE $${pIdx})`;
+      whereClause += ` AND (o.order_code ILIKE $${pIdx} OR COALESCE(u.telegram_id, '') ILIKE $${pIdx} OR COALESCE(u.username, '') ILIKE $${pIdx} OR COALESCE(p.name, '') ILIKE $${pIdx})`;
     }
 
     // Count total matching
     const countRes = await query<{ total: string }>(
       `SELECT COUNT(*)::text as total
        FROM orders o
-       JOIN products p ON o.product_id = p.id
-       JOIN users u ON o.user_id = u.id
+       LEFT JOIN products p ON o.product_id = p.id
+       LEFT JOIN users u ON o.user_id = u.id
        WHERE ${whereClause}`,
       params
     );
@@ -83,13 +81,14 @@ export async function GET(req: Request) {
       first_name: string | null;
       membership_tier: string | null;
     }>(
-      `SELECT o.id, o.order_code, o.product_id, p.name as product_name, p.price as product_price,
+      `SELECT o.id, o.order_code, o.product_id, COALESCE(p.name, 'Produk Khusus') as product_name,
+              COALESCE(p.price, (o.invoice_data->>'amount')::int, 0) as product_price,
               o.payment_status, o.fulfillment_status, o.invoice_data, o.credential_encrypted,
               o.delivered_at, o.created_at,
-              u.telegram_id, u.username, u.first_name, u.membership_tier
+              COALESCE(u.telegram_id, 'Guest') as telegram_id, u.username, u.first_name, u.membership_tier
        FROM orders o
-       JOIN products p ON o.product_id = p.id
-       JOIN users u ON o.user_id = u.id
+       LEFT JOIN products p ON o.product_id = p.id
+       LEFT JOIN users u ON o.user_id = u.id
        WHERE ${whereClause}
        ORDER BY o.created_at DESC
        LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
