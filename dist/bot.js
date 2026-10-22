@@ -20,7 +20,7 @@ var __commonJS = (cb, mod) => function __require() {
     throw mod = 0, e;
   }
 };
-var __export = (target, all) => {
+var __export2 = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
@@ -5373,7 +5373,7 @@ var init_esm = __esm({
 
 // lib/db.ts
 var db_exports = {};
-__export(db_exports, {
+__export2(db_exports, {
   default: () => db_default,
   getClient: () => getClient,
   getPool: () => getPool,
@@ -5437,7 +5437,7 @@ var init_db = __esm({
 
 // lib/settings.ts
 var settings_exports = {};
-__export(settings_exports, {
+__export2(settings_exports, {
   clearSettingsCache: () => clearSettingsCache,
   getBotStatus: () => getBotStatus,
   setBotStatus: () => setBotStatus
@@ -5500,7 +5500,7 @@ var init_settings = __esm({
 
 // lib/pricing.ts
 var pricing_exports = {};
-__export(pricing_exports, {
+__export2(pricing_exports, {
   ADMIN_TELEGRAM_ID: () => ADMIN_TELEGRAM_ID,
   CS_WHATSAPP_INTL: () => CS_WHATSAPP_INTL,
   CS_WHATSAPP_NUMBER: () => CS_WHATSAPP_NUMBER,
@@ -5623,7 +5623,7 @@ var init_pricing = __esm({
 
 // lib/custom-prices.ts
 var custom_prices_exports = {};
-__export(custom_prices_exports, {
+__export2(custom_prices_exports, {
   clearCustomPricesCache: () => clearCustomPricesCache,
   deleteCustomPrice: () => deleteCustomPrice,
   getCustomPrices: () => getCustomPrices,
@@ -5725,7 +5725,7 @@ var init_custom_prices = __esm({
 
 // lib/supplier.ts
 var supplier_exports = {};
-__export(supplier_exports, {
+__export2(supplier_exports, {
   FALLBACK_PRODUCTS: () => FALLBACK_PRODUCTS,
   PLATFORMS: () => PLATFORMS,
   createSupplierOrder: () => createSupplierOrder,
@@ -12896,7 +12896,7 @@ var init_encrypt = __esm({
 
 // lib/broadcast.ts
 var broadcast_exports = {};
-__export(broadcast_exports, {
+__export2(broadcast_exports, {
   broadcastOrderSuccess: () => broadcastOrderSuccess,
   buildOrderBroadcastMessage: () => buildOrderBroadcastMessage,
   formatWibDateTime: () => formatWibDateTime,
@@ -13282,7 +13282,7 @@ var init_broadcast = __esm({
 
 // lib/voucher.ts
 var voucher_exports = {};
-__export(voucher_exports, {
+__export2(voucher_exports, {
   applyVoucherUsage: () => applyVoucherUsage,
   clearPendingUserVoucher: () => clearPendingUserVoucher,
   createVoucher: () => createVoucher,
@@ -13629,7 +13629,7 @@ var init_voucher = __esm({
 
 // lib/membership.ts
 var membership_exports = {};
-__export(membership_exports, {
+__export2(membership_exports, {
   MEMBERSHIP_PACKAGES: () => MEMBERSHIP_PACKAGES,
   MEMBERSHIP_PRODUCT_DISCOUNT: () => MEMBERSHIP_PRODUCT_DISCOUNT,
   MEMBERSHIP_WEEKLY_QUOTA_LIMIT: () => MEMBERSHIP_WEEKLY_QUOTA_LIMIT,
@@ -18404,7 +18404,7 @@ var require_lib3 = __commonJS({
 
 // lib/shopeepay.ts
 var shopeepay_exports = {};
-__export(shopeepay_exports, {
+__export2(shopeepay_exports, {
   SHOPEEPAY_API_KEY: () => SHOPEEPAY_API_KEY,
   SHOPEEPAY_BASE_URL: () => SHOPEEPAY_BASE_URL,
   SHOPEEPAY_STATIC_QRIS: () => SHOPEEPAY_STATIC_QRIS,
@@ -18653,7 +18653,7 @@ var init_shopeepay = __esm({
 
 // lib/fulfillment.ts
 var fulfillment_exports = {};
-__export(fulfillment_exports, {
+__export2(fulfillment_exports, {
   adminManualFulfill: () => adminManualFulfill,
   adminRetrySupplierFulfill: () => adminRetrySupplierFulfill,
   checkAndProcessUnpaidShopeeOrders: () => checkAndProcessUnpaidShopeeOrders,
@@ -19270,10 +19270,10 @@ async function checkAndProcessUnpaidShopeeOrders(botInstance) {
             const now = Date.now();
             if (now - lastSessionExpiredAlert > 2 * 60 * 60 * 1e3) {
               lastSessionExpiredAlert = now;
-              const { ADMIN_TELEGRAM_ID: ADMIN_TELEGRAM_ID3 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
+              const { ADMIN_TELEGRAM_ID: ADMIN_TELEGRAM_ID4 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
               const { sendSafeMessage: sendSafeMessage2 } = await Promise.resolve().then(() => (init_handler(), handler_exports));
               await sendSafeMessage2(
-                { chatId: ADMIN_TELEGRAM_ID3 },
+                { chatId: ADMIN_TELEGRAM_ID4 },
                 botInstance,
                 `\u{1F6A8} <b>PERINGATAN GATEWAY: Sesi ShopeePay Kedaluwarsa!</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
@@ -19309,10 +19309,10 @@ Gateway melaporkan: <code>login timeout, please login again (code 200020)</code>
           const now = Date.now();
           if (now - lastSessionExpiredAlert > 2 * 60 * 60 * 1e3) {
             lastSessionExpiredAlert = now;
-            const { ADMIN_TELEGRAM_ID: ADMIN_TELEGRAM_ID3 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
+            const { ADMIN_TELEGRAM_ID: ADMIN_TELEGRAM_ID4 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
             const { sendSafeMessage: sendSafeMessage2 } = await Promise.resolve().then(() => (init_handler(), handler_exports));
             await sendSafeMessage2(
-              { chatId: ADMIN_TELEGRAM_ID3 },
+              { chatId: ADMIN_TELEGRAM_ID4 },
               botInstance,
               `\u{1F6A8} <b>PERINGATAN GATEWAY: Sesi ShopeePay Kedaluwarsa!</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
@@ -19347,7 +19347,7 @@ var init_fulfillment = __esm({
 
 // lib/channel-gate.ts
 var channel_gate_exports = {};
-__export(channel_gate_exports, {
+__export2(channel_gate_exports, {
   checkUserChannelMembership: () => checkUserChannelMembership,
   clearChannelGateCache: () => clearChannelGateCache,
   clearMembershipCache: () => clearMembershipCache,
@@ -19546,7 +19546,7 @@ var init_channel_gate = __esm({
 
 // lib/admin-media.ts
 var admin_media_exports = {};
-__export(admin_media_exports, {
+__export2(admin_media_exports, {
   clearAdminFulfillDraft: () => clearAdminFulfillDraft,
   clearLastAdminMedia: () => clearLastAdminMedia,
   getAdminFulfillDraft: () => getAdminFulfillDraft,
@@ -19660,7 +19660,7 @@ var init_admin_media = __esm({
 
 // bot/menu.ts
 var menu_exports = {};
-__export(menu_exports, {
+__export2(menu_exports, {
   PLATFORMS: () => PLATFORMS2,
   clearAdminBroadcastState: () => clearAdminBroadcastState,
   clearAdminWaitingFulfillNotes: () => clearAdminWaitingFulfillNotes,
@@ -22264,7 +22264,7 @@ var init_menu = __esm({
 
 // lib/unique-code.ts
 var unique_code_exports = {};
-__export(unique_code_exports, {
+__export2(unique_code_exports, {
   generateUniqueCheckoutAmount: () => generateUniqueCheckoutAmount
 });
 async function generateUniqueCheckoutAmount(baseAmount) {
@@ -44134,20 +44134,20 @@ var require_axios = __commonJS({
       }, env);
       const {
         fetch: envFetch,
-        Request,
+        Request: Request2,
         Response: Response2
       } = env;
       const isFetchSupported = envFetch ? isFunction(envFetch) : typeof fetch === "function";
-      const isRequestSupported = isFunction(Request);
+      const isRequestSupported = isFunction(Request2);
       const isResponseSupported = isFunction(Response2);
       if (!isFetchSupported) {
         return false;
       }
       const isReadableStreamSupported = isFetchSupported && isFunction(ReadableStream2);
-      const encodeText = isFetchSupported && (typeof TextEncoder2 === "function" ? /* @__PURE__ */ ((encoder) => (str) => encoder.encode(str))(new TextEncoder2()) : async (str) => new Uint8Array(await new Request(str).arrayBuffer()));
+      const encodeText = isFetchSupported && (typeof TextEncoder2 === "function" ? /* @__PURE__ */ ((encoder) => (str) => encoder.encode(str))(new TextEncoder2()) : async (str) => new Uint8Array(await new Request2(str).arrayBuffer()));
       const supportsRequestStream = isRequestSupported && isReadableStreamSupported && test(() => {
         let duplexAccessed = false;
-        const request = new Request(platform.origin, {
+        const request = new Request2(platform.origin, {
           body: new ReadableStream2(),
           method: "POST",
           get duplex() {
@@ -44184,7 +44184,7 @@ var require_axios = __commonJS({
           return body.size;
         }
         if (utils$1.isSpecCompliantForm(body)) {
-          const _request = new Request(platform.origin, {
+          const _request = new Request2(platform.origin, {
             method: "POST",
             body
           });
@@ -44291,7 +44291,7 @@ var require_axios = __commonJS({
           if (supportsRequestStream && method !== "get" && method !== "head" && (onUploadProgress || mustEnforceStreamBody)) {
             requestContentLength = requestContentLength == null ? await resolveBodyLength(headers, data) : requestContentLength;
             if (requestContentLength !== 0 || mustEnforceStreamBody) {
-              let _request = new Request(url2, {
+              let _request = new Request2(url2, {
                 method: "POST",
                 body: data,
                 duplex: "half"
@@ -44313,7 +44313,7 @@ var require_axios = __commonJS({
           if (!utils$1.isString(withCredentials)) {
             withCredentials = withCredentials ? "include" : "omit";
           }
-          const isCredentialsSupported = isRequestSupported && "credentials" in Request.prototype;
+          const isCredentialsSupported = isRequestSupported && "credentials" in Request2.prototype;
           if (utils$1.isFormData(data)) {
             const contentType = headers.getContentType();
             if (contentType && /^multipart\/form-data/i.test(contentType) && !/boundary=/i.test(contentType)) {
@@ -44357,7 +44357,7 @@ var require_axios = __commonJS({
               safeFetchOptions.redirect = "manual";
             }
           }
-          request = isRequestSupported && new Request(url2, resolvedOptions);
+          request = isRequestSupported && new Request2(url2, resolvedOptions);
           let response = await (isRequestSupported ? _fetch(request, safeFetchOptions) : _fetch(url2, resolvedOptions));
           const responseHeaders = AxiosHeaders.from(response.headers);
           if (hasMaxContentLength) {
@@ -44462,10 +44462,10 @@ var require_axios = __commonJS({
       let env = config && config.env || {};
       const {
         fetch: fetch2,
-        Request,
+        Request: Request2,
         Response: Response2
       } = env;
-      const seeds = [Request, Response2, fetch2];
+      const seeds = [Request2, Response2, fetch2];
       let len = seeds.length, i = len, seed, target, map = seedCache;
       while (i--) {
         seed = seeds[i];
@@ -46201,7 +46201,7 @@ var require_midtrans_client = __commonJS({
 
 // lib/midtrans.ts
 var midtrans_exports = {};
-__export(midtrans_exports, {
+__export2(midtrans_exports, {
   QrisResult: () => QrisResult,
   coreApi: () => coreApi,
   createQrisTransaction: () => createQrisTransaction,
@@ -46283,7 +46283,7 @@ var init_midtrans = __esm({
 
 // lib/sakurupiah.ts
 var sakurupiah_exports = {};
-__export(sakurupiah_exports, {
+__export2(sakurupiah_exports, {
   SAKURUPIAH_API_ID: () => SAKURUPIAH_API_ID,
   SAKURUPIAH_API_KEY: () => SAKURUPIAH_API_KEY,
   checkSakurupiahStatus: () => checkSakurupiahStatus,
@@ -46891,7 +46891,7 @@ var init_buy = __esm({
 
 // bot/handler.ts
 var handler_exports = {};
-__export(handler_exports, {
+__export2(handler_exports, {
   bot: () => bot,
   cleanupChatMessages: () => cleanupChatMessages,
   clearPreviousBotMessages: () => clearPreviousBotMessages,
@@ -47773,21 +47773,7837 @@ var init_handler = __esm({
   }
 });
 
+// node_modules/next/dist/shared/lib/i18n/detect-domain-locale.js
+var require_detect_domain_locale = __commonJS({
+  "node_modules/next/dist/shared/lib/i18n/detect-domain-locale.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "detectDomainLocale", {
+      enumerable: true,
+      get: function() {
+        return detectDomainLocale;
+      }
+    });
+    function detectDomainLocale(domainItems, hostname, detectedLocale) {
+      if (!domainItems) return;
+      if (detectedLocale) {
+        detectedLocale = detectedLocale.toLowerCase();
+      }
+      for (const item of domainItems) {
+        const domainHostname = item.domain?.split(":", 1)[0].toLowerCase();
+        if (hostname === domainHostname || detectedLocale === item.defaultLocale.toLowerCase() || item.locales?.some((locale) => locale.toLowerCase() === detectedLocale)) {
+          return item;
+        }
+      }
+    }
+  }
+});
+
+// node_modules/next/dist/shared/lib/router/utils/remove-trailing-slash.js
+var require_remove_trailing_slash = __commonJS({
+  "node_modules/next/dist/shared/lib/router/utils/remove-trailing-slash.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "removeTrailingSlash", {
+      enumerable: true,
+      get: function() {
+        return removeTrailingSlash;
+      }
+    });
+    function removeTrailingSlash(route) {
+      return route.charCodeAt(route.length - 1) === 47 && route.length > 1 ? route.slice(0, -1) : route;
+    }
+  }
+});
+
+// node_modules/next/dist/shared/lib/router/utils/parse-path.js
+var require_parse_path = __commonJS({
+  "node_modules/next/dist/shared/lib/router/utils/parse-path.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "parsePath", {
+      enumerable: true,
+      get: function() {
+        return parsePath;
+      }
+    });
+    function parsePath(path2) {
+      const hashIndex = path2.indexOf("#");
+      const queryIndex = path2.indexOf("?");
+      const hasQuery = queryIndex > -1 && (hashIndex < 0 || queryIndex < hashIndex);
+      if (hasQuery || hashIndex > -1) {
+        return {
+          pathname: path2.substring(0, hasQuery ? queryIndex : hashIndex),
+          query: hasQuery ? path2.substring(queryIndex, hashIndex > -1 ? hashIndex : void 0) : "",
+          hash: hashIndex > -1 ? path2.slice(hashIndex) : ""
+        };
+      }
+      return {
+        pathname: path2,
+        query: "",
+        hash: ""
+      };
+    }
+  }
+});
+
+// node_modules/next/dist/shared/lib/router/utils/add-path-prefix.js
+var require_add_path_prefix = __commonJS({
+  "node_modules/next/dist/shared/lib/router/utils/add-path-prefix.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "addPathPrefix", {
+      enumerable: true,
+      get: function() {
+        return addPathPrefix;
+      }
+    });
+    var _parsepath = require_parse_path();
+    function addPathPrefix(path2, prefix) {
+      if (!path2.startsWith("/") || !prefix) {
+        return path2;
+      }
+      const { pathname, query: query2, hash } = (0, _parsepath.parsePath)(path2);
+      return `${prefix}${pathname}${query2}${hash}`;
+    }
+  }
+});
+
+// node_modules/next/dist/shared/lib/router/utils/add-path-suffix.js
+var require_add_path_suffix = __commonJS({
+  "node_modules/next/dist/shared/lib/router/utils/add-path-suffix.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "addPathSuffix", {
+      enumerable: true,
+      get: function() {
+        return addPathSuffix;
+      }
+    });
+    var _parsepath = require_parse_path();
+    function addPathSuffix(path2, suffix) {
+      if (!path2.startsWith("/") || !suffix) {
+        return path2;
+      }
+      const { pathname, query: query2, hash } = (0, _parsepath.parsePath)(path2);
+      return `${pathname}${suffix}${query2}${hash}`;
+    }
+  }
+});
+
+// node_modules/next/dist/shared/lib/router/utils/path-has-prefix.js
+var require_path_has_prefix = __commonJS({
+  "node_modules/next/dist/shared/lib/router/utils/path-has-prefix.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "pathHasPrefix", {
+      enumerable: true,
+      get: function() {
+        return pathHasPrefix;
+      }
+    });
+    var _parsepath = require_parse_path();
+    function pathHasPrefix(path2, prefix) {
+      if (typeof path2 !== "string") {
+        return false;
+      }
+      const { pathname } = (0, _parsepath.parsePath)(path2);
+      return pathname === prefix || pathname.startsWith(prefix + "/");
+    }
+  }
+});
+
+// node_modules/next/dist/shared/lib/router/utils/add-locale.js
+var require_add_locale = __commonJS({
+  "node_modules/next/dist/shared/lib/router/utils/add-locale.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "addLocale", {
+      enumerable: true,
+      get: function() {
+        return addLocale;
+      }
+    });
+    var _addpathprefix = require_add_path_prefix();
+    var _pathhasprefix = require_path_has_prefix();
+    function addLocale(path2, locale, defaultLocale, ignorePrefix) {
+      if (!locale || locale === defaultLocale) return path2;
+      const lower = path2.toLowerCase();
+      if (!ignorePrefix) {
+        if ((0, _pathhasprefix.pathHasPrefix)(lower, "/api")) return path2;
+        if ((0, _pathhasprefix.pathHasPrefix)(lower, `/${locale.toLowerCase()}`)) return path2;
+      }
+      return (0, _addpathprefix.addPathPrefix)(path2, `/${locale}`);
+    }
+  }
+});
+
+// node_modules/next/dist/shared/lib/router/utils/format-next-pathname-info.js
+var require_format_next_pathname_info = __commonJS({
+  "node_modules/next/dist/shared/lib/router/utils/format-next-pathname-info.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "formatNextPathnameInfo", {
+      enumerable: true,
+      get: function() {
+        return formatNextPathnameInfo;
+      }
+    });
+    var _removetrailingslash = require_remove_trailing_slash();
+    var _addpathprefix = require_add_path_prefix();
+    var _addpathsuffix = require_add_path_suffix();
+    var _addlocale = require_add_locale();
+    function formatNextPathnameInfo(info) {
+      let pathname = (0, _addlocale.addLocale)(info.pathname, info.locale, info.buildId ? void 0 : info.defaultLocale, info.ignorePrefix);
+      if (info.buildId || !info.trailingSlash) {
+        pathname = (0, _removetrailingslash.removeTrailingSlash)(pathname);
+      }
+      if (info.buildId) {
+        pathname = (0, _addpathsuffix.addPathSuffix)((0, _addpathprefix.addPathPrefix)(pathname, `/_next/data/${info.buildId}`), info.pathname === "/" ? "index.json" : ".json");
+      }
+      pathname = (0, _addpathprefix.addPathPrefix)(pathname, info.basePath);
+      return !info.buildId && info.trailingSlash ? !pathname.endsWith("/") ? (0, _addpathsuffix.addPathSuffix)(pathname, "/") : pathname : (0, _removetrailingslash.removeTrailingSlash)(pathname);
+    }
+  }
+});
+
+// node_modules/next/dist/shared/lib/get-hostname.js
+var require_get_hostname = __commonJS({
+  "node_modules/next/dist/shared/lib/get-hostname.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "getHostname", {
+      enumerable: true,
+      get: function() {
+        return getHostname;
+      }
+    });
+    function getHostname(parsed, headers) {
+      let hostname;
+      if (headers?.host && !Array.isArray(headers.host)) {
+        hostname = headers.host.toString().split(":", 1)[0];
+      } else if (parsed.hostname) {
+        hostname = parsed.hostname;
+      } else return;
+      return hostname.toLowerCase();
+    }
+  }
+});
+
+// node_modules/next/dist/shared/lib/i18n/normalize-locale-path.js
+var require_normalize_locale_path = __commonJS({
+  "node_modules/next/dist/shared/lib/i18n/normalize-locale-path.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "normalizeLocalePath", {
+      enumerable: true,
+      get: function() {
+        return normalizeLocalePath;
+      }
+    });
+    var cache = /* @__PURE__ */ new WeakMap();
+    function normalizeLocalePath(pathname, locales) {
+      if (!locales) return {
+        pathname
+      };
+      let lowercasedLocales = cache.get(locales);
+      if (!lowercasedLocales) {
+        lowercasedLocales = locales.map((locale) => locale.toLowerCase());
+        cache.set(locales, lowercasedLocales);
+      }
+      let detectedLocale;
+      const segments = pathname.split("/", 2);
+      if (!segments[1]) return {
+        pathname
+      };
+      const segment = segments[1].toLowerCase();
+      const index = lowercasedLocales.indexOf(segment);
+      if (index < 0) return {
+        pathname
+      };
+      detectedLocale = locales[index];
+      pathname = pathname.slice(detectedLocale.length + 1) || "/";
+      return {
+        pathname,
+        detectedLocale
+      };
+    }
+  }
+});
+
+// node_modules/next/dist/shared/lib/router/utils/remove-path-prefix.js
+var require_remove_path_prefix = __commonJS({
+  "node_modules/next/dist/shared/lib/router/utils/remove-path-prefix.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "removePathPrefix", {
+      enumerable: true,
+      get: function() {
+        return removePathPrefix;
+      }
+    });
+    var _pathhasprefix = require_path_has_prefix();
+    function removePathPrefix(path2, prefix) {
+      if (!(0, _pathhasprefix.pathHasPrefix)(path2, prefix)) {
+        return path2;
+      }
+      const withoutPrefix = path2.slice(prefix.length);
+      if (withoutPrefix.startsWith("/")) {
+        return withoutPrefix;
+      }
+      return `/${withoutPrefix}`;
+    }
+  }
+});
+
+// node_modules/next/dist/shared/lib/router/utils/get-next-pathname-info.js
+var require_get_next_pathname_info = __commonJS({
+  "node_modules/next/dist/shared/lib/router/utils/get-next-pathname-info.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "getNextPathnameInfo", {
+      enumerable: true,
+      get: function() {
+        return getNextPathnameInfo;
+      }
+    });
+    var _normalizelocalepath = require_normalize_locale_path();
+    var _removepathprefix = require_remove_path_prefix();
+    var _pathhasprefix = require_path_has_prefix();
+    function getNextPathnameInfo(pathname, options) {
+      const { basePath, i18n, trailingSlash } = options.nextConfig ?? {};
+      const info = {
+        pathname,
+        trailingSlash: pathname !== "/" ? pathname.endsWith("/") : trailingSlash
+      };
+      if (basePath && (0, _pathhasprefix.pathHasPrefix)(info.pathname, basePath)) {
+        info.pathname = (0, _removepathprefix.removePathPrefix)(info.pathname, basePath);
+        info.basePath = basePath;
+      }
+      let pathnameNoDataPrefix = info.pathname;
+      if (info.pathname.startsWith("/_next/data/") && info.pathname.endsWith(".json")) {
+        const paths = info.pathname.replace(/^\/_next\/data\//, "").replace(/\.json$/, "").split("/");
+        const buildId = paths[0];
+        info.buildId = buildId;
+        pathnameNoDataPrefix = paths[1] !== "index" ? `/${paths.slice(1).join("/")}` : "/";
+        if (options.parseData === true) {
+          info.pathname = pathnameNoDataPrefix;
+        }
+      }
+      if (i18n) {
+        let result = options.i18nProvider ? options.i18nProvider.analyze(info.pathname) : (0, _normalizelocalepath.normalizeLocalePath)(info.pathname, i18n.locales);
+        info.locale = result.detectedLocale;
+        info.pathname = result.pathname ?? info.pathname;
+        if (!result.detectedLocale && info.buildId) {
+          result = options.i18nProvider ? options.i18nProvider.analyze(pathnameNoDataPrefix) : (0, _normalizelocalepath.normalizeLocalePath)(pathnameNoDataPrefix, i18n.locales);
+          if (result.detectedLocale) {
+            info.locale = result.detectedLocale;
+          }
+        }
+      }
+      return info;
+    }
+  }
+});
+
+// node_modules/next/dist/server/web/next-url.js
+var require_next_url = __commonJS({
+  "node_modules/next/dist/server/web/next-url.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "NextURL", {
+      enumerable: true,
+      get: function() {
+        return NextURL;
+      }
+    });
+    var _detectdomainlocale = require_detect_domain_locale();
+    var _formatnextpathnameinfo = require_format_next_pathname_info();
+    var _gethostname = require_get_hostname();
+    var _getnextpathnameinfo = require_get_next_pathname_info();
+    var REGEX_LOCALHOST_HOSTNAME = /^(?:127(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}|\[::1\]|localhost)$/;
+    function parseURL(url, base) {
+      const parsed = new URL(String(url), base && String(base));
+      if (REGEX_LOCALHOST_HOSTNAME.test(parsed.hostname)) {
+        parsed.hostname = "localhost";
+      }
+      return parsed;
+    }
+    var Internal = /* @__PURE__ */ Symbol("NextURLInternal");
+    var NextURL = class _NextURL {
+      constructor(input, baseOrOpts, opts) {
+        let base;
+        let options;
+        if (typeof baseOrOpts === "object" && "pathname" in baseOrOpts || typeof baseOrOpts === "string") {
+          base = baseOrOpts;
+          options = opts || {};
+        } else {
+          options = opts || baseOrOpts || {};
+        }
+        this[Internal] = {
+          url: parseURL(input, base ?? options.base),
+          options,
+          basePath: ""
+        };
+        this.analyze();
+      }
+      analyze() {
+        var _this_Internal_options_nextConfig_i18n, _this_Internal_options_nextConfig, _this_Internal_domainLocale, _this_Internal_options_nextConfig_i18n1, _this_Internal_options_nextConfig1;
+        const info = (0, _getnextpathnameinfo.getNextPathnameInfo)(this[Internal].url.pathname, {
+          nextConfig: this[Internal].options.nextConfig,
+          parseData: !process.env.__NEXT_NO_MIDDLEWARE_URL_NORMALIZE,
+          i18nProvider: this[Internal].options.i18nProvider
+        });
+        const hostname = (0, _gethostname.getHostname)(this[Internal].url, this[Internal].options.headers);
+        this[Internal].domainLocale = this[Internal].options.i18nProvider ? this[Internal].options.i18nProvider.detectDomainLocale(hostname) : (0, _detectdomainlocale.detectDomainLocale)((_this_Internal_options_nextConfig = this[Internal].options.nextConfig) == null ? void 0 : (_this_Internal_options_nextConfig_i18n = _this_Internal_options_nextConfig.i18n) == null ? void 0 : _this_Internal_options_nextConfig_i18n.domains, hostname);
+        const defaultLocale = ((_this_Internal_domainLocale = this[Internal].domainLocale) == null ? void 0 : _this_Internal_domainLocale.defaultLocale) || ((_this_Internal_options_nextConfig1 = this[Internal].options.nextConfig) == null ? void 0 : (_this_Internal_options_nextConfig_i18n1 = _this_Internal_options_nextConfig1.i18n) == null ? void 0 : _this_Internal_options_nextConfig_i18n1.defaultLocale);
+        this[Internal].url.pathname = info.pathname;
+        this[Internal].defaultLocale = defaultLocale;
+        this[Internal].basePath = info.basePath ?? "";
+        this[Internal].buildId = info.buildId;
+        this[Internal].locale = info.locale ?? defaultLocale;
+        this[Internal].trailingSlash = info.trailingSlash;
+      }
+      formatPathname() {
+        return (0, _formatnextpathnameinfo.formatNextPathnameInfo)({
+          basePath: this[Internal].basePath,
+          buildId: this[Internal].buildId,
+          defaultLocale: !this[Internal].options.forceLocale ? this[Internal].defaultLocale : void 0,
+          locale: this[Internal].locale,
+          pathname: this[Internal].url.pathname,
+          trailingSlash: this[Internal].trailingSlash
+        });
+      }
+      formatSearch() {
+        return this[Internal].url.search;
+      }
+      get buildId() {
+        return this[Internal].buildId;
+      }
+      set buildId(buildId) {
+        this[Internal].buildId = buildId;
+      }
+      get locale() {
+        return this[Internal].locale ?? "";
+      }
+      set locale(locale) {
+        var _this_Internal_options_nextConfig_i18n, _this_Internal_options_nextConfig;
+        if (!this[Internal].locale || !((_this_Internal_options_nextConfig = this[Internal].options.nextConfig) == null ? void 0 : (_this_Internal_options_nextConfig_i18n = _this_Internal_options_nextConfig.i18n) == null ? void 0 : _this_Internal_options_nextConfig_i18n.locales.includes(locale))) {
+          throw new TypeError(`The NextURL configuration includes no locale "${locale}"`);
+        }
+        this[Internal].locale = locale;
+      }
+      get defaultLocale() {
+        return this[Internal].defaultLocale;
+      }
+      get domainLocale() {
+        return this[Internal].domainLocale;
+      }
+      get searchParams() {
+        return this[Internal].url.searchParams;
+      }
+      get host() {
+        return this[Internal].url.host;
+      }
+      set host(value) {
+        this[Internal].url.host = value;
+      }
+      get hostname() {
+        return this[Internal].url.hostname;
+      }
+      set hostname(value) {
+        this[Internal].url.hostname = value;
+      }
+      get port() {
+        return this[Internal].url.port;
+      }
+      set port(value) {
+        this[Internal].url.port = value;
+      }
+      get protocol() {
+        return this[Internal].url.protocol;
+      }
+      set protocol(value) {
+        this[Internal].url.protocol = value;
+      }
+      get href() {
+        const pathname = this.formatPathname();
+        const search = this.formatSearch();
+        return `${this.protocol}//${this.host}${pathname}${search}${this.hash}`;
+      }
+      set href(url) {
+        this[Internal].url = parseURL(url);
+        this.analyze();
+      }
+      get origin() {
+        return this[Internal].url.origin;
+      }
+      get pathname() {
+        return this[Internal].url.pathname;
+      }
+      set pathname(value) {
+        this[Internal].url.pathname = value;
+      }
+      get hash() {
+        return this[Internal].url.hash;
+      }
+      set hash(value) {
+        this[Internal].url.hash = value;
+      }
+      get search() {
+        return this[Internal].url.search;
+      }
+      set search(value) {
+        this[Internal].url.search = value;
+      }
+      get password() {
+        return this[Internal].url.password;
+      }
+      set password(value) {
+        this[Internal].url.password = value;
+      }
+      get username() {
+        return this[Internal].url.username;
+      }
+      set username(value) {
+        this[Internal].url.username = value;
+      }
+      get basePath() {
+        return this[Internal].basePath;
+      }
+      set basePath(value) {
+        this[Internal].basePath = value.startsWith("/") ? value : `/${value}`;
+      }
+      toString() {
+        return this.href;
+      }
+      toJSON() {
+        return this.href;
+      }
+      [/* @__PURE__ */ Symbol.for("edge-runtime.inspect.custom")]() {
+        return {
+          href: this.href,
+          origin: this.origin,
+          protocol: this.protocol,
+          username: this.username,
+          password: this.password,
+          host: this.host,
+          hostname: this.hostname,
+          port: this.port,
+          pathname: this.pathname,
+          search: this.search,
+          searchParams: this.searchParams,
+          hash: this.hash
+        };
+      }
+      clone() {
+        return new _NextURL(String(this), this[Internal].options);
+      }
+    };
+  }
+});
+
+// node_modules/next/dist/lib/constants.js
+var require_constants2 = __commonJS({
+  "node_modules/next/dist/lib/constants.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      ACTION_SUFFIX: function() {
+        return ACTION_SUFFIX;
+      },
+      APP_DIR_ALIAS: function() {
+        return APP_DIR_ALIAS;
+      },
+      CACHE_ONE_YEAR_SECONDS: function() {
+        return CACHE_ONE_YEAR_SECONDS;
+      },
+      DOT_NEXT_ALIAS: function() {
+        return DOT_NEXT_ALIAS;
+      },
+      ESLINT_DEFAULT_DIRS: function() {
+        return ESLINT_DEFAULT_DIRS;
+      },
+      GSP_NO_RETURNED_VALUE: function() {
+        return GSP_NO_RETURNED_VALUE;
+      },
+      GSSP_COMPONENT_MEMBER_ERROR: function() {
+        return GSSP_COMPONENT_MEMBER_ERROR;
+      },
+      GSSP_NO_RETURNED_VALUE: function() {
+        return GSSP_NO_RETURNED_VALUE;
+      },
+      HTML_CONTENT_TYPE_HEADER: function() {
+        return HTML_CONTENT_TYPE_HEADER;
+      },
+      INFINITE_CACHE: function() {
+        return INFINITE_CACHE;
+      },
+      INSTRUMENTATION_HOOK_FILENAME: function() {
+        return INSTRUMENTATION_HOOK_FILENAME;
+      },
+      JSON_CONTENT_TYPE_HEADER: function() {
+        return JSON_CONTENT_TYPE_HEADER;
+      },
+      MATCHED_PATH_HEADER: function() {
+        return MATCHED_PATH_HEADER;
+      },
+      MIDDLEWARE_FILENAME: function() {
+        return MIDDLEWARE_FILENAME;
+      },
+      MIDDLEWARE_LOCATION_REGEXP: function() {
+        return MIDDLEWARE_LOCATION_REGEXP;
+      },
+      NEXT_BODY_SUFFIX: function() {
+        return NEXT_BODY_SUFFIX;
+      },
+      NEXT_CACHE_IMPLICIT_TAG_ID: function() {
+        return NEXT_CACHE_IMPLICIT_TAG_ID;
+      },
+      NEXT_CACHE_REVALIDATED_TAGS_HEADER: function() {
+        return NEXT_CACHE_REVALIDATED_TAGS_HEADER;
+      },
+      NEXT_CACHE_REVALIDATE_TAG_TOKEN_HEADER: function() {
+        return NEXT_CACHE_REVALIDATE_TAG_TOKEN_HEADER;
+      },
+      NEXT_CACHE_ROOT_PARAM_TAG_ID: function() {
+        return NEXT_CACHE_ROOT_PARAM_TAG_ID;
+      },
+      NEXT_CACHE_SOFT_TAG_MAX_LENGTH: function() {
+        return NEXT_CACHE_SOFT_TAG_MAX_LENGTH;
+      },
+      NEXT_CACHE_TAGS_HEADER: function() {
+        return NEXT_CACHE_TAGS_HEADER;
+      },
+      NEXT_CACHE_TAG_MAX_ITEMS: function() {
+        return NEXT_CACHE_TAG_MAX_ITEMS;
+      },
+      NEXT_CACHE_TAG_MAX_LENGTH: function() {
+        return NEXT_CACHE_TAG_MAX_LENGTH;
+      },
+      NEXT_DATA_SUFFIX: function() {
+        return NEXT_DATA_SUFFIX;
+      },
+      NEXT_INTERCEPTION_MARKER_PREFIX: function() {
+        return NEXT_INTERCEPTION_MARKER_PREFIX;
+      },
+      NEXT_META_SUFFIX: function() {
+        return NEXT_META_SUFFIX;
+      },
+      NEXT_NAV_DEPLOYMENT_ID_HEADER: function() {
+        return NEXT_NAV_DEPLOYMENT_ID_HEADER;
+      },
+      NEXT_QUERY_PARAM_PREFIX: function() {
+        return NEXT_QUERY_PARAM_PREFIX;
+      },
+      NEXT_RESUME_HEADER: function() {
+        return NEXT_RESUME_HEADER;
+      },
+      NEXT_RESUME_STATE_LENGTH_HEADER: function() {
+        return NEXT_RESUME_STATE_LENGTH_HEADER;
+      },
+      NON_STANDARD_NODE_ENV: function() {
+        return NON_STANDARD_NODE_ENV;
+      },
+      PAGES_DIR_ALIAS: function() {
+        return PAGES_DIR_ALIAS;
+      },
+      PRERENDER_REVALIDATE_HEADER: function() {
+        return PRERENDER_REVALIDATE_HEADER;
+      },
+      PRERENDER_REVALIDATE_ONLY_GENERATED_HEADER: function() {
+        return PRERENDER_REVALIDATE_ONLY_GENERATED_HEADER;
+      },
+      PROXY_FILENAME: function() {
+        return PROXY_FILENAME;
+      },
+      PROXY_LOCATION_REGEXP: function() {
+        return PROXY_LOCATION_REGEXP;
+      },
+      PUBLIC_DIR_MIDDLEWARE_CONFLICT: function() {
+        return PUBLIC_DIR_MIDDLEWARE_CONFLICT;
+      },
+      ROOT_DIR_ALIAS: function() {
+        return ROOT_DIR_ALIAS;
+      },
+      RSC_ACTION_CLIENT_WRAPPER_ALIAS: function() {
+        return RSC_ACTION_CLIENT_WRAPPER_ALIAS;
+      },
+      RSC_ACTION_ENCRYPTION_ALIAS: function() {
+        return RSC_ACTION_ENCRYPTION_ALIAS;
+      },
+      RSC_ACTION_PROXY_ALIAS: function() {
+        return RSC_ACTION_PROXY_ALIAS;
+      },
+      RSC_ACTION_VALIDATE_ALIAS: function() {
+        return RSC_ACTION_VALIDATE_ALIAS;
+      },
+      RSC_CACHE_WRAPPER_ALIAS: function() {
+        return RSC_CACHE_WRAPPER_ALIAS;
+      },
+      RSC_DYNAMIC_IMPORT_WRAPPER_ALIAS: function() {
+        return RSC_DYNAMIC_IMPORT_WRAPPER_ALIAS;
+      },
+      RSC_MOD_REF_PROXY_ALIAS: function() {
+        return RSC_MOD_REF_PROXY_ALIAS;
+      },
+      RSC_SEGMENTS_DIR_SUFFIX: function() {
+        return RSC_SEGMENTS_DIR_SUFFIX;
+      },
+      RSC_SEGMENT_SUFFIX: function() {
+        return RSC_SEGMENT_SUFFIX;
+      },
+      RSC_SUFFIX: function() {
+        return RSC_SUFFIX;
+      },
+      SERVER_PROPS_EXPORT_ERROR: function() {
+        return SERVER_PROPS_EXPORT_ERROR;
+      },
+      SERVER_PROPS_GET_INIT_PROPS_CONFLICT: function() {
+        return SERVER_PROPS_GET_INIT_PROPS_CONFLICT;
+      },
+      SERVER_PROPS_SSG_CONFLICT: function() {
+        return SERVER_PROPS_SSG_CONFLICT;
+      },
+      SERVER_RUNTIME: function() {
+        return SERVER_RUNTIME;
+      },
+      SSG_FALLBACK_EXPORT_ERROR: function() {
+        return SSG_FALLBACK_EXPORT_ERROR;
+      },
+      SSG_GET_INITIAL_PROPS_CONFLICT: function() {
+        return SSG_GET_INITIAL_PROPS_CONFLICT;
+      },
+      STATIC_STATUS_PAGE_GET_INITIAL_PROPS_ERROR: function() {
+        return STATIC_STATUS_PAGE_GET_INITIAL_PROPS_ERROR;
+      },
+      TEXT_PLAIN_CONTENT_TYPE_HEADER: function() {
+        return TEXT_PLAIN_CONTENT_TYPE_HEADER;
+      },
+      UNSTABLE_REVALIDATE_RENAME_ERROR: function() {
+        return UNSTABLE_REVALIDATE_RENAME_ERROR;
+      },
+      WEBPACK_LAYERS: function() {
+        return WEBPACK_LAYERS;
+      },
+      WEBPACK_RESOURCE_QUERIES: function() {
+        return WEBPACK_RESOURCE_QUERIES;
+      },
+      WEB_SOCKET_MAX_RECONNECTIONS: function() {
+        return WEB_SOCKET_MAX_RECONNECTIONS;
+      }
+    });
+    var TEXT_PLAIN_CONTENT_TYPE_HEADER = "text/plain";
+    var HTML_CONTENT_TYPE_HEADER = "text/html; charset=utf-8";
+    var JSON_CONTENT_TYPE_HEADER = "application/json; charset=utf-8";
+    var NEXT_QUERY_PARAM_PREFIX = "nxtP";
+    var NEXT_INTERCEPTION_MARKER_PREFIX = "nxtI";
+    var MATCHED_PATH_HEADER = "x-matched-path";
+    var PRERENDER_REVALIDATE_HEADER = "x-prerender-revalidate";
+    var PRERENDER_REVALIDATE_ONLY_GENERATED_HEADER = "x-prerender-revalidate-if-generated";
+    var RSC_SEGMENTS_DIR_SUFFIX = ".segments";
+    var RSC_SEGMENT_SUFFIX = ".segment.rsc";
+    var RSC_SUFFIX = ".rsc";
+    var ACTION_SUFFIX = ".action";
+    var NEXT_DATA_SUFFIX = ".json";
+    var NEXT_META_SUFFIX = ".meta";
+    var NEXT_BODY_SUFFIX = ".body";
+    var NEXT_NAV_DEPLOYMENT_ID_HEADER = "x-nextjs-deployment-id";
+    var NEXT_CACHE_TAGS_HEADER = "x-next-cache-tags";
+    var NEXT_CACHE_REVALIDATED_TAGS_HEADER = "x-next-revalidated-tags";
+    var NEXT_CACHE_REVALIDATE_TAG_TOKEN_HEADER = "x-next-revalidate-tag-token";
+    var NEXT_RESUME_HEADER = "next-resume";
+    var NEXT_RESUME_STATE_LENGTH_HEADER = "x-next-resume-state-length";
+    var NEXT_CACHE_TAG_MAX_ITEMS = 128;
+    var NEXT_CACHE_TAG_MAX_LENGTH = 256;
+    var NEXT_CACHE_SOFT_TAG_MAX_LENGTH = 1024;
+    var NEXT_CACHE_IMPLICIT_TAG_ID = "_N_T_";
+    var NEXT_CACHE_ROOT_PARAM_TAG_ID = "_N_RP_";
+    var CACHE_ONE_YEAR_SECONDS = 31536e3;
+    var INFINITE_CACHE = 4294967294;
+    var MIDDLEWARE_FILENAME = "middleware";
+    var MIDDLEWARE_LOCATION_REGEXP = `(?:src/)?${MIDDLEWARE_FILENAME}`;
+    var PROXY_FILENAME = "proxy";
+    var PROXY_LOCATION_REGEXP = `(?:src/)?${PROXY_FILENAME}`;
+    var INSTRUMENTATION_HOOK_FILENAME = "instrumentation";
+    var PAGES_DIR_ALIAS = "private-next-pages";
+    var DOT_NEXT_ALIAS = "private-dot-next";
+    var ROOT_DIR_ALIAS = "private-next-root-dir";
+    var APP_DIR_ALIAS = "private-next-app-dir";
+    var RSC_MOD_REF_PROXY_ALIAS = "private-next-rsc-mod-ref-proxy";
+    var RSC_ACTION_VALIDATE_ALIAS = "private-next-rsc-action-validate";
+    var RSC_ACTION_PROXY_ALIAS = "private-next-rsc-server-reference";
+    var RSC_CACHE_WRAPPER_ALIAS = "private-next-rsc-cache-wrapper";
+    var RSC_DYNAMIC_IMPORT_WRAPPER_ALIAS = "private-next-rsc-track-dynamic-import";
+    var RSC_ACTION_ENCRYPTION_ALIAS = "private-next-rsc-action-encryption";
+    var RSC_ACTION_CLIENT_WRAPPER_ALIAS = "private-next-rsc-action-client-wrapper";
+    var PUBLIC_DIR_MIDDLEWARE_CONFLICT = `You can not have a '_next' folder inside of your public folder. This conflicts with the internal '/_next' route. https://nextjs.org/docs/messages/public-next-folder-conflict`;
+    var SSG_GET_INITIAL_PROPS_CONFLICT = `You can not use getInitialProps with getStaticProps. To use SSG, please remove your getInitialProps`;
+    var SERVER_PROPS_GET_INIT_PROPS_CONFLICT = `You can not use getInitialProps with getServerSideProps. Please remove getInitialProps.`;
+    var SERVER_PROPS_SSG_CONFLICT = `You can not use getStaticProps or getStaticPaths with getServerSideProps. To use SSG, please remove getServerSideProps`;
+    var STATIC_STATUS_PAGE_GET_INITIAL_PROPS_ERROR = `can not have getInitialProps/getServerSideProps, https://nextjs.org/docs/messages/404-get-initial-props`;
+    var SERVER_PROPS_EXPORT_ERROR = `pages with \`getServerSideProps\` can not be exported. See more info here: https://nextjs.org/docs/messages/gssp-export`;
+    var GSP_NO_RETURNED_VALUE = "Your `getStaticProps` function did not return an object. Did you forget to add a `return`?";
+    var GSSP_NO_RETURNED_VALUE = "Your `getServerSideProps` function did not return an object. Did you forget to add a `return`?";
+    var UNSTABLE_REVALIDATE_RENAME_ERROR = "The `unstable_revalidate` property is available for general use.\nPlease use `revalidate` instead.";
+    var GSSP_COMPONENT_MEMBER_ERROR = `can not be attached to a page's component and must be exported from the page. See more info here: https://nextjs.org/docs/messages/gssp-component-member`;
+    var NON_STANDARD_NODE_ENV = `You are using a non-standard "NODE_ENV" value in your environment. This creates inconsistencies in the project and is strongly advised against. Read more: https://nextjs.org/docs/messages/non-standard-node-env`;
+    var SSG_FALLBACK_EXPORT_ERROR = `Pages with \`fallback\` enabled in \`getStaticPaths\` can not be exported. See more info here: https://nextjs.org/docs/messages/ssg-fallback-true-export`;
+    var ESLINT_DEFAULT_DIRS = [
+      "app",
+      "pages",
+      "components",
+      "lib",
+      "src"
+    ];
+    var SERVER_RUNTIME = {
+      edge: "edge",
+      experimentalEdge: "experimental-edge",
+      nodejs: "nodejs"
+    };
+    var WEB_SOCKET_MAX_RECONNECTIONS = 12;
+    var WEBPACK_LAYERS_NAMES = {
+      /**
+      * The layer for the shared code between the client and server bundles.
+      */
+      shared: "shared",
+      /**
+      * The layer for server-only runtime and picking up `react-server` export conditions.
+      * Including app router RSC pages and app router custom routes and metadata routes.
+      */
+      reactServerComponents: "rsc",
+      /**
+      * Server Side Rendering layer for app (ssr).
+      */
+      serverSideRendering: "ssr",
+      /**
+      * The browser client bundle layer for actions.
+      */
+      actionBrowser: "action-browser",
+      /**
+      * The Node.js bundle layer for the API routes.
+      */
+      apiNode: "api-node",
+      /**
+      * The Edge Lite bundle layer for the API routes.
+      */
+      apiEdge: "api-edge",
+      /**
+      * The layer for the middleware code.
+      */
+      middleware: "middleware",
+      /**
+      * The layer for the instrumentation hooks.
+      */
+      instrument: "instrument",
+      /**
+      * The layer for assets on the edge.
+      */
+      edgeAsset: "edge-asset",
+      /**
+      * The browser client bundle layer for App directory.
+      */
+      appPagesBrowser: "app-pages-browser",
+      /**
+      * The browser client bundle layer for Pages directory.
+      */
+      pagesDirBrowser: "pages-dir-browser",
+      /**
+      * The Edge Lite bundle layer for Pages directory.
+      */
+      pagesDirEdge: "pages-dir-edge",
+      /**
+      * The Node.js bundle layer for Pages directory.
+      */
+      pagesDirNode: "pages-dir-node"
+    };
+    var WEBPACK_LAYERS = {
+      ...WEBPACK_LAYERS_NAMES,
+      GROUP: {
+        builtinReact: [
+          WEBPACK_LAYERS_NAMES.reactServerComponents,
+          WEBPACK_LAYERS_NAMES.actionBrowser
+        ],
+        serverOnly: [
+          WEBPACK_LAYERS_NAMES.reactServerComponents,
+          WEBPACK_LAYERS_NAMES.actionBrowser,
+          WEBPACK_LAYERS_NAMES.instrument,
+          WEBPACK_LAYERS_NAMES.middleware
+        ],
+        neutralTarget: [
+          // pages api
+          WEBPACK_LAYERS_NAMES.apiNode,
+          WEBPACK_LAYERS_NAMES.apiEdge
+        ],
+        clientOnly: [
+          WEBPACK_LAYERS_NAMES.serverSideRendering,
+          WEBPACK_LAYERS_NAMES.appPagesBrowser
+        ],
+        bundled: [
+          WEBPACK_LAYERS_NAMES.reactServerComponents,
+          WEBPACK_LAYERS_NAMES.actionBrowser,
+          WEBPACK_LAYERS_NAMES.serverSideRendering,
+          WEBPACK_LAYERS_NAMES.appPagesBrowser,
+          WEBPACK_LAYERS_NAMES.shared,
+          WEBPACK_LAYERS_NAMES.instrument,
+          WEBPACK_LAYERS_NAMES.middleware
+        ],
+        appPages: [
+          // app router pages and layouts
+          WEBPACK_LAYERS_NAMES.reactServerComponents,
+          WEBPACK_LAYERS_NAMES.serverSideRendering,
+          WEBPACK_LAYERS_NAMES.appPagesBrowser,
+          WEBPACK_LAYERS_NAMES.actionBrowser
+        ]
+      }
+    };
+    var WEBPACK_RESOURCE_QUERIES = {
+      edgeSSREntry: "__next_edge_ssr_entry__",
+      metadata: "__next_metadata__",
+      metadataRoute: "__next_metadata_route__",
+      metadataImageMeta: "__next_metadata_image_meta__"
+    };
+  }
+});
+
+// node_modules/next/dist/server/web/utils.js
+var require_utils5 = __commonJS({
+  "node_modules/next/dist/server/web/utils.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      fromNodeOutgoingHttpHeaders: function() {
+        return fromNodeOutgoingHttpHeaders;
+      },
+      normalizeNextQueryParam: function() {
+        return normalizeNextQueryParam;
+      },
+      splitCookiesString: function() {
+        return splitCookiesString;
+      },
+      toNodeOutgoingHttpHeaders: function() {
+        return toNodeOutgoingHttpHeaders;
+      },
+      validateURL: function() {
+        return validateURL;
+      }
+    });
+    var _constants = require_constants2();
+    function fromNodeOutgoingHttpHeaders(nodeHeaders) {
+      const headers = new Headers();
+      for (let [key, value] of Object.entries(nodeHeaders)) {
+        const values = Array.isArray(value) ? value : [
+          value
+        ];
+        for (let v of values) {
+          if (typeof v === "undefined") continue;
+          if (typeof v === "number") {
+            v = v.toString();
+          }
+          headers.append(key, v);
+        }
+      }
+      return headers;
+    }
+    function splitCookiesString(cookiesString) {
+      var cookiesStrings = [];
+      var pos = 0;
+      var start2;
+      var ch;
+      var lastComma;
+      var nextStart;
+      var cookiesSeparatorFound;
+      function skipWhitespace() {
+        while (pos < cookiesString.length && /\s/.test(cookiesString.charAt(pos))) {
+          pos += 1;
+        }
+        return pos < cookiesString.length;
+      }
+      function notSpecialChar() {
+        ch = cookiesString.charAt(pos);
+        return ch !== "=" && ch !== ";" && ch !== ",";
+      }
+      while (pos < cookiesString.length) {
+        start2 = pos;
+        cookiesSeparatorFound = false;
+        while (skipWhitespace()) {
+          ch = cookiesString.charAt(pos);
+          if (ch === ",") {
+            lastComma = pos;
+            pos += 1;
+            skipWhitespace();
+            nextStart = pos;
+            while (pos < cookiesString.length && notSpecialChar()) {
+              pos += 1;
+            }
+            if (pos < cookiesString.length && cookiesString.charAt(pos) === "=") {
+              cookiesSeparatorFound = true;
+              pos = nextStart;
+              cookiesStrings.push(cookiesString.substring(start2, lastComma));
+              start2 = pos;
+            } else {
+              pos = lastComma + 1;
+            }
+          } else {
+            pos += 1;
+          }
+        }
+        if (!cookiesSeparatorFound || pos >= cookiesString.length) {
+          cookiesStrings.push(cookiesString.substring(start2, cookiesString.length));
+        }
+      }
+      return cookiesStrings;
+    }
+    function toNodeOutgoingHttpHeaders(headers) {
+      const nodeHeaders = {};
+      const cookies = [];
+      if (headers) {
+        for (const [key, value] of headers.entries()) {
+          if (key.toLowerCase() === "set-cookie") {
+            cookies.push(...splitCookiesString(value));
+            nodeHeaders[key] = cookies.length === 1 ? cookies[0] : cookies;
+          } else {
+            nodeHeaders[key] = value;
+          }
+        }
+      }
+      return nodeHeaders;
+    }
+    function validateURL(url) {
+      try {
+        return String(new URL(String(url)));
+      } catch (error) {
+        throw new Error(`URL is malformed "${String(url)}". Please use only absolute URLs - https://nextjs.org/docs/messages/middleware-relative-urls`, {
+          cause: error
+        });
+      }
+    }
+    function normalizeNextQueryParam(key) {
+      const prefixes = [
+        _constants.NEXT_QUERY_PARAM_PREFIX,
+        _constants.NEXT_INTERCEPTION_MARKER_PREFIX
+      ];
+      for (const prefix of prefixes) {
+        if (key !== prefix && key.startsWith(prefix)) {
+          return key.substring(prefix.length);
+        }
+      }
+      return null;
+    }
+  }
+});
+
+// node_modules/next/dist/server/web/error.js
+var require_error = __commonJS({
+  "node_modules/next/dist/server/web/error.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      PageSignatureError: function() {
+        return PageSignatureError;
+      },
+      RemovedPageError: function() {
+        return RemovedPageError;
+      },
+      RemovedUAError: function() {
+        return RemovedUAError;
+      }
+    });
+    var PageSignatureError = class extends Error {
+      constructor({ page }) {
+        super(`The middleware "${page}" accepts an async API directly with the form:
+  
+  export function middleware(request, event) {
+    return NextResponse.redirect('/new-location')
+  }
+  
+  Read more: https://nextjs.org/docs/messages/middleware-new-signature
+  `);
+      }
+    };
+    var RemovedPageError = class extends Error {
+      constructor() {
+        super(`The request.page has been deprecated in favour of \`URLPattern\`.
+  Read more: https://nextjs.org/docs/messages/middleware-request-page
+  `);
+      }
+    };
+    var RemovedUAError = class extends Error {
+      constructor() {
+        super(`The request.ua has been removed in favour of \`userAgent\` function.
+  Read more: https://nextjs.org/docs/messages/middleware-parse-user-agent
+  `);
+      }
+    };
+  }
+});
+
+// node_modules/next/dist/compiled/@edge-runtime/cookies/index.js
+var require_cookies = __commonJS({
+  "node_modules/next/dist/compiled/@edge-runtime/cookies/index.js"(exports2, module2) {
+    "use strict";
+    var __defProp2 = Object.defineProperty;
+    var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
+    var __getOwnPropNames2 = Object.getOwnPropertyNames;
+    var __hasOwnProp2 = Object.prototype.hasOwnProperty;
+    var __export3 = (target, all) => {
+      for (var name in all)
+        __defProp2(target, name, { get: all[name], enumerable: true });
+    };
+    var __copyProps2 = (to, from, except, desc) => {
+      if (from && typeof from === "object" || typeof from === "function") {
+        for (let key of __getOwnPropNames2(from))
+          if (!__hasOwnProp2.call(to, key) && key !== except)
+            __defProp2(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc2(from, key)) || desc.enumerable });
+      }
+      return to;
+    };
+    var __toCommonJS = (mod) => __copyProps2(__defProp2({}, "__esModule", { value: true }), mod);
+    var src_exports = {};
+    __export3(src_exports, {
+      RequestCookies: () => RequestCookies,
+      ResponseCookies: () => ResponseCookies,
+      parseCookie: () => parseCookie,
+      parseSetCookie: () => parseSetCookie,
+      stringifyCookie: () => stringifyCookie
+    });
+    module2.exports = __toCommonJS(src_exports);
+    function stringifyCookie(c) {
+      var _a;
+      const attrs = [
+        "path" in c && c.path && `Path=${c.path}`,
+        "expires" in c && (c.expires || c.expires === 0) && `Expires=${(typeof c.expires === "number" ? new Date(c.expires) : c.expires).toUTCString()}`,
+        "maxAge" in c && typeof c.maxAge === "number" && `Max-Age=${c.maxAge}`,
+        "domain" in c && c.domain && `Domain=${c.domain}`,
+        "secure" in c && c.secure && "Secure",
+        "httpOnly" in c && c.httpOnly && "HttpOnly",
+        "sameSite" in c && c.sameSite && `SameSite=${c.sameSite}`,
+        "partitioned" in c && c.partitioned && "Partitioned",
+        "priority" in c && c.priority && `Priority=${c.priority}`
+      ].filter(Boolean);
+      const stringified = `${c.name}=${encodeURIComponent((_a = c.value) != null ? _a : "")}`;
+      return attrs.length === 0 ? stringified : `${stringified}; ${attrs.join("; ")}`;
+    }
+    function parseCookie(cookie) {
+      const map = /* @__PURE__ */ new Map();
+      for (const pair of cookie.split(/; */)) {
+        if (!pair)
+          continue;
+        const splitAt = pair.indexOf("=");
+        if (splitAt === -1) {
+          map.set(pair, "true");
+          continue;
+        }
+        const [key, value] = [pair.slice(0, splitAt), pair.slice(splitAt + 1)];
+        try {
+          map.set(key, decodeURIComponent(value != null ? value : "true"));
+        } catch {
+        }
+      }
+      return map;
+    }
+    function parseSetCookie(setCookie) {
+      if (!setCookie) {
+        return void 0;
+      }
+      const [[name, value], ...attributes] = parseCookie(setCookie);
+      const {
+        domain,
+        expires,
+        httponly,
+        maxage,
+        path: path2,
+        samesite,
+        secure,
+        partitioned,
+        priority
+      } = Object.fromEntries(
+        attributes.map(([key, value2]) => [
+          key.toLowerCase().replace(/-/g, ""),
+          value2
+        ])
+      );
+      const cookie = {
+        name,
+        value: decodeURIComponent(value),
+        domain,
+        ...expires && { expires: new Date(expires) },
+        ...httponly && { httpOnly: true },
+        ...typeof maxage === "string" && { maxAge: Number(maxage) },
+        path: path2,
+        ...samesite && { sameSite: parseSameSite(samesite) },
+        ...secure && { secure: true },
+        ...priority && { priority: parsePriority(priority) },
+        ...partitioned && { partitioned: true }
+      };
+      return compact(cookie);
+    }
+    function compact(t) {
+      const newT = {};
+      for (const key in t) {
+        if (t[key]) {
+          newT[key] = t[key];
+        }
+      }
+      return newT;
+    }
+    var SAME_SITE = ["strict", "lax", "none"];
+    function parseSameSite(string) {
+      string = string.toLowerCase();
+      return SAME_SITE.includes(string) ? string : void 0;
+    }
+    var PRIORITY = ["low", "medium", "high"];
+    function parsePriority(string) {
+      string = string.toLowerCase();
+      return PRIORITY.includes(string) ? string : void 0;
+    }
+    function splitCookiesString(cookiesString) {
+      if (!cookiesString)
+        return [];
+      var cookiesStrings = [];
+      var pos = 0;
+      var start2;
+      var ch;
+      var lastComma;
+      var nextStart;
+      var cookiesSeparatorFound;
+      function skipWhitespace() {
+        while (pos < cookiesString.length && /\s/.test(cookiesString.charAt(pos))) {
+          pos += 1;
+        }
+        return pos < cookiesString.length;
+      }
+      function notSpecialChar() {
+        ch = cookiesString.charAt(pos);
+        return ch !== "=" && ch !== ";" && ch !== ",";
+      }
+      while (pos < cookiesString.length) {
+        start2 = pos;
+        cookiesSeparatorFound = false;
+        while (skipWhitespace()) {
+          ch = cookiesString.charAt(pos);
+          if (ch === ",") {
+            lastComma = pos;
+            pos += 1;
+            skipWhitespace();
+            nextStart = pos;
+            while (pos < cookiesString.length && notSpecialChar()) {
+              pos += 1;
+            }
+            if (pos < cookiesString.length && cookiesString.charAt(pos) === "=") {
+              cookiesSeparatorFound = true;
+              pos = nextStart;
+              cookiesStrings.push(cookiesString.substring(start2, lastComma));
+              start2 = pos;
+            } else {
+              pos = lastComma + 1;
+            }
+          } else {
+            pos += 1;
+          }
+        }
+        if (!cookiesSeparatorFound || pos >= cookiesString.length) {
+          cookiesStrings.push(cookiesString.substring(start2, cookiesString.length));
+        }
+      }
+      return cookiesStrings;
+    }
+    var RequestCookies = class {
+      constructor(requestHeaders) {
+        this._parsed = /* @__PURE__ */ new Map();
+        this._headers = requestHeaders;
+        const header = requestHeaders.get("cookie");
+        if (header) {
+          const parsed = parseCookie(header);
+          for (const [name, value] of parsed) {
+            this._parsed.set(name, { name, value });
+          }
+        }
+      }
+      [Symbol.iterator]() {
+        return this._parsed[Symbol.iterator]();
+      }
+      /**
+       * The amount of cookies received from the client
+       */
+      get size() {
+        return this._parsed.size;
+      }
+      get(...args) {
+        const name = typeof args[0] === "string" ? args[0] : args[0].name;
+        return this._parsed.get(name);
+      }
+      getAll(...args) {
+        var _a;
+        const all = Array.from(this._parsed);
+        if (!args.length) {
+          return all.map(([_, value]) => value);
+        }
+        const name = typeof args[0] === "string" ? args[0] : (_a = args[0]) == null ? void 0 : _a.name;
+        return all.filter(([n]) => n === name).map(([_, value]) => value);
+      }
+      has(name) {
+        return this._parsed.has(name);
+      }
+      set(...args) {
+        const [name, value] = args.length === 1 ? [args[0].name, args[0].value] : args;
+        const map = this._parsed;
+        map.set(name, { name, value });
+        this._headers.set(
+          "cookie",
+          Array.from(map).map(([_, value2]) => stringifyCookie(value2)).join("; ")
+        );
+        return this;
+      }
+      /**
+       * Delete the cookies matching the passed name or names in the request.
+       */
+      delete(names) {
+        const map = this._parsed;
+        const result = !Array.isArray(names) ? map.delete(names) : names.map((name) => map.delete(name));
+        this._headers.set(
+          "cookie",
+          Array.from(map).map(([_, value]) => stringifyCookie(value)).join("; ")
+        );
+        return result;
+      }
+      /**
+       * Delete all the cookies in the cookies in the request.
+       */
+      clear() {
+        this.delete(Array.from(this._parsed.keys()));
+        return this;
+      }
+      /**
+       * Format the cookies in the request as a string for logging
+       */
+      [/* @__PURE__ */ Symbol.for("edge-runtime.inspect.custom")]() {
+        return `RequestCookies ${JSON.stringify(Object.fromEntries(this._parsed))}`;
+      }
+      toString() {
+        return [...this._parsed.values()].map((v) => `${v.name}=${encodeURIComponent(v.value)}`).join("; ");
+      }
+    };
+    var ResponseCookies = class {
+      constructor(responseHeaders) {
+        this._parsed = /* @__PURE__ */ new Map();
+        var _a, _b, _c;
+        this._headers = responseHeaders;
+        const setCookie = (_c = (_b = (_a = responseHeaders.getSetCookie) == null ? void 0 : _a.call(responseHeaders)) != null ? _b : responseHeaders.get("set-cookie")) != null ? _c : [];
+        const cookieStrings = Array.isArray(setCookie) ? setCookie : splitCookiesString(setCookie);
+        for (const cookieString of cookieStrings) {
+          const parsed = parseSetCookie(cookieString);
+          if (parsed)
+            this._parsed.set(parsed.name, parsed);
+        }
+      }
+      /**
+       * {@link https://wicg.github.io/cookie-store/#CookieStore-get CookieStore#get} without the Promise.
+       */
+      get(...args) {
+        const key = typeof args[0] === "string" ? args[0] : args[0].name;
+        return this._parsed.get(key);
+      }
+      /**
+       * {@link https://wicg.github.io/cookie-store/#CookieStore-getAll CookieStore#getAll} without the Promise.
+       */
+      getAll(...args) {
+        var _a;
+        const all = Array.from(this._parsed.values());
+        if (!args.length) {
+          return all;
+        }
+        const key = typeof args[0] === "string" ? args[0] : (_a = args[0]) == null ? void 0 : _a.name;
+        return all.filter((c) => c.name === key);
+      }
+      has(name) {
+        return this._parsed.has(name);
+      }
+      /**
+       * {@link https://wicg.github.io/cookie-store/#CookieStore-set CookieStore#set} without the Promise.
+       */
+      set(...args) {
+        const [name, value, cookie] = args.length === 1 ? [args[0].name, args[0].value, args[0]] : args;
+        const map = this._parsed;
+        map.set(name, normalizeCookie({ name, value, ...cookie }));
+        replace(map, this._headers);
+        return this;
+      }
+      /**
+       * {@link https://wicg.github.io/cookie-store/#CookieStore-delete CookieStore#delete} without the Promise.
+       */
+      delete(...args) {
+        const [name, options] = typeof args[0] === "string" ? [args[0]] : [args[0].name, args[0]];
+        return this.set({ ...options, name, value: "", expires: /* @__PURE__ */ new Date(0) });
+      }
+      [/* @__PURE__ */ Symbol.for("edge-runtime.inspect.custom")]() {
+        return `ResponseCookies ${JSON.stringify(Object.fromEntries(this._parsed))}`;
+      }
+      toString() {
+        return [...this._parsed.values()].map(stringifyCookie).join("; ");
+      }
+    };
+    function replace(bag, headers) {
+      headers.delete("set-cookie");
+      for (const [, value] of bag) {
+        const serialized = stringifyCookie(value);
+        headers.append("set-cookie", serialized);
+      }
+    }
+    function normalizeCookie(cookie = { name: "", value: "" }) {
+      if (typeof cookie.expires === "number") {
+        cookie.expires = new Date(cookie.expires);
+      }
+      if (cookie.maxAge) {
+        cookie.expires = new Date(Date.now() + cookie.maxAge * 1e3);
+      }
+      if (cookie.path === null || cookie.path === void 0) {
+        cookie.path = "/";
+      }
+      return cookie;
+    }
+  }
+});
+
+// node_modules/next/dist/server/web/spec-extension/cookies.js
+var require_cookies2 = __commonJS({
+  "node_modules/next/dist/server/web/spec-extension/cookies.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      RequestCookies: function() {
+        return _cookies.RequestCookies;
+      },
+      ResponseCookies: function() {
+        return _cookies.ResponseCookies;
+      },
+      stringifyCookie: function() {
+        return _cookies.stringifyCookie;
+      }
+    });
+    var _cookies = require_cookies();
+  }
+});
+
+// node_modules/next/dist/server/web/spec-extension/request.js
+var require_request = __commonJS({
+  "node_modules/next/dist/server/web/spec-extension/request.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      INTERNALS: function() {
+        return INTERNALS;
+      },
+      NextRequest: function() {
+        return NextRequest;
+      }
+    });
+    var _nexturl = require_next_url();
+    var _utils = require_utils5();
+    var _error = require_error();
+    var _cookies = require_cookies2();
+    var INTERNALS = /* @__PURE__ */ Symbol("internal request");
+    var NextRequest = class extends Request {
+      constructor(input, init = {}) {
+        const url = typeof input !== "string" && "url" in input ? input.url : String(input);
+        (0, _utils.validateURL)(url);
+        if (process.env.NEXT_RUNTIME !== "edge") {
+          if (init.body && init.duplex !== "half") {
+            init.duplex = "half";
+          }
+        }
+        if (input instanceof Request) super(input, init);
+        else super(url, init);
+        const nextUrl = new _nexturl.NextURL(url, {
+          headers: (0, _utils.toNodeOutgoingHttpHeaders)(this.headers),
+          nextConfig: init.nextConfig
+        });
+        this[INTERNALS] = {
+          cookies: new _cookies.RequestCookies(this.headers),
+          nextUrl,
+          url: process.env.__NEXT_NO_MIDDLEWARE_URL_NORMALIZE ? url : nextUrl.toString()
+        };
+      }
+      [/* @__PURE__ */ Symbol.for("edge-runtime.inspect.custom")]() {
+        return {
+          cookies: this.cookies,
+          nextUrl: this.nextUrl,
+          url: this.url,
+          // rest of props come from Request
+          bodyUsed: this.bodyUsed,
+          cache: this.cache,
+          credentials: this.credentials,
+          destination: this.destination,
+          headers: Object.fromEntries(this.headers),
+          integrity: this.integrity,
+          keepalive: this.keepalive,
+          method: this.method,
+          mode: this.mode,
+          redirect: this.redirect,
+          referrer: this.referrer,
+          referrerPolicy: this.referrerPolicy,
+          signal: this.signal
+        };
+      }
+      get cookies() {
+        return this[INTERNALS].cookies;
+      }
+      get nextUrl() {
+        return this[INTERNALS].nextUrl;
+      }
+      /**
+      * @deprecated
+      * `page` has been deprecated in favour of `URLPattern`.
+      * Read more: https://nextjs.org/docs/messages/middleware-request-page
+      */
+      get page() {
+        throw new _error.RemovedPageError();
+      }
+      /**
+      * @deprecated
+      * `ua` has been removed in favour of \`userAgent\` function.
+      * Read more: https://nextjs.org/docs/messages/middleware-parse-user-agent
+      */
+      get ua() {
+        throw new _error.RemovedUAError();
+      }
+      get url() {
+        return this[INTERNALS].url;
+      }
+    };
+  }
+});
+
+// node_modules/next/dist/server/web/spec-extension/adapters/reflect.js
+var require_reflect = __commonJS({
+  "node_modules/next/dist/server/web/spec-extension/adapters/reflect.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "ReflectAdapter", {
+      enumerable: true,
+      get: function() {
+        return ReflectAdapter;
+      }
+    });
+    var ReflectAdapter = class {
+      static get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, receiver);
+        if (typeof value === "function") {
+          return value.bind(target);
+        }
+        return value;
+      }
+      static set(target, prop, value, receiver) {
+        return Reflect.set(target, prop, value, receiver);
+      }
+      static has(target, prop) {
+        return Reflect.has(target, prop);
+      }
+      static deleteProperty(target, prop) {
+        return Reflect.deleteProperty(target, prop);
+      }
+    };
+  }
+});
+
+// node_modules/next/dist/server/web/spec-extension/response.js
+var require_response = __commonJS({
+  "node_modules/next/dist/server/web/spec-extension/response.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "NextResponse", {
+      enumerable: true,
+      get: function() {
+        return NextResponse2;
+      }
+    });
+    var _cookies = require_cookies2();
+    var _nexturl = require_next_url();
+    var _utils = require_utils5();
+    var _reflect = require_reflect();
+    var _cookies1 = require_cookies2();
+    var INTERNALS = /* @__PURE__ */ Symbol("internal response");
+    var REDIRECTS = /* @__PURE__ */ new Set([
+      301,
+      302,
+      303,
+      307,
+      308
+    ]);
+    function handleMiddlewareField(init, headers) {
+      var _init_request;
+      if (init == null ? void 0 : (_init_request = init.request) == null ? void 0 : _init_request.headers) {
+        if (!(init.request.headers instanceof Headers)) {
+          throw new Error("request.headers must be an instance of Headers");
+        }
+        const keys = [];
+        for (const [key, value] of init.request.headers) {
+          headers.set("x-middleware-request-" + key, value);
+          keys.push(key);
+        }
+        headers.set("x-middleware-override-headers", keys.join(","));
+      }
+    }
+    var NextResponse2 = class _NextResponse extends Response {
+      constructor(body, init = {}) {
+        super(body, init);
+        const headers = this.headers;
+        const cookies = new _cookies1.ResponseCookies(headers);
+        const cookiesProxy = new Proxy(cookies, {
+          get(target, prop, receiver) {
+            switch (prop) {
+              case "delete":
+              case "set": {
+                return (...args) => {
+                  const result = Reflect.apply(target[prop], target, args);
+                  const newHeaders = new Headers(headers);
+                  if (result instanceof _cookies1.ResponseCookies) {
+                    headers.set("x-middleware-set-cookie", result.getAll().map((cookie) => (0, _cookies.stringifyCookie)(cookie)).join(","));
+                  }
+                  handleMiddlewareField(init, newHeaders);
+                  return result;
+                };
+              }
+              default:
+                return _reflect.ReflectAdapter.get(target, prop, receiver);
+            }
+          }
+        });
+        this[INTERNALS] = {
+          cookies: cookiesProxy,
+          url: init.url ? new _nexturl.NextURL(init.url, {
+            headers: (0, _utils.toNodeOutgoingHttpHeaders)(headers),
+            nextConfig: init.nextConfig
+          }) : void 0
+        };
+      }
+      [/* @__PURE__ */ Symbol.for("edge-runtime.inspect.custom")]() {
+        return {
+          cookies: this.cookies,
+          url: this.url,
+          // rest of props come from Response
+          body: this.body,
+          bodyUsed: this.bodyUsed,
+          headers: Object.fromEntries(this.headers),
+          ok: this.ok,
+          redirected: this.redirected,
+          status: this.status,
+          statusText: this.statusText,
+          type: this.type
+        };
+      }
+      get cookies() {
+        return this[INTERNALS].cookies;
+      }
+      static json(body, init) {
+        const response = Response.json(body, init);
+        return new _NextResponse(response.body, response);
+      }
+      static redirect(url, init) {
+        const status = typeof init === "number" ? init : (init == null ? void 0 : init.status) ?? 307;
+        if (!REDIRECTS.has(status)) {
+          throw new RangeError('Failed to execute "redirect" on "response": Invalid status code');
+        }
+        const initObj = typeof init === "object" ? init : {};
+        const headers = new Headers(initObj == null ? void 0 : initObj.headers);
+        headers.set("Location", (0, _utils.validateURL)(url));
+        return new _NextResponse(null, {
+          ...initObj,
+          headers,
+          status
+        });
+      }
+      static rewrite(destination, init) {
+        const headers = new Headers(init == null ? void 0 : init.headers);
+        headers.set("x-middleware-rewrite", (0, _utils.validateURL)(destination));
+        handleMiddlewareField(init, headers);
+        return new _NextResponse(null, {
+          ...init,
+          headers
+        });
+      }
+      static next(init) {
+        const headers = new Headers(init == null ? void 0 : init.headers);
+        headers.set("x-middleware-next", "1");
+        handleMiddlewareField(init, headers);
+        return new _NextResponse(null, {
+          ...init,
+          headers
+        });
+      }
+    };
+  }
+});
+
+// node_modules/next/dist/server/web/spec-extension/image-response.js
+var require_image_response = __commonJS({
+  "node_modules/next/dist/server/web/spec-extension/image-response.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "ImageResponse", {
+      enumerable: true,
+      get: function() {
+        return ImageResponse;
+      }
+    });
+    function ImageResponse() {
+      throw new Error('ImageResponse moved from "next/server" to "next/og" since Next.js 14, please import from "next/og" instead');
+    }
+  }
+});
+
+// node_modules/next/dist/compiled/ua-parser-js/ua-parser.js
+var require_ua_parser = __commonJS({
+  "node_modules/next/dist/compiled/ua-parser-js/ua-parser.js"(exports2, module2) {
+    (() => {
+      var i = { 943: function(i2, e2) {
+        (function(o2, a) {
+          "use strict";
+          var r = "1.0.35", t = "", n = "?", s = "function", b = "undefined", w = "object", l = "string", d = "major", c = "model", u = "name", p = "type", m = "vendor", f = "version", h = "architecture", v = "console", g = "mobile", k = "tablet", x = "smarttv", _ = "wearable", y = "embedded", q = 350;
+          var T = "Amazon", S = "Apple", z = "ASUS", N = "BlackBerry", A = "Browser", C = "Chrome", E = "Edge", O = "Firefox", U = "Google", j = "Huawei", P = "LG", R = "Microsoft", M = "Motorola", B = "Opera", V = "Samsung", D = "Sharp", I = "Sony", W = "Viera", F = "Xiaomi", G = "Zebra", H = "Facebook", L = "Chromium OS", Z = "Mac OS";
+          var extend = function(i3, e3) {
+            var o3 = {};
+            for (var a2 in i3) {
+              if (e3[a2] && e3[a2].length % 2 === 0) {
+                o3[a2] = e3[a2].concat(i3[a2]);
+              } else {
+                o3[a2] = i3[a2];
+              }
+            }
+            return o3;
+          }, enumerize = function(i3) {
+            var e3 = {};
+            for (var o3 = 0; o3 < i3.length; o3++) {
+              e3[i3[o3].toUpperCase()] = i3[o3];
+            }
+            return e3;
+          }, has = function(i3, e3) {
+            return typeof i3 === l ? lowerize(e3).indexOf(lowerize(i3)) !== -1 : false;
+          }, lowerize = function(i3) {
+            return i3.toLowerCase();
+          }, majorize = function(i3) {
+            return typeof i3 === l ? i3.replace(/[^\d\.]/g, t).split(".")[0] : a;
+          }, trim = function(i3, e3) {
+            if (typeof i3 === l) {
+              i3 = i3.replace(/^\s\s*/, t);
+              return typeof e3 === b ? i3 : i3.substring(0, q);
+            }
+          };
+          var rgxMapper = function(i3, e3) {
+            var o3 = 0, r2, t2, n2, b2, l2, d2;
+            while (o3 < e3.length && !l2) {
+              var c2 = e3[o3], u2 = e3[o3 + 1];
+              r2 = t2 = 0;
+              while (r2 < c2.length && !l2) {
+                if (!c2[r2]) {
+                  break;
+                }
+                l2 = c2[r2++].exec(i3);
+                if (!!l2) {
+                  for (n2 = 0; n2 < u2.length; n2++) {
+                    d2 = l2[++t2];
+                    b2 = u2[n2];
+                    if (typeof b2 === w && b2.length > 0) {
+                      if (b2.length === 2) {
+                        if (typeof b2[1] == s) {
+                          this[b2[0]] = b2[1].call(this, d2);
+                        } else {
+                          this[b2[0]] = b2[1];
+                        }
+                      } else if (b2.length === 3) {
+                        if (typeof b2[1] === s && !(b2[1].exec && b2[1].test)) {
+                          this[b2[0]] = d2 ? b2[1].call(this, d2, b2[2]) : a;
+                        } else {
+                          this[b2[0]] = d2 ? d2.replace(b2[1], b2[2]) : a;
+                        }
+                      } else if (b2.length === 4) {
+                        this[b2[0]] = d2 ? b2[3].call(this, d2.replace(b2[1], b2[2])) : a;
+                      }
+                    } else {
+                      this[b2] = d2 ? d2 : a;
+                    }
+                  }
+                }
+              }
+              o3 += 2;
+            }
+          }, strMapper = function(i3, e3) {
+            for (var o3 in e3) {
+              if (typeof e3[o3] === w && e3[o3].length > 0) {
+                for (var r2 = 0; r2 < e3[o3].length; r2++) {
+                  if (has(e3[o3][r2], i3)) {
+                    return o3 === n ? a : o3;
+                  }
+                }
+              } else if (has(e3[o3], i3)) {
+                return o3 === n ? a : o3;
+              }
+            }
+            return i3;
+          };
+          var $ = { "1.0": "/8", 1.2: "/1", 1.3: "/3", "2.0": "/412", "2.0.2": "/416", "2.0.3": "/417", "2.0.4": "/419", "?": "/" }, X = { ME: "4.90", "NT 3.11": "NT3.51", "NT 4.0": "NT4.0", 2e3: "NT 5.0", XP: ["NT 5.1", "NT 5.2"], Vista: "NT 6.0", 7: "NT 6.1", 8: "NT 6.2", 8.1: "NT 6.3", 10: ["NT 6.4", "NT 10.0"], RT: "ARM" };
+          var K = { browser: [[/\b(?:crmo|crios)\/([\w\.]+)/i], [f, [u, "Chrome"]], [/edg(?:e|ios|a)?\/([\w\.]+)/i], [f, [u, "Edge"]], [/(opera mini)\/([-\w\.]+)/i, /(opera [mobiletab]{3,6})\b.+version\/([-\w\.]+)/i, /(opera)(?:.+version\/|[\/ ]+)([\w\.]+)/i], [u, f], [/opios[\/ ]+([\w\.]+)/i], [f, [u, B + " Mini"]], [/\bopr\/([\w\.]+)/i], [f, [u, B]], [/(kindle)\/([\w\.]+)/i, /(lunascape|maxthon|netfront|jasmine|blazer)[\/ ]?([\w\.]*)/i, /(avant |iemobile|slim)(?:browser)?[\/ ]?([\w\.]*)/i, /(ba?idubrowser)[\/ ]?([\w\.]+)/i, /(?:ms|\()(ie) ([\w\.]+)/i, /(flock|rockmelt|midori|epiphany|silk|skyfire|bolt|iron|vivaldi|iridium|phantomjs|bowser|quark|qupzilla|falkon|rekonq|puffin|brave|whale(?!.+naver)|qqbrowserlite|qq|duckduckgo)\/([-\w\.]+)/i, /(heytap|ovi)browser\/([\d\.]+)/i, /(weibo)__([\d\.]+)/i], [u, f], [/(?:\buc? ?browser|(?:juc.+)ucweb)[\/ ]?([\w\.]+)/i], [f, [u, "UC" + A]], [/microm.+\bqbcore\/([\w\.]+)/i, /\bqbcore\/([\w\.]+).+microm/i], [f, [u, "WeChat(Win) Desktop"]], [/micromessenger\/([\w\.]+)/i], [f, [u, "WeChat"]], [/konqueror\/([\w\.]+)/i], [f, [u, "Konqueror"]], [/trident.+rv[: ]([\w\.]{1,9})\b.+like gecko/i], [f, [u, "IE"]], [/ya(?:search)?browser\/([\w\.]+)/i], [f, [u, "Yandex"]], [/(avast|avg)\/([\w\.]+)/i], [[u, /(.+)/, "$1 Secure " + A], f], [/\bfocus\/([\w\.]+)/i], [f, [u, O + " Focus"]], [/\bopt\/([\w\.]+)/i], [f, [u, B + " Touch"]], [/coc_coc\w+\/([\w\.]+)/i], [f, [u, "Coc Coc"]], [/dolfin\/([\w\.]+)/i], [f, [u, "Dolphin"]], [/coast\/([\w\.]+)/i], [f, [u, B + " Coast"]], [/miuibrowser\/([\w\.]+)/i], [f, [u, "MIUI " + A]], [/fxios\/([-\w\.]+)/i], [f, [u, O]], [/\bqihu|(qi?ho?o?|360)browser/i], [[u, "360 " + A]], [/(oculus|samsung|sailfish|huawei)browser\/([\w\.]+)/i], [[u, /(.+)/, "$1 " + A], f], [/(comodo_dragon)\/([\w\.]+)/i], [[u, /_/g, " "], f], [/(electron)\/([\w\.]+) safari/i, /(tesla)(?: qtcarbrowser|\/(20\d\d\.[-\w\.]+))/i, /m?(qqbrowser|baiduboxapp|2345Explorer)[\/ ]?([\w\.]+)/i], [u, f], [/(metasr)[\/ ]?([\w\.]+)/i, /(lbbrowser)/i, /\[(linkedin)app\]/i], [u], [/((?:fban\/fbios|fb_iab\/fb4a)(?!.+fbav)|;fbav\/([\w\.]+);)/i], [[u, H], f], [/(kakao(?:talk|story))[\/ ]([\w\.]+)/i, /(naver)\(.*?(\d+\.[\w\.]+).*\)/i, /safari (line)\/([\w\.]+)/i, /\b(line)\/([\w\.]+)\/iab/i, /(chromium|instagram)[\/ ]([-\w\.]+)/i], [u, f], [/\bgsa\/([\w\.]+) .*safari\//i], [f, [u, "GSA"]], [/musical_ly(?:.+app_?version\/|_)([\w\.]+)/i], [f, [u, "TikTok"]], [/headlesschrome(?:\/([\w\.]+)| )/i], [f, [u, C + " Headless"]], [/ wv\).+(chrome)\/([\w\.]+)/i], [[u, C + " WebView"], f], [/droid.+ version\/([\w\.]+)\b.+(?:mobile safari|safari)/i], [f, [u, "Android " + A]], [/(chrome|omniweb|arora|[tizenoka]{5} ?browser)\/v?([\w\.]+)/i], [u, f], [/version\/([\w\.\,]+) .*mobile\/\w+ (safari)/i], [f, [u, "Mobile Safari"]], [/version\/([\w(\.|\,)]+) .*(mobile ?safari|safari)/i], [f, u], [/webkit.+?(mobile ?safari|safari)(\/[\w\.]+)/i], [u, [f, strMapper, $]], [/(webkit|khtml)\/([\w\.]+)/i], [u, f], [/(navigator|netscape\d?)\/([-\w\.]+)/i], [[u, "Netscape"], f], [/mobile vr; rv:([\w\.]+)\).+firefox/i], [f, [u, O + " Reality"]], [/ekiohf.+(flow)\/([\w\.]+)/i, /(swiftfox)/i, /(icedragon|iceweasel|camino|chimera|fennec|maemo browser|minimo|conkeror|klar)[\/ ]?([\w\.\+]+)/i, /(seamonkey|k-meleon|icecat|iceape|firebird|phoenix|palemoon|basilisk|waterfox)\/([-\w\.]+)$/i, /(firefox)\/([\w\.]+)/i, /(mozilla)\/([\w\.]+) .+rv\:.+gecko\/\d+/i, /(polaris|lynx|dillo|icab|doris|amaya|w3m|netsurf|sleipnir|obigo|mosaic|(?:go|ice|up)[\. ]?browser)[-\/ ]?v?([\w\.]+)/i, /(links) \(([\w\.]+)/i, /panasonic;(viera)/i], [u, f], [/(cobalt)\/([\w\.]+)/i], [u, [f, /master.|lts./, ""]]], cpu: [[/(?:(amd|x(?:(?:86|64)[-_])?|wow|win)64)[;\)]/i], [[h, "amd64"]], [/(ia32(?=;))/i], [[h, lowerize]], [/((?:i[346]|x)86)[;\)]/i], [[h, "ia32"]], [/\b(aarch64|arm(v?8e?l?|_?64))\b/i], [[h, "arm64"]], [/\b(arm(?:v[67])?ht?n?[fl]p?)\b/i], [[h, "armhf"]], [/windows (ce|mobile); ppc;/i], [[h, "arm"]], [/((?:ppc|powerpc)(?:64)?)(?: mac|;|\))/i], [[h, /ower/, t, lowerize]], [/(sun4\w)[;\)]/i], [[h, "sparc"]], [/((?:avr32|ia64(?=;))|68k(?=\))|\barm(?=v(?:[1-7]|[5-7]1)l?|;|eabi)|(?=atmel )avr|(?:irix|mips|sparc)(?:64)?\b|pa-risc)/i], [[h, lowerize]]], device: [[/\b(sch-i[89]0\d|shw-m380s|sm-[ptx]\w{2,4}|gt-[pn]\d{2,4}|sgh-t8[56]9|nexus 10)/i], [c, [m, V], [p, k]], [/\b((?:s[cgp]h|gt|sm)-\w+|sc[g-]?[\d]+a?|galaxy nexus)/i, /samsung[- ]([-\w]+)/i, /sec-(sgh\w+)/i], [c, [m, V], [p, g]], [/(?:\/|\()(ip(?:hone|od)[\w, ]*)(?:\/|;)/i], [c, [m, S], [p, g]], [/\((ipad);[-\w\),; ]+apple/i, /applecoremedia\/[\w\.]+ \((ipad)/i, /\b(ipad)\d\d?,\d\d?[;\]].+ios/i], [c, [m, S], [p, k]], [/(macintosh);/i], [c, [m, S]], [/\b(sh-?[altvz]?\d\d[a-ekm]?)/i], [c, [m, D], [p, g]], [/\b((?:ag[rs][23]?|bah2?|sht?|btv)-a?[lw]\d{2})\b(?!.+d\/s)/i], [c, [m, j], [p, k]], [/(?:huawei|honor)([-\w ]+)[;\)]/i, /\b(nexus 6p|\w{2,4}e?-[atu]?[ln][\dx][012359c][adn]?)\b(?!.+d\/s)/i], [c, [m, j], [p, g]], [/\b(poco[\w ]+)(?: bui|\))/i, /\b; (\w+) build\/hm\1/i, /\b(hm[-_ ]?note?[_ ]?(?:\d\w)?) bui/i, /\b(redmi[\-_ ]?(?:note|k)?[\w_ ]+)(?: bui|\))/i, /\b(mi[-_ ]?(?:a\d|one|one[_ ]plus|note lte|max|cc)?[_ ]?(?:\d?\w?)[_ ]?(?:plus|se|lite)?)(?: bui|\))/i], [[c, /_/g, " "], [m, F], [p, g]], [/\b(mi[-_ ]?(?:pad)(?:[\w_ ]+))(?: bui|\))/i], [[c, /_/g, " "], [m, F], [p, k]], [/; (\w+) bui.+ oppo/i, /\b(cph[12]\d{3}|p(?:af|c[al]|d\w|e[ar])[mt]\d0|x9007|a101op)\b/i], [c, [m, "OPPO"], [p, g]], [/vivo (\w+)(?: bui|\))/i, /\b(v[12]\d{3}\w?[at])(?: bui|;)/i], [c, [m, "Vivo"], [p, g]], [/\b(rmx[12]\d{3})(?: bui|;|\))/i], [c, [m, "Realme"], [p, g]], [/\b(milestone|droid(?:[2-4x]| (?:bionic|x2|pro|razr))?:?( 4g)?)\b[\w ]+build\//i, /\bmot(?:orola)?[- ](\w*)/i, /((?:moto[\w\(\) ]+|xt\d{3,4}|nexus 6)(?= bui|\)))/i], [c, [m, M], [p, g]], [/\b(mz60\d|xoom[2 ]{0,2}) build\//i], [c, [m, M], [p, k]], [/((?=lg)?[vl]k\-?\d{3}) bui| 3\.[-\w; ]{10}lg?-([06cv9]{3,4})/i], [c, [m, P], [p, k]], [/(lm(?:-?f100[nv]?|-[\w\.]+)(?= bui|\))|nexus [45])/i, /\blg[-e;\/ ]+((?!browser|netcast|android tv)\w+)/i, /\blg-?([\d\w]+) bui/i], [c, [m, P], [p, g]], [/(ideatab[-\w ]+)/i, /lenovo ?(s[56]000[-\w]+|tab(?:[\w ]+)|yt[-\d\w]{6}|tb[-\d\w]{6})/i], [c, [m, "Lenovo"], [p, k]], [/(?:maemo|nokia).*(n900|lumia \d+)/i, /nokia[-_ ]?([-\w\.]*)/i], [[c, /_/g, " "], [m, "Nokia"], [p, g]], [/(pixel c)\b/i], [c, [m, U], [p, k]], [/droid.+; (pixel[\daxl ]{0,6})(?: bui|\))/i], [c, [m, U], [p, g]], [/droid.+ (a?\d[0-2]{2}so|[c-g]\d{4}|so[-gl]\w+|xq-a\w[4-7][12])(?= bui|\).+chrome\/(?![1-6]{0,1}\d\.))/i], [c, [m, I], [p, g]], [/sony tablet [ps]/i, /\b(?:sony)?sgp\w+(?: bui|\))/i], [[c, "Xperia Tablet"], [m, I], [p, k]], [/ (kb2005|in20[12]5|be20[12][59])\b/i, /(?:one)?(?:plus)? (a\d0\d\d)(?: b|\))/i], [c, [m, "OnePlus"], [p, g]], [/(alexa)webm/i, /(kf[a-z]{2}wi|aeo[c-r]{2})( bui|\))/i, /(kf[a-z]+)( bui|\)).+silk\//i], [c, [m, T], [p, k]], [/((?:sd|kf)[0349hijorstuw]+)( bui|\)).+silk\//i], [[c, /(.+)/g, "Fire Phone $1"], [m, T], [p, g]], [/(playbook);[-\w\),; ]+(rim)/i], [c, m, [p, k]], [/\b((?:bb[a-f]|st[hv])100-\d)/i, /\(bb10; (\w+)/i], [c, [m, N], [p, g]], [/(?:\b|asus_)(transfo[prime ]{4,10} \w+|eeepc|slider \w+|nexus 7|padfone|p00[cj])/i], [c, [m, z], [p, k]], [/ (z[bes]6[027][012][km][ls]|zenfone \d\w?)\b/i], [c, [m, z], [p, g]], [/(nexus 9)/i], [c, [m, "HTC"], [p, k]], [/(htc)[-;_ ]{1,2}([\w ]+(?=\)| bui)|\w+)/i, /(zte)[- ]([\w ]+?)(?: bui|\/|\))/i, /(alcatel|geeksphone|nexian|panasonic(?!(?:;|\.))|sony(?!-bra))[-_ ]?([-\w]*)/i], [m, [c, /_/g, " "], [p, g]], [/droid.+; ([ab][1-7]-?[0178a]\d\d?)/i], [c, [m, "Acer"], [p, k]], [/droid.+; (m[1-5] note) bui/i, /\bmz-([-\w]{2,})/i], [c, [m, "Meizu"], [p, g]], [/(blackberry|benq|palm(?=\-)|sonyericsson|acer|asus|dell|meizu|motorola|polytron)[-_ ]?([-\w]*)/i, /(hp) ([\w ]+\w)/i, /(asus)-?(\w+)/i, /(microsoft); (lumia[\w ]+)/i, /(lenovo)[-_ ]?([-\w]+)/i, /(jolla)/i, /(oppo) ?([\w ]+) bui/i], [m, c, [p, g]], [/(kobo)\s(ereader|touch)/i, /(archos) (gamepad2?)/i, /(hp).+(touchpad(?!.+tablet)|tablet)/i, /(kindle)\/([\w\.]+)/i, /(nook)[\w ]+build\/(\w+)/i, /(dell) (strea[kpr\d ]*[\dko])/i, /(le[- ]+pan)[- ]+(\w{1,9}) bui/i, /(trinity)[- ]*(t\d{3}) bui/i, /(gigaset)[- ]+(q\w{1,9}) bui/i, /(vodafone) ([\w ]+)(?:\)| bui)/i], [m, c, [p, k]], [/(surface duo)/i], [c, [m, R], [p, k]], [/droid [\d\.]+; (fp\du?)(?: b|\))/i], [c, [m, "Fairphone"], [p, g]], [/(u304aa)/i], [c, [m, "AT&T"], [p, g]], [/\bsie-(\w*)/i], [c, [m, "Siemens"], [p, g]], [/\b(rct\w+) b/i], [c, [m, "RCA"], [p, k]], [/\b(venue[\d ]{2,7}) b/i], [c, [m, "Dell"], [p, k]], [/\b(q(?:mv|ta)\w+) b/i], [c, [m, "Verizon"], [p, k]], [/\b(?:barnes[& ]+noble |bn[rt])([\w\+ ]*) b/i], [c, [m, "Barnes & Noble"], [p, k]], [/\b(tm\d{3}\w+) b/i], [c, [m, "NuVision"], [p, k]], [/\b(k88) b/i], [c, [m, "ZTE"], [p, k]], [/\b(nx\d{3}j) b/i], [c, [m, "ZTE"], [p, g]], [/\b(gen\d{3}) b.+49h/i], [c, [m, "Swiss"], [p, g]], [/\b(zur\d{3}) b/i], [c, [m, "Swiss"], [p, k]], [/\b((zeki)?tb.*\b) b/i], [c, [m, "Zeki"], [p, k]], [/\b([yr]\d{2}) b/i, /\b(dragon[- ]+touch |dt)(\w{5}) b/i], [[m, "Dragon Touch"], c, [p, k]], [/\b(ns-?\w{0,9}) b/i], [c, [m, "Insignia"], [p, k]], [/\b((nxa|next)-?\w{0,9}) b/i], [c, [m, "NextBook"], [p, k]], [/\b(xtreme\_)?(v(1[045]|2[015]|[3469]0|7[05])) b/i], [[m, "Voice"], c, [p, g]], [/\b(lvtel\-)?(v1[12]) b/i], [[m, "LvTel"], c, [p, g]], [/\b(ph-1) /i], [c, [m, "Essential"], [p, g]], [/\b(v(100md|700na|7011|917g).*\b) b/i], [c, [m, "Envizen"], [p, k]], [/\b(trio[-\w\. ]+) b/i], [c, [m, "MachSpeed"], [p, k]], [/\btu_(1491) b/i], [c, [m, "Rotor"], [p, k]], [/(shield[\w ]+) b/i], [c, [m, "Nvidia"], [p, k]], [/(sprint) (\w+)/i], [m, c, [p, g]], [/(kin\.[onetw]{3})/i], [[c, /\./g, " "], [m, R], [p, g]], [/droid.+; (cc6666?|et5[16]|mc[239][23]x?|vc8[03]x?)\)/i], [c, [m, G], [p, k]], [/droid.+; (ec30|ps20|tc[2-8]\d[kx])\)/i], [c, [m, G], [p, g]], [/smart-tv.+(samsung)/i], [m, [p, x]], [/hbbtv.+maple;(\d+)/i], [[c, /^/, "SmartTV"], [m, V], [p, x]], [/(nux; netcast.+smarttv|lg (netcast\.tv-201\d|android tv))/i], [[m, P], [p, x]], [/(apple) ?tv/i], [m, [c, S + " TV"], [p, x]], [/crkey/i], [[c, C + "cast"], [m, U], [p, x]], [/droid.+aft(\w)( bui|\))/i], [c, [m, T], [p, x]], [/\(dtv[\);].+(aquos)/i, /(aquos-tv[\w ]+)\)/i], [c, [m, D], [p, x]], [/(bravia[\w ]+)( bui|\))/i], [c, [m, I], [p, x]], [/(mitv-\w{5}) bui/i], [c, [m, F], [p, x]], [/Hbbtv.*(technisat) (.*);/i], [m, c, [p, x]], [/\b(roku)[\dx]*[\)\/]((?:dvp-)?[\d\.]*)/i, /hbbtv\/\d+\.\d+\.\d+ +\([\w\+ ]*; *([\w\d][^;]*);([^;]*)/i], [[m, trim], [c, trim], [p, x]], [/\b(android tv|smart[- ]?tv|opera tv|tv; rv:)\b/i], [[p, x]], [/(ouya)/i, /(nintendo) ([wids3utch]+)/i], [m, c, [p, v]], [/droid.+; (shield) bui/i], [c, [m, "Nvidia"], [p, v]], [/(playstation [345portablevi]+)/i], [c, [m, I], [p, v]], [/\b(xbox(?: one)?(?!; xbox))[\); ]/i], [c, [m, R], [p, v]], [/((pebble))app/i], [m, c, [p, _]], [/(watch)(?: ?os[,\/]|\d,\d\/)[\d\.]+/i], [c, [m, S], [p, _]], [/droid.+; (glass) \d/i], [c, [m, U], [p, _]], [/droid.+; (wt63?0{2,3})\)/i], [c, [m, G], [p, _]], [/(quest( 2| pro)?)/i], [c, [m, H], [p, _]], [/(tesla)(?: qtcarbrowser|\/[-\w\.]+)/i], [m, [p, y]], [/(aeobc)\b/i], [c, [m, T], [p, y]], [/droid .+?; ([^;]+?)(?: bui|\) applew).+? mobile safari/i], [c, [p, g]], [/droid .+?; ([^;]+?)(?: bui|\) applew).+?(?! mobile) safari/i], [c, [p, k]], [/\b((tablet|tab)[;\/]|focus\/\d(?!.+mobile))/i], [[p, k]], [/(phone|mobile(?:[;\/]| [ \w\/\.]*safari)|pda(?=.+windows ce))/i], [[p, g]], [/(android[-\w\. ]{0,9});.+buil/i], [c, [m, "Generic"]]], engine: [[/windows.+ edge\/([\w\.]+)/i], [f, [u, E + "HTML"]], [/webkit\/537\.36.+chrome\/(?!27)([\w\.]+)/i], [f, [u, "Blink"]], [/(presto)\/([\w\.]+)/i, /(webkit|trident|netfront|netsurf|amaya|lynx|w3m|goanna)\/([\w\.]+)/i, /ekioh(flow)\/([\w\.]+)/i, /(khtml|tasman|links)[\/ ]\(?([\w\.]+)/i, /(icab)[\/ ]([23]\.[\d\.]+)/i, /\b(libweb)/i], [u, f], [/rv\:([\w\.]{1,9})\b.+(gecko)/i], [f, u]], os: [[/microsoft (windows) (vista|xp)/i], [u, f], [/(windows) nt 6\.2; (arm)/i, /(windows (?:phone(?: os)?|mobile))[\/ ]?([\d\.\w ]*)/i, /(windows)[\/ ]?([ntce\d\. ]+\w)(?!.+xbox)/i], [u, [f, strMapper, X]], [/(win(?=3|9|n)|win 9x )([nt\d\.]+)/i], [[u, "Windows"], [f, strMapper, X]], [/ip[honead]{2,4}\b(?:.*os ([\w]+) like mac|; opera)/i, /ios;fbsv\/([\d\.]+)/i, /cfnetwork\/.+darwin/i], [[f, /_/g, "."], [u, "iOS"]], [/(mac os x) ?([\w\. ]*)/i, /(macintosh|mac_powerpc\b)(?!.+haiku)/i], [[u, Z], [f, /_/g, "."]], [/droid ([\w\.]+)\b.+(android[- ]x86|harmonyos)/i], [f, u], [/(android|webos|qnx|bada|rim tablet os|maemo|meego|sailfish)[-\/ ]?([\w\.]*)/i, /(blackberry)\w*\/([\w\.]*)/i, /(tizen|kaios)[\/ ]([\w\.]+)/i, /\((series40);/i], [u, f], [/\(bb(10);/i], [f, [u, N]], [/(?:symbian ?os|symbos|s60(?=;)|series60)[-\/ ]?([\w\.]*)/i], [f, [u, "Symbian"]], [/mozilla\/[\d\.]+ \((?:mobile|tablet|tv|mobile; [\w ]+); rv:.+ gecko\/([\w\.]+)/i], [f, [u, O + " OS"]], [/web0s;.+rt(tv)/i, /\b(?:hp)?wos(?:browser)?\/([\w\.]+)/i], [f, [u, "webOS"]], [/watch(?: ?os[,\/]|\d,\d\/)([\d\.]+)/i], [f, [u, "watchOS"]], [/crkey\/([\d\.]+)/i], [f, [u, C + "cast"]], [/(cros) [\w]+(?:\)| ([\w\.]+)\b)/i], [[u, L], f], [/panasonic;(viera)/i, /(netrange)mmh/i, /(nettv)\/(\d+\.[\w\.]+)/i, /(nintendo|playstation) ([wids345portablevuch]+)/i, /(xbox); +xbox ([^\);]+)/i, /\b(joli|palm)\b ?(?:os)?\/?([\w\.]*)/i, /(mint)[\/\(\) ]?(\w*)/i, /(mageia|vectorlinux)[; ]/i, /([kxln]?ubuntu|debian|suse|opensuse|gentoo|arch(?= linux)|slackware|fedora|mandriva|centos|pclinuxos|red ?hat|zenwalk|linpus|raspbian|plan 9|minix|risc os|contiki|deepin|manjaro|elementary os|sabayon|linspire)(?: gnu\/linux)?(?: enterprise)?(?:[- ]linux)?(?:-gnu)?[-\/ ]?(?!chrom|package)([-\w\.]*)/i, /(hurd|linux) ?([\w\.]*)/i, /(gnu) ?([\w\.]*)/i, /\b([-frentopcghs]{0,5}bsd|dragonfly)[\/ ]?(?!amd|[ix346]{1,2}86)([\w\.]*)/i, /(haiku) (\w+)/i], [u, f], [/(sunos) ?([\w\.\d]*)/i], [[u, "Solaris"], f], [/((?:open)?solaris)[-\/ ]?([\w\.]*)/i, /(aix) ((\d)(?=\.|\)| )[\w\.])*/i, /\b(beos|os\/2|amigaos|morphos|openvms|fuchsia|hp-ux|serenityos)/i, /(unix) ?([\w\.]*)/i], [u, f]] };
+          var UAParser = function(i3, e3) {
+            if (typeof i3 === w) {
+              e3 = i3;
+              i3 = a;
+            }
+            if (!(this instanceof UAParser)) {
+              return new UAParser(i3, e3).getResult();
+            }
+            var r2 = typeof o2 !== b && o2.navigator ? o2.navigator : a;
+            var n2 = i3 || (r2 && r2.userAgent ? r2.userAgent : t);
+            var v2 = r2 && r2.userAgentData ? r2.userAgentData : a;
+            var x2 = e3 ? extend(K, e3) : K;
+            var _2 = r2 && r2.userAgent == n2;
+            this.getBrowser = function() {
+              var i4 = {};
+              i4[u] = a;
+              i4[f] = a;
+              rgxMapper.call(i4, n2, x2.browser);
+              i4[d] = majorize(i4[f]);
+              if (_2 && r2 && r2.brave && typeof r2.brave.isBrave == s) {
+                i4[u] = "Brave";
+              }
+              return i4;
+            };
+            this.getCPU = function() {
+              var i4 = {};
+              i4[h] = a;
+              rgxMapper.call(i4, n2, x2.cpu);
+              return i4;
+            };
+            this.getDevice = function() {
+              var i4 = {};
+              i4[m] = a;
+              i4[c] = a;
+              i4[p] = a;
+              rgxMapper.call(i4, n2, x2.device);
+              if (_2 && !i4[p] && v2 && v2.mobile) {
+                i4[p] = g;
+              }
+              if (_2 && i4[c] == "Macintosh" && r2 && typeof r2.standalone !== b && r2.maxTouchPoints && r2.maxTouchPoints > 2) {
+                i4[c] = "iPad";
+                i4[p] = k;
+              }
+              return i4;
+            };
+            this.getEngine = function() {
+              var i4 = {};
+              i4[u] = a;
+              i4[f] = a;
+              rgxMapper.call(i4, n2, x2.engine);
+              return i4;
+            };
+            this.getOS = function() {
+              var i4 = {};
+              i4[u] = a;
+              i4[f] = a;
+              rgxMapper.call(i4, n2, x2.os);
+              if (_2 && !i4[u] && v2 && v2.platform != "Unknown") {
+                i4[u] = v2.platform.replace(/chrome os/i, L).replace(/macos/i, Z);
+              }
+              return i4;
+            };
+            this.getResult = function() {
+              return { ua: this.getUA(), browser: this.getBrowser(), engine: this.getEngine(), os: this.getOS(), device: this.getDevice(), cpu: this.getCPU() };
+            };
+            this.getUA = function() {
+              return n2;
+            };
+            this.setUA = function(i4) {
+              n2 = typeof i4 === l && i4.length > q ? trim(i4, q) : i4;
+              return this;
+            };
+            this.setUA(n2);
+            return this;
+          };
+          UAParser.VERSION = r;
+          UAParser.BROWSER = enumerize([u, f, d]);
+          UAParser.CPU = enumerize([h]);
+          UAParser.DEVICE = enumerize([c, m, p, v, g, x, k, _, y]);
+          UAParser.ENGINE = UAParser.OS = enumerize([u, f]);
+          if (typeof e2 !== b) {
+            if ("object" !== b && i2.exports) {
+              e2 = i2.exports = UAParser;
+            }
+            e2.UAParser = UAParser;
+          } else {
+            if (typeof define === s && define.amd) {
+              define((function() {
+                return UAParser;
+              }));
+            } else if (typeof o2 !== b) {
+              o2.UAParser = UAParser;
+            }
+          }
+          var Q = typeof o2 !== b && (o2.jQuery || o2.Zepto);
+          if (Q && !Q.ua) {
+            var Y = new UAParser();
+            Q.ua = Y.getResult();
+            Q.ua.get = function() {
+              return Y.getUA();
+            };
+            Q.ua.set = function(i3) {
+              Y.setUA(i3);
+              var e3 = Y.getResult();
+              for (var o3 in e3) {
+                Q.ua[o3] = e3[o3];
+              }
+            };
+          }
+        })(typeof window === "object" ? window : this);
+      } };
+      var e = {};
+      function __nccwpck_require__(o2) {
+        var a = e[o2];
+        if (a !== void 0) {
+          return a.exports;
+        }
+        var r = e[o2] = { exports: {} };
+        var t = true;
+        try {
+          i[o2].call(r.exports, r, r.exports, __nccwpck_require__);
+          t = false;
+        } finally {
+          if (t) delete e[o2];
+        }
+        return r.exports;
+      }
+      if (typeof __nccwpck_require__ !== "undefined") __nccwpck_require__.ab = __dirname + "/";
+      var o = __nccwpck_require__(943);
+      module2.exports = o;
+    })();
+  }
+});
+
+// node_modules/next/dist/server/web/spec-extension/user-agent.js
+var require_user_agent = __commonJS({
+  "node_modules/next/dist/server/web/spec-extension/user-agent.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      isBot: function() {
+        return isBot;
+      },
+      userAgent: function() {
+        return userAgent;
+      },
+      userAgentFromString: function() {
+        return userAgentFromString;
+      }
+    });
+    var _uaparserjs = /* @__PURE__ */ _interop_require_default(require_ua_parser());
+    function _interop_require_default(obj) {
+      return obj && obj.__esModule ? obj : {
+        default: obj
+      };
+    }
+    function isBot(input) {
+      return /Googlebot|Mediapartners-Google|AdsBot-Google|googleweblight|Storebot-Google|Google-PageRenderer|Google-InspectionTool|Bingbot|BingPreview|Slurp|DuckDuckBot|baiduspider|yandex|sogou|LinkedInBot|bitlybot|tumblr|vkShare|quora link preview|facebookexternalhit|facebookcatalog|Twitterbot|applebot|redditbot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|ia_archiver|GPTBot/i.test(input);
+    }
+    function userAgentFromString(input) {
+      return {
+        ...(0, _uaparserjs.default)(input),
+        isBot: input === void 0 ? false : isBot(input)
+      };
+    }
+    function userAgent({ headers }) {
+      return userAgentFromString(headers.get("user-agent") || void 0);
+    }
+  }
+});
+
+// node_modules/next/dist/server/web/spec-extension/url-pattern.js
+var require_url_pattern = __commonJS({
+  "node_modules/next/dist/server/web/spec-extension/url-pattern.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "URLPattern", {
+      enumerable: true,
+      get: function() {
+        return GlobalURLPattern;
+      }
+    });
+    var GlobalURLPattern = typeof URLPattern === "undefined" ? void 0 : URLPattern;
+  }
+});
+
+// node_modules/next/dist/server/app-render/async-local-storage.js
+var require_async_local_storage = __commonJS({
+  "node_modules/next/dist/server/app-render/async-local-storage.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      bindSnapshot: function() {
+        return bindSnapshot;
+      },
+      createAsyncLocalStorage: function() {
+        return createAsyncLocalStorage;
+      },
+      createSnapshot: function() {
+        return createSnapshot;
+      },
+      getOrCreateGlobalAsyncLocalStorage: function() {
+        return getOrCreateGlobalAsyncLocalStorage;
+      }
+    });
+    var sharedAsyncLocalStorageNotAvailableError = new Error("Invariant: AsyncLocalStorage accessed in runtime where it is not available");
+    var FakeAsyncLocalStorage = class {
+      disable() {
+        throw sharedAsyncLocalStorageNotAvailableError;
+      }
+      getStore() {
+        return void 0;
+      }
+      run() {
+        throw sharedAsyncLocalStorageNotAvailableError;
+      }
+      exit() {
+        throw sharedAsyncLocalStorageNotAvailableError;
+      }
+      enterWith() {
+        throw sharedAsyncLocalStorageNotAvailableError;
+      }
+      static bind(fn) {
+        return fn;
+      }
+    };
+    var maybeGlobalAsyncLocalStorage = typeof globalThis !== "undefined" && globalThis.AsyncLocalStorage;
+    function createAsyncLocalStorage() {
+      if (maybeGlobalAsyncLocalStorage) {
+        return new maybeGlobalAsyncLocalStorage();
+      }
+      return new FakeAsyncLocalStorage();
+    }
+    function getOrCreateGlobalAsyncLocalStorage(name) {
+      const key = /* @__PURE__ */ Symbol.for(`@next/${name}@${"16.4.0"}`);
+      const globalStore = globalThis;
+      return globalStore[key] ??= createAsyncLocalStorage();
+    }
+    function bindSnapshot(fn) {
+      if (maybeGlobalAsyncLocalStorage) {
+        return maybeGlobalAsyncLocalStorage.bind(fn);
+      }
+      return FakeAsyncLocalStorage.bind(fn);
+    }
+    function createSnapshot() {
+      if (maybeGlobalAsyncLocalStorage) {
+        return maybeGlobalAsyncLocalStorage.snapshot();
+      }
+      return function(fn, ...args) {
+        return fn(...args);
+      };
+    }
+  }
+});
+
+// node_modules/next/dist/server/app-render/work-async-storage-instance.js
+var require_work_async_storage_instance = __commonJS({
+  "node_modules/next/dist/server/app-render/work-async-storage-instance.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "workAsyncStorageInstance", {
+      enumerable: true,
+      get: function() {
+        return workAsyncStorageInstance;
+      }
+    });
+    var _asynclocalstorage = require_async_local_storage();
+    var workAsyncStorageInstance = (0, _asynclocalstorage.getOrCreateGlobalAsyncLocalStorage)("work-async-storage");
+  }
+});
+
+// node_modules/next/dist/server/app-render/work-async-storage.external.js
+var require_work_async_storage_external = __commonJS({
+  "node_modules/next/dist/server/app-render/work-async-storage.external.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "workAsyncStorage", {
+      enumerable: true,
+      get: function() {
+        return _workasyncstorageinstance.workAsyncStorageInstance;
+      }
+    });
+    var _workasyncstorageinstance = require_work_async_storage_instance();
+  }
+});
+
+// node_modules/next/dist/server/app-render/work-unit-async-storage-instance.js
+var require_work_unit_async_storage_instance = __commonJS({
+  "node_modules/next/dist/server/app-render/work-unit-async-storage-instance.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "workUnitAsyncStorageInstance", {
+      enumerable: true,
+      get: function() {
+        return workUnitAsyncStorageInstance;
+      }
+    });
+    var _asynclocalstorage = require_async_local_storage();
+    var workUnitAsyncStorageInstance = (0, _asynclocalstorage.getOrCreateGlobalAsyncLocalStorage)("work-unit-async-storage");
+  }
+});
+
+// node_modules/next/dist/shared/lib/invariant-error.js
+var require_invariant_error = __commonJS({
+  "node_modules/next/dist/shared/lib/invariant-error.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "InvariantError", {
+      enumerable: true,
+      get: function() {
+        return InvariantError;
+      }
+    });
+    var InvariantError = class extends Error {
+      constructor(message, options) {
+        super(`Invariant: ${message.endsWith(".") ? message : message + "."} This is a bug in Next.js.`, options);
+        this.name = "InvariantError";
+      }
+    };
+  }
+});
+
+// node_modules/next/dist/server/app-render/work-unit-async-storage.external.js
+var require_work_unit_async_storage_external = __commonJS({
+  "node_modules/next/dist/server/app-render/work-unit-async-storage.external.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      getCacheSignal: function() {
+        return getCacheSignal;
+      },
+      getDraftModeProviderForCacheScope: function() {
+        return getDraftModeProviderForCacheScope;
+      },
+      getHmrRefreshHash: function() {
+        return getHmrRefreshHash;
+      },
+      getResumeDataCache: function() {
+        return getResumeDataCache;
+      },
+      getServerComponentsHmrCache: function() {
+        return getServerComponentsHmrCache;
+      },
+      getStagedRenderingController: function() {
+        return getStagedRenderingController;
+      },
+      getVaryParamsAccumulator: function() {
+        return getVaryParamsAccumulator;
+      },
+      isHmrRefresh: function() {
+        return isHmrRefresh;
+      },
+      throwForMissingRequestStore: function() {
+        return throwForMissingRequestStore;
+      },
+      throwInvariantForMissingStore: function() {
+        return throwInvariantForMissingStore;
+      },
+      willConsumerServerCache: function() {
+        return willConsumerServerCache;
+      },
+      workUnitAsyncStorage: function() {
+        return _workunitasyncstorageinstance.workUnitAsyncStorageInstance;
+      }
+    });
+    var _workunitasyncstorageinstance = require_work_unit_async_storage_instance();
+    var _invarianterror = require_invariant_error();
+    function willConsumerServerCache(workUnitStore) {
+      if (!workUnitStore) {
+        return false;
+      }
+      switch (workUnitStore.type) {
+        case "cache":
+        case "private-cache":
+        case "unstable-cache":
+          return workUnitStore.consumerWillServerCache;
+        case "prerender":
+        case "prerender-client":
+        case "prerender-legacy":
+          return true;
+        case "request":
+        case "prerender-runtime":
+        case "validation-client":
+        case "build-time-generator":
+          return false;
+        default:
+          return workUnitStore;
+      }
+    }
+    function throwForMissingRequestStore(callingExpression) {
+      throw new Error(`\`${callingExpression}\` was called outside a request scope. Read more: https://nextjs.org/docs/messages/next-dynamic-api-wrong-context`);
+    }
+    function throwInvariantForMissingStore() {
+      throw new _invarianterror.InvariantError("Expected workUnitAsyncStorage to have a store.");
+    }
+    function getResumeDataCache(workUnitStore) {
+      switch (workUnitStore.type) {
+        case "request":
+        case "prerender":
+        case "prerender-runtime":
+        case "prerender-client":
+        case "validation-client":
+          return workUnitStore.resumeDataCache;
+        case "cache":
+        case "private-cache":
+        case "unstable-cache":
+        case "prerender-legacy":
+        case "build-time-generator":
+          return null;
+        default:
+          return workUnitStore;
+      }
+    }
+    function getHmrRefreshHash(workUnitStore) {
+      if (process.env.__NEXT_DEV_SERVER) {
+        switch (workUnitStore.type) {
+          case "cache":
+          case "private-cache":
+          case "prerender":
+          case "prerender-runtime":
+          case "request":
+            return workUnitStore.hmrRefreshHash;
+          case "prerender-client":
+          case "validation-client":
+          case "prerender-legacy":
+          case "unstable-cache":
+          case "build-time-generator":
+            break;
+          default:
+            workUnitStore;
+        }
+      }
+      return void 0;
+    }
+    function isHmrRefresh(workUnitStore) {
+      if (process.env.__NEXT_DEV_SERVER) {
+        switch (workUnitStore.type) {
+          case "cache":
+          case "private-cache":
+          case "request":
+            return workUnitStore.isHmrRefresh ?? false;
+          case "prerender":
+          case "prerender-client":
+          case "validation-client":
+          case "prerender-runtime":
+          case "prerender-legacy":
+          case "unstable-cache":
+          case "build-time-generator":
+            break;
+          default:
+            workUnitStore;
+        }
+      }
+      return false;
+    }
+    function getServerComponentsHmrCache(workUnitStore) {
+      if (process.env.__NEXT_DEV_SERVER) {
+        switch (workUnitStore.type) {
+          case "cache":
+          case "private-cache":
+          case "request":
+            return workUnitStore.serverComponentsHmrCache;
+          case "prerender":
+          case "prerender-client":
+          case "validation-client":
+          case "prerender-runtime":
+          case "prerender-legacy":
+          case "unstable-cache":
+          case "build-time-generator":
+            break;
+          default:
+            workUnitStore;
+        }
+      }
+      return void 0;
+    }
+    function getDraftModeProviderForCacheScope(workStore, workUnitStore) {
+      if (workStore.isDraftMode) {
+        switch (workUnitStore.type) {
+          case "cache":
+          case "private-cache":
+          case "unstable-cache":
+          case "prerender-runtime":
+          case "request":
+            return workUnitStore.draftMode;
+          case "prerender":
+          case "prerender-client":
+          case "validation-client":
+          case "prerender-legacy":
+          case "build-time-generator":
+            break;
+          default:
+            workUnitStore;
+        }
+      }
+      return void 0;
+    }
+    function getStagedRenderingController(workUnitStore) {
+      switch (workUnitStore.type) {
+        case "request":
+        case "prerender-runtime":
+        case "prerender":
+          return workUnitStore.stagedRendering ?? null;
+        case "prerender-client":
+        case "validation-client":
+        case "prerender-legacy":
+        case "cache":
+        case "private-cache":
+        case "unstable-cache":
+        case "build-time-generator":
+          return null;
+        default:
+          return workUnitStore;
+      }
+    }
+    function getCacheSignal(workUnitStore) {
+      switch (workUnitStore.type) {
+        case "prerender":
+        case "prerender-client":
+        case "validation-client":
+        case "prerender-runtime":
+          return workUnitStore.cacheSignal;
+        case "request": {
+          if (workUnitStore.cacheSignal) {
+            return workUnitStore.cacheSignal;
+          }
+        }
+        case "prerender-legacy":
+        case "cache":
+        case "private-cache":
+        case "unstable-cache":
+        case "build-time-generator":
+          return null;
+        default:
+          return workUnitStore;
+      }
+    }
+    function getVaryParamsAccumulator(workUnitStore) {
+      switch (workUnitStore.type) {
+        case "prerender":
+        case "prerender-runtime":
+        case "request": {
+          return workUnitStore.varyParamsAccumulator ?? null;
+        }
+        case "prerender-legacy":
+        case "cache":
+        case "private-cache":
+        case "prerender-client":
+        case "validation-client":
+        case "unstable-cache":
+        case "build-time-generator":
+          return null;
+        default:
+          workUnitStore;
+          return null;
+      }
+    }
+  }
+});
+
+// node_modules/next/dist/server/after/after.js
+var require_after = __commonJS({
+  "node_modules/next/dist/server/after/after.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "after", {
+      enumerable: true,
+      get: function() {
+        return after;
+      }
+    });
+    var _workasyncstorageexternal = require_work_async_storage_external();
+    var _workunitasyncstorageexternal = require_work_unit_async_storage_external();
+    function after(task) {
+      const workStore = _workasyncstorageexternal.workAsyncStorage.getStore();
+      const workUnitStore = _workunitasyncstorageexternal.workUnitAsyncStorage.getStore();
+      if (!workStore || !workUnitStore) {
+        throw new Error("`after` was called outside a request scope. Read more: https://nextjs.org/docs/messages/next-dynamic-api-wrong-context");
+      }
+      const { afterContext } = workStore;
+      return afterContext.after(task, workUnitStore);
+    }
+  }
+});
+
+// node_modules/next/dist/server/after/index.js
+var require_after2 = __commonJS({
+  "node_modules/next/dist/server/after/index.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    _export_star(require_after(), exports2);
+    function _export_star(from, to) {
+      Object.keys(from).forEach(function(k) {
+        if (k !== "default" && !Object.prototype.hasOwnProperty.call(to, k)) {
+          Object.defineProperty(to, k, {
+            enumerable: true,
+            get: function() {
+              return from[k];
+            }
+          });
+        }
+      });
+      return from;
+    }
+  }
+});
+
+// node_modules/react/cjs/react.production.js
+var require_react_production = __commonJS({
+  "node_modules/react/cjs/react.production.js"(exports2) {
+    "use strict";
+    var REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element");
+    var REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal");
+    var REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment");
+    var REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode");
+    var REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler");
+    var REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer");
+    var REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context");
+    var REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref");
+    var REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense");
+    var REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo");
+    var REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy");
+    var REACT_ACTIVITY_TYPE = /* @__PURE__ */ Symbol.for("react.activity");
+    var REACT_VIEW_TRANSITION_TYPE = /* @__PURE__ */ Symbol.for("react.view_transition");
+    var MAYBE_ITERATOR_SYMBOL = Symbol.iterator;
+    function getIteratorFn(maybeIterable) {
+      if (null === maybeIterable || "object" !== typeof maybeIterable) return null;
+      maybeIterable = MAYBE_ITERATOR_SYMBOL && maybeIterable[MAYBE_ITERATOR_SYMBOL] || maybeIterable["@@iterator"];
+      return "function" === typeof maybeIterable ? maybeIterable : null;
+    }
+    var ReactNoopUpdateQueue = {
+      isMounted: function() {
+        return false;
+      },
+      enqueueForceUpdate: function() {
+      },
+      enqueueReplaceState: function() {
+      },
+      enqueueSetState: function() {
+      }
+    };
+    var assign = Object.assign;
+    var emptyObject = {};
+    function Component(props, context, updater) {
+      this.props = props;
+      this.context = context;
+      this.refs = emptyObject;
+      this.updater = updater || ReactNoopUpdateQueue;
+    }
+    Component.prototype.isReactComponent = {};
+    Component.prototype.setState = function(partialState, callback) {
+      if ("object" !== typeof partialState && "function" !== typeof partialState && null != partialState)
+        throw Error(
+          "takes an object of state variables to update or a function which returns an object of state variables."
+        );
+      this.updater.enqueueSetState(this, partialState, callback, "setState");
+    };
+    Component.prototype.forceUpdate = function(callback) {
+      this.updater.enqueueForceUpdate(this, callback, "forceUpdate");
+    };
+    function ComponentDummy() {
+    }
+    ComponentDummy.prototype = Component.prototype;
+    function PureComponent(props, context, updater) {
+      this.props = props;
+      this.context = context;
+      this.refs = emptyObject;
+      this.updater = updater || ReactNoopUpdateQueue;
+    }
+    var pureComponentPrototype = PureComponent.prototype = new ComponentDummy();
+    pureComponentPrototype.constructor = PureComponent;
+    assign(pureComponentPrototype, Component.prototype);
+    pureComponentPrototype.isPureReactComponent = true;
+    var isArrayImpl = Array.isArray;
+    function noop() {
+    }
+    var ReactSharedInternals = { H: null, A: null, T: null, S: null };
+    var hasOwnProperty = Object.prototype.hasOwnProperty;
+    function ReactElement(type, key, props) {
+      var refProp = props.ref;
+      return {
+        $$typeof: REACT_ELEMENT_TYPE,
+        type,
+        key,
+        ref: void 0 !== refProp ? refProp : null,
+        props
+      };
+    }
+    function cloneAndReplaceKey(oldElement, newKey) {
+      return ReactElement(oldElement.type, newKey, oldElement.props);
+    }
+    function isValidElement(object) {
+      return "object" === typeof object && null !== object && object.$$typeof === REACT_ELEMENT_TYPE;
+    }
+    function escape2(key) {
+      var escaperLookup = { "=": "=0", ":": "=2" };
+      return "$" + key.replace(/[=:]/g, function(match) {
+        return escaperLookup[match];
+      });
+    }
+    var userProvidedKeyEscapeRegex = /\/+/g;
+    function getElementKey(element, index) {
+      return "object" === typeof element && null !== element && null != element.key ? escape2("" + element.key) : index.toString(36);
+    }
+    function resolveThenable(thenable) {
+      switch (thenable.status) {
+        case "fulfilled":
+          return thenable.value;
+        case "rejected":
+          throw thenable.reason;
+        default:
+          switch ("string" === typeof thenable.status ? thenable.then(noop, noop) : (thenable.status = "pending", thenable.then(
+            function(fulfilledValue) {
+              "pending" === thenable.status && (thenable.status = "fulfilled", thenable.value = fulfilledValue);
+            },
+            function(error) {
+              "pending" === thenable.status && (thenable.status = "rejected", thenable.reason = error);
+            }
+          )), thenable.status) {
+            case "fulfilled":
+              return thenable.value;
+            case "rejected":
+              throw thenable.reason;
+          }
+      }
+      throw thenable;
+    }
+    function mapIntoArray(children, array, escapedPrefix, nameSoFar, callback) {
+      var type = typeof children;
+      if ("undefined" === type || "boolean" === type) children = null;
+      var invokeCallback = false;
+      if (null === children) invokeCallback = true;
+      else
+        switch (type) {
+          case "bigint":
+          case "string":
+          case "number":
+            invokeCallback = true;
+            break;
+          case "object":
+            switch (children.$$typeof) {
+              case REACT_ELEMENT_TYPE:
+              case REACT_PORTAL_TYPE:
+                invokeCallback = true;
+                break;
+              case REACT_LAZY_TYPE:
+                return invokeCallback = children._init, mapIntoArray(
+                  invokeCallback(children._payload),
+                  array,
+                  escapedPrefix,
+                  nameSoFar,
+                  callback
+                );
+            }
+        }
+      if (invokeCallback)
+        return callback = callback(children), invokeCallback = "" === nameSoFar ? "." + getElementKey(children, 0) : nameSoFar, isArrayImpl(callback) ? (escapedPrefix = "", null != invokeCallback && (escapedPrefix = invokeCallback.replace(userProvidedKeyEscapeRegex, "$&/") + "/"), mapIntoArray(callback, array, escapedPrefix, "", function(c) {
+          return c;
+        })) : null != callback && (isValidElement(callback) && (callback = cloneAndReplaceKey(
+          callback,
+          escapedPrefix + (null == callback.key || children && children.key === callback.key ? "" : ("" + callback.key).replace(
+            userProvidedKeyEscapeRegex,
+            "$&/"
+          ) + "/") + invokeCallback
+        )), array.push(callback)), 1;
+      invokeCallback = 0;
+      var nextNamePrefix = "" === nameSoFar ? "." : nameSoFar + ":";
+      if (isArrayImpl(children))
+        for (var i = 0; i < children.length; i++)
+          nameSoFar = children[i], type = nextNamePrefix + getElementKey(nameSoFar, i), invokeCallback += mapIntoArray(
+            nameSoFar,
+            array,
+            escapedPrefix,
+            type,
+            callback
+          );
+      else if (i = getIteratorFn(children), "function" === typeof i)
+        for (children = i.call(children), i = 0; !(nameSoFar = children.next()).done; )
+          nameSoFar = nameSoFar.value, type = nextNamePrefix + getElementKey(nameSoFar, i++), invokeCallback += mapIntoArray(
+            nameSoFar,
+            array,
+            escapedPrefix,
+            type,
+            callback
+          );
+      else if ("object" === type) {
+        if ("function" === typeof children.then)
+          return mapIntoArray(
+            resolveThenable(children),
+            array,
+            escapedPrefix,
+            nameSoFar,
+            callback
+          );
+        array = String(children);
+        throw Error(
+          "Objects are not valid as a React child (found: " + ("[object Object]" === array ? "object with keys {" + Object.keys(children).join(", ") + "}" : array) + "). If you meant to render a collection of children, use an array instead."
+        );
+      }
+      return invokeCallback;
+    }
+    function mapChildren(children, func, context) {
+      if (null == children) return children;
+      var result = [], count = 0;
+      mapIntoArray(children, result, "", "", function(child) {
+        return func.call(context, child, count++);
+      });
+      return result;
+    }
+    function lazyInitializer(payload) {
+      if (-1 === payload._status) {
+        var ctor = payload._result, thenable = ctor();
+        thenable.then(
+          function(moduleObject) {
+            if (0 === payload._status || -1 === payload._status)
+              payload._status = 1, payload._result = moduleObject, void 0 === thenable.status && (thenable.status = "fulfilled", thenable.value = moduleObject);
+          },
+          function(error) {
+            if (0 === payload._status || -1 === payload._status)
+              payload._status = 2, payload._result = error, void 0 === thenable.status && (thenable.status = "rejected", thenable.reason = error);
+          }
+        );
+        -1 === payload._status && (payload._status = 0, payload._result = thenable);
+      }
+      if (1 === payload._status) return payload._result.default;
+      throw payload._result;
+    }
+    var reportGlobalError = "function" === typeof reportError ? reportError : function(error) {
+      if ("object" === typeof window && "function" === typeof window.ErrorEvent) {
+        var event = new window.ErrorEvent("error", {
+          bubbles: true,
+          cancelable: true,
+          message: "object" === typeof error && null !== error && "string" === typeof error.message ? String(error.message) : String(error),
+          error
+        });
+        if (!window.dispatchEvent(event)) return;
+      } else if ("object" === typeof process && "function" === typeof process.emit) {
+        process.emit("uncaughtException", error);
+        return;
+      }
+      console.error(error);
+    };
+    function startTransition(scope) {
+      var prevTransition = ReactSharedInternals.T, currentTransition = {};
+      currentTransition.types = null !== prevTransition ? prevTransition.types : null;
+      ReactSharedInternals.T = currentTransition;
+      try {
+        var returnValue = scope(), onStartTransitionFinish = ReactSharedInternals.S;
+        null !== onStartTransitionFinish && onStartTransitionFinish(currentTransition, returnValue);
+        "object" === typeof returnValue && null !== returnValue && "function" === typeof returnValue.then && returnValue.then(noop, reportGlobalError);
+      } catch (error) {
+        reportGlobalError(error);
+      } finally {
+        null !== prevTransition && null !== currentTransition.types && (prevTransition.types = currentTransition.types), ReactSharedInternals.T = prevTransition;
+      }
+    }
+    function addTransitionType(type) {
+      var transition = ReactSharedInternals.T;
+      if (null !== transition) {
+        var transitionTypes = transition.types;
+        null === transitionTypes ? transition.types = [type] : -1 === transitionTypes.indexOf(type) && transitionTypes.push(type);
+      } else startTransition(addTransitionType.bind(null, type));
+    }
+    var Children = {
+      map: mapChildren,
+      forEach: function(children, forEachFunc, forEachContext) {
+        mapChildren(
+          children,
+          function() {
+            forEachFunc.apply(this, arguments);
+          },
+          forEachContext
+        );
+      },
+      count: function(children) {
+        var n = 0;
+        mapChildren(children, function() {
+          n++;
+        });
+        return n;
+      },
+      toArray: function(children) {
+        return mapChildren(children, function(child) {
+          return child;
+        }) || [];
+      },
+      only: function(children) {
+        if (!isValidElement(children))
+          throw Error(
+            "React.Children.only expected to receive a single React element child."
+          );
+        return children;
+      }
+    };
+    exports2.Activity = REACT_ACTIVITY_TYPE;
+    exports2.Children = Children;
+    exports2.Component = Component;
+    exports2.Fragment = REACT_FRAGMENT_TYPE;
+    exports2.Profiler = REACT_PROFILER_TYPE;
+    exports2.PureComponent = PureComponent;
+    exports2.StrictMode = REACT_STRICT_MODE_TYPE;
+    exports2.Suspense = REACT_SUSPENSE_TYPE;
+    exports2.ViewTransition = REACT_VIEW_TRANSITION_TYPE;
+    exports2.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE = ReactSharedInternals;
+    exports2.__COMPILER_RUNTIME = {
+      __proto__: null,
+      c: function(size) {
+        return ReactSharedInternals.H.useMemoCache(size);
+      }
+    };
+    exports2.addTransitionType = addTransitionType;
+    exports2.cache = function(fn) {
+      return function() {
+        return fn.apply(null, arguments);
+      };
+    };
+    exports2.cacheSignal = function() {
+      return null;
+    };
+    exports2.cloneElement = function(element, config, children) {
+      if (null === element || void 0 === element)
+        throw Error(
+          "The argument must be a React element, but you passed " + element + "."
+        );
+      var props = assign({}, element.props), key = element.key;
+      if (null != config)
+        for (propName in void 0 !== config.key && (key = "" + config.key), config)
+          !hasOwnProperty.call(config, propName) || "key" === propName || "__self" === propName || "__source" === propName || "ref" === propName && void 0 === config.ref || (props[propName] = config[propName]);
+      var propName = arguments.length - 2;
+      if (1 === propName) props.children = children;
+      else if (1 < propName) {
+        for (var childArray = Array(propName), i = 0; i < propName; i++)
+          childArray[i] = arguments[i + 2];
+        props.children = childArray;
+      }
+      return ReactElement(element.type, key, props);
+    };
+    exports2.createContext = function(defaultValue) {
+      defaultValue = {
+        $$typeof: REACT_CONTEXT_TYPE,
+        _currentValue: defaultValue,
+        _currentValue2: defaultValue,
+        _threadCount: 0,
+        Provider: null,
+        Consumer: null
+      };
+      defaultValue.Provider = defaultValue;
+      defaultValue.Consumer = {
+        $$typeof: REACT_CONSUMER_TYPE,
+        _context: defaultValue
+      };
+      return defaultValue;
+    };
+    exports2.createElement = function(type, config, children) {
+      var propName, props = {}, key = null;
+      if (null != config)
+        for (propName in void 0 !== config.key && (key = "" + config.key), config)
+          hasOwnProperty.call(config, propName) && "key" !== propName && "__self" !== propName && "__source" !== propName && (props[propName] = config[propName]);
+      var childrenLength = arguments.length - 2;
+      if (1 === childrenLength) props.children = children;
+      else if (1 < childrenLength) {
+        for (var childArray = Array(childrenLength), i = 0; i < childrenLength; i++)
+          childArray[i] = arguments[i + 2];
+        props.children = childArray;
+      }
+      if (type && type.defaultProps)
+        for (propName in childrenLength = type.defaultProps, childrenLength)
+          void 0 === props[propName] && (props[propName] = childrenLength[propName]);
+      return ReactElement(type, key, props);
+    };
+    exports2.createRef = function() {
+      return { current: null };
+    };
+    exports2.forwardRef = function(render) {
+      return { $$typeof: REACT_FORWARD_REF_TYPE, render };
+    };
+    exports2.isValidElement = isValidElement;
+    exports2.lazy = function(ctor) {
+      return {
+        $$typeof: REACT_LAZY_TYPE,
+        _payload: { _status: -1, _result: ctor },
+        _init: lazyInitializer
+      };
+    };
+    exports2.memo = function(type, compare) {
+      return {
+        $$typeof: REACT_MEMO_TYPE,
+        type,
+        compare: void 0 === compare ? null : compare
+      };
+    };
+    exports2.startTransition = startTransition;
+    exports2.unstable_useCacheRefresh = function() {
+      return ReactSharedInternals.H.useCacheRefresh();
+    };
+    exports2.use = function(usable) {
+      return ReactSharedInternals.H.use(usable);
+    };
+    exports2.useActionState = function(action, initialState, permalink) {
+      return ReactSharedInternals.H.useActionState(action, initialState, permalink);
+    };
+    exports2.useCallback = function(callback, deps) {
+      return ReactSharedInternals.H.useCallback(callback, deps);
+    };
+    exports2.useContext = function(Context2) {
+      return ReactSharedInternals.H.useContext(Context2);
+    };
+    exports2.useDebugValue = function() {
+    };
+    exports2.useDeferredValue = function(value, initialValue) {
+      return ReactSharedInternals.H.useDeferredValue(value, initialValue);
+    };
+    exports2.useEffect = function(create, deps) {
+      return ReactSharedInternals.H.useEffect(create, deps);
+    };
+    exports2.useEffectEvent = function(callback) {
+      return ReactSharedInternals.H.useEffectEvent(callback);
+    };
+    exports2.useId = function() {
+      return ReactSharedInternals.H.useId();
+    };
+    exports2.useImperativeHandle = function(ref, create, deps) {
+      return ReactSharedInternals.H.useImperativeHandle(ref, create, deps);
+    };
+    exports2.useInsertionEffect = function(create, deps) {
+      return ReactSharedInternals.H.useInsertionEffect(create, deps);
+    };
+    exports2.useLayoutEffect = function(create, deps) {
+      return ReactSharedInternals.H.useLayoutEffect(create, deps);
+    };
+    exports2.useMemo = function(create, deps) {
+      return ReactSharedInternals.H.useMemo(create, deps);
+    };
+    exports2.useOptimistic = function(passthrough, reducer) {
+      return ReactSharedInternals.H.useOptimistic(passthrough, reducer);
+    };
+    exports2.useReducer = function(reducer, initialArg, init) {
+      return ReactSharedInternals.H.useReducer(reducer, initialArg, init);
+    };
+    exports2.useRef = function(initialValue) {
+      return ReactSharedInternals.H.useRef(initialValue);
+    };
+    exports2.useState = function(initialState) {
+      return ReactSharedInternals.H.useState(initialState);
+    };
+    exports2.useSyncExternalStore = function(subscribe, getSnapshot, getServerSnapshot) {
+      return ReactSharedInternals.H.useSyncExternalStore(
+        subscribe,
+        getSnapshot,
+        getServerSnapshot
+      );
+    };
+    exports2.useTransition = function() {
+      return ReactSharedInternals.H.useTransition();
+    };
+    exports2.version = "19.3.0";
+  }
+});
+
+// node_modules/react/cjs/react.development.js
+var require_react_development = __commonJS({
+  "node_modules/react/cjs/react.development.js"(exports2, module2) {
+    "use strict";
+    "production" !== process.env.NODE_ENV && (function() {
+      function defineDeprecationWarning(methodName, info) {
+        Object.defineProperty(Component.prototype, methodName, {
+          get: function() {
+            console.warn(
+              "%s(...) is deprecated in plain JavaScript React classes. %s",
+              info[0],
+              info[1]
+            );
+          }
+        });
+      }
+      function getIteratorFn(maybeIterable) {
+        if (null === maybeIterable || "object" !== typeof maybeIterable)
+          return null;
+        maybeIterable = MAYBE_ITERATOR_SYMBOL && maybeIterable[MAYBE_ITERATOR_SYMBOL] || maybeIterable["@@iterator"];
+        return "function" === typeof maybeIterable ? maybeIterable : null;
+      }
+      function warnNoop(publicInstance, callerName) {
+        publicInstance = (publicInstance = publicInstance.constructor) && (publicInstance.displayName || publicInstance.name) || "ReactClass";
+        var warningKey = publicInstance + "." + callerName;
+        didWarnStateUpdateForUnmountedComponent[warningKey] || (console.error(
+          "Can't call %s on a component that is not yet mounted. This is a no-op, but it might indicate a bug in your application. Instead, assign to `this.state` directly or define a `state = {};` class property with the desired state in the %s component.",
+          callerName,
+          publicInstance
+        ), didWarnStateUpdateForUnmountedComponent[warningKey] = true);
+      }
+      function Component(props, context, updater) {
+        this.props = props;
+        this.context = context;
+        this.refs = emptyObject;
+        this.updater = updater || ReactNoopUpdateQueue;
+      }
+      function ComponentDummy() {
+      }
+      function PureComponent(props, context, updater) {
+        this.props = props;
+        this.context = context;
+        this.refs = emptyObject;
+        this.updater = updater || ReactNoopUpdateQueue;
+      }
+      function noop() {
+      }
+      function testStringCoercion(value) {
+        return "" + value;
+      }
+      function checkKeyStringCoercion(value) {
+        try {
+          testStringCoercion(value);
+          var JSCompiler_inline_result = false;
+        } catch (e) {
+          JSCompiler_inline_result = true;
+        }
+        if (JSCompiler_inline_result) {
+          JSCompiler_inline_result = console;
+          var JSCompiler_temp_const = JSCompiler_inline_result.error;
+          var JSCompiler_inline_result$jscomp$0 = "function" === typeof Symbol && Symbol.toStringTag && value[Symbol.toStringTag] || value.constructor.name || "Object";
+          JSCompiler_temp_const.call(
+            JSCompiler_inline_result,
+            "The provided key is an unsupported type %s. This value must be coerced to a string before using it here.",
+            JSCompiler_inline_result$jscomp$0
+          );
+          return testStringCoercion(value);
+        }
+      }
+      function getComponentNameFromType(type) {
+        if (null == type) return null;
+        if ("function" === typeof type)
+          return type.$$typeof === REACT_CLIENT_REFERENCE ? null : type.displayName || type.name || null;
+        if ("string" === typeof type) return type;
+        switch (type) {
+          case REACT_FRAGMENT_TYPE:
+            return "Fragment";
+          case REACT_PROFILER_TYPE:
+            return "Profiler";
+          case REACT_STRICT_MODE_TYPE:
+            return "StrictMode";
+          case REACT_SUSPENSE_TYPE:
+            return "Suspense";
+          case REACT_SUSPENSE_LIST_TYPE:
+            return "SuspenseList";
+          case REACT_ACTIVITY_TYPE:
+            return "Activity";
+          case REACT_VIEW_TRANSITION_TYPE:
+            return "ViewTransition";
+        }
+        if ("object" === typeof type)
+          switch ("number" === typeof type.tag && console.error(
+            "Received an unexpected object in getComponentNameFromType(). This is likely a bug in React. Please file an issue."
+          ), type.$$typeof) {
+            case REACT_PORTAL_TYPE:
+              return "Portal";
+            case REACT_CONTEXT_TYPE:
+              return type.displayName || "Context";
+            case REACT_CONSUMER_TYPE:
+              return (type._context.displayName || "Context") + ".Consumer";
+            case REACT_FORWARD_REF_TYPE:
+              var innerType = type.render;
+              type = type.displayName;
+              type || (type = innerType.displayName || innerType.name || "", type = "" !== type ? "ForwardRef(" + type + ")" : "ForwardRef");
+              return type;
+            case REACT_MEMO_TYPE:
+              return innerType = type.displayName || null, null !== innerType ? innerType : getComponentNameFromType(type.type) || "Memo";
+            case REACT_LAZY_TYPE:
+              innerType = type._payload;
+              type = type._init;
+              try {
+                return getComponentNameFromType(type(innerType));
+              } catch (x) {
+              }
+          }
+        return null;
+      }
+      function getTaskName(type) {
+        if (type === REACT_FRAGMENT_TYPE) return "<>";
+        if ("object" === typeof type && null !== type && type.$$typeof === REACT_LAZY_TYPE)
+          return "<...>";
+        try {
+          var name = getComponentNameFromType(type);
+          return name ? "<" + name + ">" : "<...>";
+        } catch (x) {
+          return "<...>";
+        }
+      }
+      function getOwner() {
+        var dispatcher = ReactSharedInternals.A;
+        return null === dispatcher ? null : dispatcher.getOwner();
+      }
+      function UnknownOwner() {
+        return Error("react-stack-top-frame");
+      }
+      function hasValidKey(config) {
+        if (hasOwnProperty.call(config, "key")) {
+          var getter = Object.getOwnPropertyDescriptor(config, "key").get;
+          if (getter && getter.isReactWarning) return false;
+        }
+        return void 0 !== config.key;
+      }
+      function defineKeyPropWarningGetter(props, displayName) {
+        function warnAboutAccessingKey() {
+          specialPropKeyWarningShown || (specialPropKeyWarningShown = true, console.error(
+            "%s: `key` is not a prop. Trying to access it will result in `undefined` being returned. If you need to access the same value within the child component, you should pass it as a different prop. (https://react.dev/link/special-props)",
+            displayName
+          ));
+        }
+        warnAboutAccessingKey.isReactWarning = true;
+        Object.defineProperty(props, "key", {
+          get: warnAboutAccessingKey,
+          configurable: true
+        });
+      }
+      function elementRefGetterWithDeprecationWarning() {
+        var componentName = getComponentNameFromType(this.type);
+        didWarnAboutElementRef[componentName] || (didWarnAboutElementRef[componentName] = true, console.error(
+          "Accessing element.ref was removed in React 19. ref is now a regular prop. It will be removed from the JSX Element type in a future release."
+        ));
+        componentName = this.props.ref;
+        return void 0 !== componentName ? componentName : null;
+      }
+      function ReactElement(type, key, props, owner, debugStack, debugTask) {
+        var refProp = props.ref;
+        type = {
+          $$typeof: REACT_ELEMENT_TYPE,
+          type,
+          key,
+          props,
+          _owner: owner
+        };
+        null !== (void 0 !== refProp ? refProp : null) ? Object.defineProperty(type, "ref", {
+          enumerable: false,
+          get: elementRefGetterWithDeprecationWarning
+        }) : Object.defineProperty(type, "ref", { enumerable: false, value: null });
+        type._store = {};
+        Object.defineProperty(type._store, "validated", {
+          configurable: false,
+          enumerable: false,
+          writable: true,
+          value: 0
+        });
+        Object.defineProperty(type, "_debugInfo", {
+          configurable: false,
+          enumerable: false,
+          writable: true,
+          value: null
+        });
+        Object.defineProperty(type, "_debugStack", {
+          configurable: false,
+          enumerable: false,
+          writable: true,
+          value: debugStack
+        });
+        Object.defineProperty(type, "_debugTask", {
+          configurable: false,
+          enumerable: false,
+          writable: true,
+          value: debugTask
+        });
+        Object.freeze && (Object.freeze(type.props), Object.freeze(type));
+        return type;
+      }
+      function cloneAndReplaceKey(oldElement, newKey) {
+        newKey = ReactElement(
+          oldElement.type,
+          newKey,
+          oldElement.props,
+          oldElement._owner,
+          oldElement._debugStack,
+          oldElement._debugTask
+        );
+        oldElement._store && (newKey._store.validated = oldElement._store.validated);
+        return newKey;
+      }
+      function validateChildKeys(node) {
+        isValidElement(node) ? node._store && (node._store.validated = 1) : "object" === typeof node && null !== node && node.$$typeof === REACT_LAZY_TYPE && ("fulfilled" === node._payload.status ? isValidElement(node._payload.value) && node._payload.value._store && (node._payload.value._store.validated = 1) : node._store && (node._store.validated = 1));
+      }
+      function isValidElement(object) {
+        return "object" === typeof object && null !== object && object.$$typeof === REACT_ELEMENT_TYPE;
+      }
+      function escape2(key) {
+        var escaperLookup = { "=": "=0", ":": "=2" };
+        return "$" + key.replace(/[=:]/g, function(match) {
+          return escaperLookup[match];
+        });
+      }
+      function getElementKey(element, index) {
+        return "object" === typeof element && null !== element && null != element.key ? (checkKeyStringCoercion(element.key), escape2("" + element.key)) : index.toString(36);
+      }
+      function resolveThenable(thenable) {
+        switch (thenable.status) {
+          case "fulfilled":
+            return thenable.value;
+          case "rejected":
+            throw thenable.reason;
+          default:
+            switch ("string" === typeof thenable.status ? thenable.then(noop, noop) : (thenable.status = "pending", thenable.then(
+              function(fulfilledValue) {
+                "pending" === thenable.status && (thenable.status = "fulfilled", thenable.value = fulfilledValue);
+              },
+              function(error) {
+                "pending" === thenable.status && (thenable.status = "rejected", thenable.reason = error);
+              }
+            )), thenable.status) {
+              case "fulfilled":
+                return thenable.value;
+              case "rejected":
+                throw thenable.reason;
+            }
+        }
+        throw thenable;
+      }
+      function mapIntoArray(children, array, escapedPrefix, nameSoFar, callback) {
+        var type = typeof children;
+        if ("undefined" === type || "boolean" === type) children = null;
+        var invokeCallback = false;
+        if (null === children) invokeCallback = true;
+        else
+          switch (type) {
+            case "bigint":
+            case "string":
+            case "number":
+              invokeCallback = true;
+              break;
+            case "object":
+              switch (children.$$typeof) {
+                case REACT_ELEMENT_TYPE:
+                case REACT_PORTAL_TYPE:
+                  invokeCallback = true;
+                  break;
+                case REACT_LAZY_TYPE:
+                  return invokeCallback = children._init, mapIntoArray(
+                    invokeCallback(children._payload),
+                    array,
+                    escapedPrefix,
+                    nameSoFar,
+                    callback
+                  );
+              }
+          }
+        if (invokeCallback) {
+          invokeCallback = children;
+          callback = callback(invokeCallback);
+          var childKey = "" === nameSoFar ? "." + getElementKey(invokeCallback, 0) : nameSoFar;
+          isArrayImpl(callback) ? (escapedPrefix = "", null != childKey && (escapedPrefix = childKey.replace(userProvidedKeyEscapeRegex, "$&/") + "/"), mapIntoArray(callback, array, escapedPrefix, "", function(c) {
+            return c;
+          })) : null != callback && (isValidElement(callback) && (null != callback.key && (invokeCallback && invokeCallback.key === callback.key || checkKeyStringCoercion(callback.key)), escapedPrefix = cloneAndReplaceKey(
+            callback,
+            escapedPrefix + (null == callback.key || invokeCallback && invokeCallback.key === callback.key ? "" : ("" + callback.key).replace(
+              userProvidedKeyEscapeRegex,
+              "$&/"
+            ) + "/") + childKey
+          ), "" !== nameSoFar && null != invokeCallback && isValidElement(invokeCallback) && null == invokeCallback.key && invokeCallback._store && !invokeCallback._store.validated && (escapedPrefix._store.validated = 2), callback = escapedPrefix), array.push(callback));
+          return 1;
+        }
+        invokeCallback = 0;
+        childKey = "" === nameSoFar ? "." : nameSoFar + ":";
+        if (isArrayImpl(children))
+          for (var i = 0; i < children.length; i++)
+            nameSoFar = children[i], type = childKey + getElementKey(nameSoFar, i), invokeCallback += mapIntoArray(
+              nameSoFar,
+              array,
+              escapedPrefix,
+              type,
+              callback
+            );
+        else if (i = getIteratorFn(children), "function" === typeof i)
+          for (i === children.entries && (didWarnAboutMaps || console.warn(
+            "Using Maps as children is not supported. Use an array of keyed ReactElements instead."
+          ), didWarnAboutMaps = true), children = i.call(children), i = 0; !(nameSoFar = children.next()).done; )
+            nameSoFar = nameSoFar.value, type = childKey + getElementKey(nameSoFar, i++), invokeCallback += mapIntoArray(
+              nameSoFar,
+              array,
+              escapedPrefix,
+              type,
+              callback
+            );
+        else if ("object" === type) {
+          if ("function" === typeof children.then)
+            return mapIntoArray(
+              resolveThenable(children),
+              array,
+              escapedPrefix,
+              nameSoFar,
+              callback
+            );
+          array = String(children);
+          throw Error(
+            "Objects are not valid as a React child (found: " + ("[object Object]" === array ? "object with keys {" + Object.keys(children).join(", ") + "}" : array) + "). If you meant to render a collection of children, use an array instead."
+          );
+        }
+        return invokeCallback;
+      }
+      function mapChildren(children, func, context) {
+        if (null == children) return children;
+        var result = [], count = 0;
+        mapIntoArray(children, result, "", "", function(child) {
+          return func.call(context, child, count++);
+        });
+        return result;
+      }
+      function lazyInitializer(payload) {
+        if (-1 === payload._status) {
+          var resolveDebugValue = null, rejectDebugValue = null, ioInfo = payload._ioInfo;
+          null != ioInfo && (ioInfo.start = ioInfo.end = performance.now(), ioInfo.value = new Promise(function(resolve, reject) {
+            resolveDebugValue = resolve;
+            rejectDebugValue = reject;
+          }));
+          ioInfo = payload._result;
+          var thenable = ioInfo();
+          thenable.then(
+            function(moduleObject) {
+              if (0 === payload._status || -1 === payload._status) {
+                payload._status = 1;
+                payload._result = moduleObject;
+                var _ioInfo = payload._ioInfo;
+                if (null != _ioInfo) {
+                  _ioInfo.end = performance.now();
+                  var debugValue = null == moduleObject ? void 0 : moduleObject.default;
+                  resolveDebugValue(debugValue);
+                  _ioInfo.value.status = "fulfilled";
+                  _ioInfo.value.value = debugValue;
+                }
+                void 0 === thenable.status && (thenable.status = "fulfilled", thenable.value = moduleObject);
+              }
+            },
+            function(error) {
+              if (0 === payload._status || -1 === payload._status) {
+                payload._status = 2;
+                payload._result = error;
+                var _ioInfo2 = payload._ioInfo;
+                null != _ioInfo2 && (_ioInfo2.end = performance.now(), _ioInfo2.value.then(noop, noop), rejectDebugValue(error), _ioInfo2.value.status = "rejected", _ioInfo2.value.reason = error);
+                void 0 === thenable.status && (thenable.status = "rejected", thenable.reason = error);
+              }
+            }
+          );
+          ioInfo = payload._ioInfo;
+          if (null != ioInfo) {
+            var displayName = thenable.displayName;
+            "string" === typeof displayName && (ioInfo.name = displayName);
+          }
+          -1 === payload._status && (payload._status = 0, payload._result = thenable);
+        }
+        if (1 === payload._status)
+          return ioInfo = payload._result, void 0 === ioInfo && console.error(
+            "lazy: Expected the result of a dynamic import() call. Instead received: %s\n\nYour code should look like: \n  const MyComponent = lazy(() => import('./MyComponent'))\n\nDid you accidentally put curly braces around the import?",
+            ioInfo
+          ), "default" in ioInfo || console.error(
+            "lazy: Expected the result of a dynamic import() call. Instead received: %s\n\nYour code should look like: \n  const MyComponent = lazy(() => import('./MyComponent'))",
+            ioInfo
+          ), ioInfo.default;
+        throw payload._result;
+      }
+      function resolveDispatcher() {
+        var dispatcher = ReactSharedInternals.H;
+        null === dispatcher && console.error(
+          "Invalid hook call. Hooks can only be called inside of the body of a function component. This could happen for one of the following reasons:\n1. You might have mismatching versions of React and the renderer (such as React DOM)\n2. You might be breaking the Rules of Hooks\n3. You might have more than one copy of React in the same app\nSee https://react.dev/link/invalid-hook-call for tips about how to debug and fix this problem."
+        );
+        return dispatcher;
+      }
+      function releaseAsyncTransition() {
+        ReactSharedInternals.asyncTransitions--;
+      }
+      function startTransition(scope) {
+        var prevTransition = ReactSharedInternals.T, currentTransition = {};
+        currentTransition.types = null !== prevTransition ? prevTransition.types : null;
+        currentTransition._updatedFibers = /* @__PURE__ */ new Set();
+        ReactSharedInternals.T = currentTransition;
+        try {
+          var returnValue = scope(), onStartTransitionFinish = ReactSharedInternals.S;
+          null !== onStartTransitionFinish && onStartTransitionFinish(currentTransition, returnValue);
+          "object" === typeof returnValue && null !== returnValue && "function" === typeof returnValue.then && (ReactSharedInternals.asyncTransitions++, returnValue.then(releaseAsyncTransition, releaseAsyncTransition), returnValue.then(noop, reportGlobalError));
+        } catch (error) {
+          reportGlobalError(error);
+        } finally {
+          null === prevTransition && currentTransition._updatedFibers && (scope = currentTransition._updatedFibers.size, currentTransition._updatedFibers.clear(), 10 < scope && console.warn(
+            "Detected a large number of updates inside startTransition. If this is due to a subscription please re-write it to use React provided hooks. Otherwise concurrent mode guarantees are off the table."
+          )), null !== prevTransition && null !== currentTransition.types && (null !== prevTransition.types && prevTransition.types !== currentTransition.types && console.error(
+            "We expected inner Transitions to have transferred the outer types set and that you cannot add to the outer Transition while inside the inner.This is a bug in React."
+          ), prevTransition.types = currentTransition.types), ReactSharedInternals.T = prevTransition;
+        }
+      }
+      function addTransitionType(type) {
+        var transition = ReactSharedInternals.T;
+        if (null !== transition) {
+          var transitionTypes = transition.types;
+          null === transitionTypes ? transition.types = [type] : -1 === transitionTypes.indexOf(type) && transitionTypes.push(type);
+        } else
+          0 === ReactSharedInternals.asyncTransitions && console.error(
+            "addTransitionType can only be called inside a `startTransition()` callback. It must be associated with a specific Transition."
+          ), startTransition(addTransitionType.bind(null, type));
+      }
+      function enqueueTask(task) {
+        if (null === enqueueTaskImpl)
+          try {
+            var requireString = ("require" + Math.random()).slice(0, 7);
+            enqueueTaskImpl = (module2 && module2[requireString]).call(
+              module2,
+              "timers"
+            ).setImmediate;
+          } catch (_err) {
+            enqueueTaskImpl = function(callback) {
+              false === didWarnAboutMessageChannel && (didWarnAboutMessageChannel = true, "undefined" === typeof MessageChannel && console.error(
+                "This browser does not have a MessageChannel implementation, so enqueuing tasks via await act(async () => ...) will fail. Please file an issue at https://github.com/facebook/react/issues if you encounter this warning."
+              ));
+              var channel = new MessageChannel();
+              channel.port1.onmessage = callback;
+              channel.port2.postMessage(void 0);
+            };
+          }
+        return enqueueTaskImpl(task);
+      }
+      function aggregateErrors(errors) {
+        return 1 < errors.length && "function" === typeof AggregateError ? new AggregateError(errors) : errors[0];
+      }
+      function popActScope(prevActQueue, prevActScopeDepth) {
+        prevActScopeDepth !== actScopeDepth - 1 && console.error(
+          "You seem to have overlapping act() calls, this is not supported. Be sure to await previous act() calls before making a new one. "
+        );
+        actScopeDepth = prevActScopeDepth;
+      }
+      function recursivelyFlushAsyncActWork(returnValue, resolve, reject) {
+        var queue = ReactSharedInternals.actQueue;
+        if (null !== queue)
+          if (0 !== queue.length)
+            try {
+              flushActQueue(queue);
+              enqueueTask(function() {
+                return recursivelyFlushAsyncActWork(returnValue, resolve, reject);
+              });
+              return;
+            } catch (error) {
+              ReactSharedInternals.thrownErrors.push(error);
+            }
+          else ReactSharedInternals.actQueue = null;
+        0 < ReactSharedInternals.thrownErrors.length ? (queue = aggregateErrors(ReactSharedInternals.thrownErrors), ReactSharedInternals.thrownErrors.length = 0, reject(queue)) : resolve(returnValue);
+      }
+      function flushActQueue(queue) {
+        if (!isFlushing) {
+          isFlushing = true;
+          var i = 0;
+          try {
+            for (; i < queue.length; i++) {
+              var callback = queue[i];
+              do {
+                ReactSharedInternals.didUsePromise = false;
+                var continuation = callback(false);
+                if (null !== continuation) {
+                  if (ReactSharedInternals.didUsePromise) {
+                    queue[i] = callback;
+                    queue.splice(0, i);
+                    return;
+                  }
+                  callback = continuation;
+                } else break;
+              } while (1);
+            }
+            queue.length = 0;
+          } catch (error) {
+            queue.splice(0, i + 1), ReactSharedInternals.thrownErrors.push(error);
+          } finally {
+            isFlushing = false;
+          }
+        }
+      }
+      "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
+      var REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = /* @__PURE__ */ Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo"), REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy"), REACT_ACTIVITY_TYPE = /* @__PURE__ */ Symbol.for("react.activity"), REACT_VIEW_TRANSITION_TYPE = /* @__PURE__ */ Symbol.for("react.view_transition"), MAYBE_ITERATOR_SYMBOL = Symbol.iterator, didWarnStateUpdateForUnmountedComponent = {}, ReactNoopUpdateQueue = {
+        isMounted: function() {
+          return false;
+        },
+        enqueueForceUpdate: function(publicInstance) {
+          warnNoop(publicInstance, "forceUpdate");
+        },
+        enqueueReplaceState: function(publicInstance) {
+          warnNoop(publicInstance, "replaceState");
+        },
+        enqueueSetState: function(publicInstance) {
+          warnNoop(publicInstance, "setState");
+        }
+      }, assign = Object.assign, emptyObject = {};
+      Object.freeze(emptyObject);
+      Component.prototype.isReactComponent = {};
+      Component.prototype.setState = function(partialState, callback) {
+        if ("object" !== typeof partialState && "function" !== typeof partialState && null != partialState)
+          throw Error(
+            "takes an object of state variables to update or a function which returns an object of state variables."
+          );
+        this.updater.enqueueSetState(this, partialState, callback, "setState");
+      };
+      Component.prototype.forceUpdate = function(callback) {
+        this.updater.enqueueForceUpdate(this, callback, "forceUpdate");
+      };
+      var deprecatedAPIs = {
+        isMounted: [
+          "isMounted",
+          "Instead, make sure to clean up subscriptions and pending requests in componentWillUnmount to prevent memory leaks."
+        ],
+        replaceState: [
+          "replaceState",
+          "Refactor your code to use setState instead (see https://github.com/facebook/react/issues/3236)."
+        ]
+      };
+      for (fnName in deprecatedAPIs)
+        deprecatedAPIs.hasOwnProperty(fnName) && defineDeprecationWarning(fnName, deprecatedAPIs[fnName]);
+      ComponentDummy.prototype = Component.prototype;
+      deprecatedAPIs = PureComponent.prototype = new ComponentDummy();
+      deprecatedAPIs.constructor = PureComponent;
+      assign(deprecatedAPIs, Component.prototype);
+      deprecatedAPIs.isPureReactComponent = true;
+      var isArrayImpl = Array.isArray, REACT_CLIENT_REFERENCE = /* @__PURE__ */ Symbol.for("react.client.reference"), ReactSharedInternals = {
+        H: null,
+        A: null,
+        T: null,
+        S: null,
+        actQueue: null,
+        asyncTransitions: 0,
+        isBatchingLegacy: false,
+        didScheduleLegacyUpdate: false,
+        didUsePromise: false,
+        thrownErrors: [],
+        getCurrentStack: null,
+        recentlyCreatedOwnerStacks: 0
+      }, hasOwnProperty = Object.prototype.hasOwnProperty, createTask = console.createTask ? console.createTask : function() {
+        return null;
+      };
+      deprecatedAPIs = {
+        react_stack_bottom_frame: function(callStackForError) {
+          return callStackForError();
+        }
+      };
+      var specialPropKeyWarningShown, didWarnAboutOldJSXRuntime;
+      var didWarnAboutElementRef = {};
+      var unknownOwnerDebugStack = deprecatedAPIs.react_stack_bottom_frame.bind(
+        deprecatedAPIs,
+        UnknownOwner
+      )();
+      var unknownOwnerDebugTask = createTask(getTaskName(UnknownOwner));
+      var didWarnAboutMaps = false, userProvidedKeyEscapeRegex = /\/+/g, reportGlobalError = "function" === typeof reportError ? reportError : function(error) {
+        if ("object" === typeof window && "function" === typeof window.ErrorEvent) {
+          var event = new window.ErrorEvent("error", {
+            bubbles: true,
+            cancelable: true,
+            message: "object" === typeof error && null !== error && "string" === typeof error.message ? String(error.message) : String(error),
+            error
+          });
+          if (!window.dispatchEvent(event)) return;
+        } else if ("object" === typeof process && "function" === typeof process.emit) {
+          process.emit("uncaughtException", error);
+          return;
+        }
+        console.error(error);
+      }, didWarnAboutMessageChannel = false, enqueueTaskImpl = null, actScopeDepth = 0, didWarnNoAwaitAct = false, isFlushing = false, queueSeveralMicrotasks = "function" === typeof queueMicrotask ? function(callback) {
+        queueMicrotask(function() {
+          return queueMicrotask(callback);
+        });
+      } : enqueueTask;
+      deprecatedAPIs = Object.freeze({
+        __proto__: null,
+        c: function(size) {
+          return resolveDispatcher().useMemoCache(size);
+        }
+      });
+      var fnName = {
+        map: mapChildren,
+        forEach: function(children, forEachFunc, forEachContext) {
+          mapChildren(
+            children,
+            function() {
+              forEachFunc.apply(this, arguments);
+            },
+            forEachContext
+          );
+        },
+        count: function(children) {
+          var n = 0;
+          mapChildren(children, function() {
+            n++;
+          });
+          return n;
+        },
+        toArray: function(children) {
+          return mapChildren(children, function(child) {
+            return child;
+          }) || [];
+        },
+        only: function(children) {
+          if (!isValidElement(children))
+            throw Error(
+              "React.Children.only expected to receive a single React element child."
+            );
+          return children;
+        }
+      };
+      exports2.Activity = REACT_ACTIVITY_TYPE;
+      exports2.Children = fnName;
+      exports2.Component = Component;
+      exports2.Fragment = REACT_FRAGMENT_TYPE;
+      exports2.Profiler = REACT_PROFILER_TYPE;
+      exports2.PureComponent = PureComponent;
+      exports2.StrictMode = REACT_STRICT_MODE_TYPE;
+      exports2.Suspense = REACT_SUSPENSE_TYPE;
+      exports2.ViewTransition = REACT_VIEW_TRANSITION_TYPE;
+      exports2.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE = ReactSharedInternals;
+      exports2.__COMPILER_RUNTIME = deprecatedAPIs;
+      exports2.act = function(callback) {
+        var prevActQueue = ReactSharedInternals.actQueue, prevActScopeDepth = actScopeDepth;
+        actScopeDepth++;
+        var queue = ReactSharedInternals.actQueue = null !== prevActQueue ? prevActQueue : [], didAwaitActCall = false;
+        try {
+          var result = callback();
+        } catch (error) {
+          ReactSharedInternals.thrownErrors.push(error);
+        }
+        if (0 < ReactSharedInternals.thrownErrors.length)
+          throw popActScope(prevActQueue, prevActScopeDepth), callback = aggregateErrors(ReactSharedInternals.thrownErrors), ReactSharedInternals.thrownErrors.length = 0, callback;
+        if (null !== result && "object" === typeof result && "function" === typeof result.then) {
+          var thenable = result;
+          queueSeveralMicrotasks(function() {
+            didAwaitActCall || didWarnNoAwaitAct || (didWarnNoAwaitAct = true, console.error(
+              "You called act(async () => ...) without await. This could lead to unexpected testing behaviour, interleaving multiple act calls and mixing their scopes. You should - await act(async () => ...);"
+            ));
+          });
+          return {
+            then: function(resolve, reject) {
+              didAwaitActCall = true;
+              thenable.then(
+                function(returnValue) {
+                  popActScope(prevActQueue, prevActScopeDepth);
+                  if (0 === prevActScopeDepth) {
+                    try {
+                      flushActQueue(queue), enqueueTask(function() {
+                        return recursivelyFlushAsyncActWork(
+                          returnValue,
+                          resolve,
+                          reject
+                        );
+                      });
+                    } catch (error$0) {
+                      ReactSharedInternals.thrownErrors.push(error$0);
+                    }
+                    if (0 < ReactSharedInternals.thrownErrors.length) {
+                      var _thrownError = aggregateErrors(
+                        ReactSharedInternals.thrownErrors
+                      );
+                      ReactSharedInternals.thrownErrors.length = 0;
+                      reject(_thrownError);
+                    }
+                  } else resolve(returnValue);
+                },
+                function(error) {
+                  popActScope(prevActQueue, prevActScopeDepth);
+                  0 < ReactSharedInternals.thrownErrors.length ? (error = aggregateErrors(
+                    ReactSharedInternals.thrownErrors
+                  ), ReactSharedInternals.thrownErrors.length = 0, reject(error)) : reject(error);
+                }
+              );
+            }
+          };
+        }
+        var returnValue$jscomp$0 = result;
+        popActScope(prevActQueue, prevActScopeDepth);
+        0 === prevActScopeDepth && (flushActQueue(queue), 0 !== queue.length && queueSeveralMicrotasks(function() {
+          didAwaitActCall || didWarnNoAwaitAct || (didWarnNoAwaitAct = true, console.error(
+            "A component suspended inside an `act` scope, but the `act` call was not awaited. When testing React components that depend on asynchronous data, you must await the result:\n\nawait act(() => ...)"
+          ));
+        }), ReactSharedInternals.actQueue = null);
+        if (0 < ReactSharedInternals.thrownErrors.length)
+          throw callback = aggregateErrors(ReactSharedInternals.thrownErrors), ReactSharedInternals.thrownErrors.length = 0, callback;
+        return {
+          then: function(resolve, reject) {
+            didAwaitActCall = true;
+            0 === prevActScopeDepth ? (ReactSharedInternals.actQueue = queue, enqueueTask(function() {
+              return recursivelyFlushAsyncActWork(
+                returnValue$jscomp$0,
+                resolve,
+                reject
+              );
+            })) : resolve(returnValue$jscomp$0);
+          }
+        };
+      };
+      exports2.addTransitionType = addTransitionType;
+      exports2.cache = function(fn) {
+        return function() {
+          return fn.apply(null, arguments);
+        };
+      };
+      exports2.cacheSignal = function() {
+        return null;
+      };
+      exports2.captureOwnerStack = function() {
+        var getCurrentStack = ReactSharedInternals.getCurrentStack;
+        return null === getCurrentStack ? null : getCurrentStack();
+      };
+      exports2.cloneElement = function(element, config, children) {
+        if (null === element || void 0 === element)
+          throw Error(
+            "The argument must be a React element, but you passed " + element + "."
+          );
+        var props = assign({}, element.props), key = element.key, owner = element._owner;
+        if (null != config) {
+          var JSCompiler_inline_result;
+          a: {
+            if (hasOwnProperty.call(config, "ref") && (JSCompiler_inline_result = Object.getOwnPropertyDescriptor(
+              config,
+              "ref"
+            ).get) && JSCompiler_inline_result.isReactWarning) {
+              JSCompiler_inline_result = false;
+              break a;
+            }
+            JSCompiler_inline_result = void 0 !== config.ref;
+          }
+          JSCompiler_inline_result && (owner = getOwner());
+          hasValidKey(config) && (checkKeyStringCoercion(config.key), key = "" + config.key);
+          for (propName in config)
+            !hasOwnProperty.call(config, propName) || "key" === propName || "__self" === propName || "__source" === propName || "ref" === propName && void 0 === config.ref || (props[propName] = config[propName]);
+        }
+        var propName = arguments.length - 2;
+        if (1 === propName) props.children = children;
+        else if (1 < propName) {
+          JSCompiler_inline_result = Array(propName);
+          for (var i = 0; i < propName; i++)
+            JSCompiler_inline_result[i] = arguments[i + 2];
+          props.children = JSCompiler_inline_result;
+        }
+        props = ReactElement(
+          element.type,
+          key,
+          props,
+          owner,
+          element._debugStack,
+          element._debugTask
+        );
+        for (key = 2; key < arguments.length; key++)
+          validateChildKeys(arguments[key]);
+        return props;
+      };
+      exports2.createContext = function(defaultValue) {
+        defaultValue = {
+          $$typeof: REACT_CONTEXT_TYPE,
+          _currentValue: defaultValue,
+          _currentValue2: defaultValue,
+          _threadCount: 0,
+          Provider: null,
+          Consumer: null
+        };
+        defaultValue.Provider = defaultValue;
+        defaultValue.Consumer = {
+          $$typeof: REACT_CONSUMER_TYPE,
+          _context: defaultValue
+        };
+        defaultValue._currentRenderer = null;
+        defaultValue._currentRenderer2 = null;
+        return defaultValue;
+      };
+      exports2.createElement = function(type, config, children) {
+        for (var i = 2; i < arguments.length; i++)
+          validateChildKeys(arguments[i]);
+        var propName;
+        i = {};
+        var key = null;
+        if (null != config)
+          for (propName in didWarnAboutOldJSXRuntime || !("__self" in config) || "key" in config || (didWarnAboutOldJSXRuntime = true, console.warn(
+            "Your app (or one of its dependencies) is using an outdated JSX transform. Update to the modern JSX transform for faster performance: https://react.dev/link/new-jsx-transform"
+          )), hasValidKey(config) && (checkKeyStringCoercion(config.key), key = "" + config.key), config)
+            hasOwnProperty.call(config, propName) && "key" !== propName && "__self" !== propName && "__source" !== propName && (i[propName] = config[propName]);
+        var childrenLength = arguments.length - 2;
+        if (1 === childrenLength) i.children = children;
+        else if (1 < childrenLength) {
+          for (var childArray = Array(childrenLength), _i = 0; _i < childrenLength; _i++)
+            childArray[_i] = arguments[_i + 2];
+          Object.freeze && Object.freeze(childArray);
+          i.children = childArray;
+        }
+        if (type && type.defaultProps)
+          for (propName in childrenLength = type.defaultProps, childrenLength)
+            void 0 === i[propName] && (i[propName] = childrenLength[propName]);
+        key && defineKeyPropWarningGetter(
+          i,
+          "function" === typeof type ? type.displayName || type.name || "Unknown" : type
+        );
+        (propName = 1e4 > ReactSharedInternals.recentlyCreatedOwnerStacks++) ? (childArray = Error.stackTraceLimit, Error.stackTraceLimit = 10, childrenLength = Error("react-stack-top-frame"), Error.stackTraceLimit = childArray) : childrenLength = unknownOwnerDebugStack;
+        return ReactElement(
+          type,
+          key,
+          i,
+          getOwner(),
+          childrenLength,
+          propName ? createTask(getTaskName(type)) : unknownOwnerDebugTask
+        );
+      };
+      exports2.createRef = function() {
+        var refObject = { current: null };
+        Object.seal(refObject);
+        return refObject;
+      };
+      exports2.forwardRef = function(render) {
+        null != render && render.$$typeof === REACT_MEMO_TYPE ? console.error(
+          "forwardRef requires a render function but received a `memo` component. Instead of forwardRef(memo(...)), use memo(forwardRef(...))."
+        ) : "function" !== typeof render ? console.error(
+          "forwardRef requires a render function but was given %s.",
+          null === render ? "null" : typeof render
+        ) : 0 !== render.length && 2 !== render.length && console.error(
+          "forwardRef render functions accept exactly two parameters: props and ref. %s",
+          1 === render.length ? "Did you forget to use the ref parameter?" : "Any additional parameter will be undefined."
+        );
+        null != render && null != render.defaultProps && console.error(
+          "forwardRef render functions do not support defaultProps. Did you accidentally pass a React component?"
+        );
+        var elementType = { $$typeof: REACT_FORWARD_REF_TYPE, render }, ownName;
+        Object.defineProperty(elementType, "displayName", {
+          enumerable: false,
+          configurable: true,
+          get: function() {
+            return ownName;
+          },
+          set: function(name) {
+            ownName = name;
+            render.name || render.displayName || (Object.defineProperty(render, "name", { value: name }), render.displayName = name);
+          }
+        });
+        return elementType;
+      };
+      exports2.isValidElement = isValidElement;
+      exports2.lazy = function(ctor) {
+        ctor = { _status: -1, _result: ctor };
+        var lazyType = {
+          $$typeof: REACT_LAZY_TYPE,
+          _payload: ctor,
+          _init: lazyInitializer
+        }, ioInfo = {
+          name: "lazy",
+          start: -1,
+          end: -1,
+          value: null,
+          owner: null,
+          debugStack: Error("react-stack-top-frame"),
+          debugTask: console.createTask ? console.createTask("lazy()") : null
+        };
+        ctor._ioInfo = ioInfo;
+        lazyType._debugInfo = [{ awaited: ioInfo }];
+        return lazyType;
+      };
+      exports2.memo = function(type, compare) {
+        null == type && console.error(
+          "memo: The first argument must be a component. Instead received: %s",
+          null === type ? "null" : typeof type
+        );
+        compare = {
+          $$typeof: REACT_MEMO_TYPE,
+          type,
+          compare: void 0 === compare ? null : compare
+        };
+        var ownName;
+        Object.defineProperty(compare, "displayName", {
+          enumerable: false,
+          configurable: true,
+          get: function() {
+            return ownName;
+          },
+          set: function(name) {
+            ownName = name;
+            type.name || type.displayName || (Object.defineProperty(type, "name", { value: name }), type.displayName = name);
+          }
+        });
+        return compare;
+      };
+      exports2.startTransition = startTransition;
+      exports2.unstable_useCacheRefresh = function() {
+        return resolveDispatcher().useCacheRefresh();
+      };
+      exports2.use = function(usable) {
+        return resolveDispatcher().use(usable);
+      };
+      exports2.useActionState = function(action, initialState, permalink) {
+        return resolveDispatcher().useActionState(
+          action,
+          initialState,
+          permalink
+        );
+      };
+      exports2.useCallback = function(callback, deps) {
+        return resolveDispatcher().useCallback(callback, deps);
+      };
+      exports2.useContext = function(Context2) {
+        var dispatcher = resolveDispatcher();
+        Context2.$$typeof === REACT_CONSUMER_TYPE && console.error(
+          "Calling useContext(Context.Consumer) is not supported and will cause bugs. Did you mean to call useContext(Context) instead?"
+        );
+        return dispatcher.useContext(Context2);
+      };
+      exports2.useDebugValue = function(value, formatterFn) {
+        return resolveDispatcher().useDebugValue(value, formatterFn);
+      };
+      exports2.useDeferredValue = function(value, initialValue) {
+        return resolveDispatcher().useDeferredValue(value, initialValue);
+      };
+      exports2.useEffect = function(create, deps) {
+        null == create && console.warn(
+          "React Hook useEffect requires an effect callback. Did you forget to pass a callback to the hook?"
+        );
+        return resolveDispatcher().useEffect(create, deps);
+      };
+      exports2.useEffectEvent = function(callback) {
+        return resolveDispatcher().useEffectEvent(callback);
+      };
+      exports2.useId = function() {
+        return resolveDispatcher().useId();
+      };
+      exports2.useImperativeHandle = function(ref, create, deps) {
+        return resolveDispatcher().useImperativeHandle(ref, create, deps);
+      };
+      exports2.useInsertionEffect = function(create, deps) {
+        null == create && console.warn(
+          "React Hook useInsertionEffect requires an effect callback. Did you forget to pass a callback to the hook?"
+        );
+        return resolveDispatcher().useInsertionEffect(create, deps);
+      };
+      exports2.useLayoutEffect = function(create, deps) {
+        null == create && console.warn(
+          "React Hook useLayoutEffect requires an effect callback. Did you forget to pass a callback to the hook?"
+        );
+        return resolveDispatcher().useLayoutEffect(create, deps);
+      };
+      exports2.useMemo = function(create, deps) {
+        return resolveDispatcher().useMemo(create, deps);
+      };
+      exports2.useOptimistic = function(passthrough, reducer) {
+        return resolveDispatcher().useOptimistic(passthrough, reducer);
+      };
+      exports2.useReducer = function(reducer, initialArg, init) {
+        return resolveDispatcher().useReducer(reducer, initialArg, init);
+      };
+      exports2.useRef = function(initialValue) {
+        return resolveDispatcher().useRef(initialValue);
+      };
+      exports2.useState = function(initialState) {
+        return resolveDispatcher().useState(initialState);
+      };
+      exports2.useSyncExternalStore = function(subscribe, getSnapshot, getServerSnapshot) {
+        return resolveDispatcher().useSyncExternalStore(
+          subscribe,
+          getSnapshot,
+          getServerSnapshot
+        );
+      };
+      exports2.useTransition = function() {
+        return resolveDispatcher().useTransition();
+      };
+      exports2.version = "19.3.0";
+      "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop(Error());
+    })();
+  }
+});
+
+// node_modules/react/index.js
+var require_react = __commonJS({
+  "node_modules/react/index.js"(exports2, module2) {
+    "use strict";
+    if (process.env.NODE_ENV === "production") {
+      module2.exports = require_react_production();
+    } else {
+      module2.exports = require_react_development();
+    }
+  }
+});
+
+// node_modules/next/dist/client/components/hooks-server-context.js
+var require_hooks_server_context = __commonJS({
+  "node_modules/next/dist/client/components/hooks-server-context.js"(exports2, module2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      DynamicServerError: function() {
+        return DynamicServerError;
+      },
+      isDynamicServerError: function() {
+        return isDynamicServerError;
+      }
+    });
+    var DYNAMIC_ERROR_CODE = "DYNAMIC_SERVER_USAGE";
+    var DynamicServerError = class extends Error {
+      constructor(description) {
+        super(`Dynamic server usage: ${description}`), this.description = description, this.digest = DYNAMIC_ERROR_CODE;
+      }
+    };
+    function isDynamicServerError(err) {
+      if (typeof err !== "object" || err === null || !("digest" in err) || typeof err.digest !== "string") {
+        return false;
+      }
+      return err.digest === DYNAMIC_ERROR_CODE;
+    }
+    if ((typeof exports2.default === "function" || typeof exports2.default === "object" && exports2.default !== null) && typeof exports2.default.__esModule === "undefined") {
+      Object.defineProperty(exports2.default, "__esModule", { value: true });
+      Object.assign(exports2.default, exports2);
+      module2.exports = exports2.default;
+    }
+  }
+});
+
+// node_modules/next/dist/client/components/static-generation-bailout.js
+var require_static_generation_bailout = __commonJS({
+  "node_modules/next/dist/client/components/static-generation-bailout.js"(exports2, module2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      StaticGenBailoutError: function() {
+        return StaticGenBailoutError;
+      },
+      isStaticGenBailoutError: function() {
+        return isStaticGenBailoutError;
+      }
+    });
+    var NEXT_STATIC_GEN_BAILOUT = "NEXT_STATIC_GEN_BAILOUT";
+    var StaticGenBailoutError = class extends Error {
+      constructor(...args) {
+        super(...args), this.code = NEXT_STATIC_GEN_BAILOUT;
+      }
+    };
+    function isStaticGenBailoutError(error) {
+      if (typeof error !== "object" || error === null || !("code" in error)) {
+        return false;
+      }
+      return error.code === NEXT_STATIC_GEN_BAILOUT;
+    }
+    if ((typeof exports2.default === "function" || typeof exports2.default === "object" && exports2.default !== null) && typeof exports2.default.__esModule === "undefined") {
+      Object.defineProperty(exports2.default, "__esModule", { value: true });
+      Object.assign(exports2.default, exports2);
+      module2.exports = exports2.default;
+    }
+  }
+});
+
+// node_modules/next/dist/shared/lib/promise-with-resolvers.js
+var require_promise_with_resolvers = __commonJS({
+  "node_modules/next/dist/shared/lib/promise-with-resolvers.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "createPromiseWithResolvers", {
+      enumerable: true,
+      get: function() {
+        return createPromiseWithResolvers;
+      }
+    });
+    function createPromiseWithResolvers() {
+      let resolve;
+      let reject;
+      const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return {
+        resolve,
+        reject,
+        promise
+      };
+    }
+  }
+});
+
+// node_modules/next/dist/shared/lib/segment.js
+var require_segment = __commonJS({
+  "node_modules/next/dist/shared/lib/segment.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      DEFAULT_SEGMENT_KEY: function() {
+        return DEFAULT_SEGMENT_KEY;
+      },
+      NOT_FOUND_SEGMENT_KEY: function() {
+        return NOT_FOUND_SEGMENT_KEY;
+      },
+      PAGE_SEGMENT_KEY: function() {
+        return PAGE_SEGMENT_KEY;
+      },
+      computeSelectedLayoutSegment: function() {
+        return computeSelectedLayoutSegment;
+      },
+      getSegmentValue: function() {
+        return getSegmentValue;
+      },
+      getSelectedLayoutSegmentPath: function() {
+        return getSelectedLayoutSegmentPath;
+      },
+      isGroupSegment: function() {
+        return isGroupSegment;
+      },
+      isParallelRouteSegment: function() {
+        return isParallelRouteSegment;
+      }
+    });
+    function getSegmentValue(segment) {
+      return Array.isArray(segment) ? segment[1] : segment;
+    }
+    function isGroupSegment(segment) {
+      return segment[0] === "(" && segment.endsWith(")");
+    }
+    function isParallelRouteSegment(segment) {
+      return segment.startsWith("@") && segment !== "@children";
+    }
+    function computeSelectedLayoutSegment(segments, parallelRouteKey) {
+      if (!segments || segments.length === 0) {
+        return null;
+      }
+      const rawSegment = parallelRouteKey === "children" ? segments[0] : segments[segments.length - 1];
+      return rawSegment === DEFAULT_SEGMENT_KEY ? null : rawSegment;
+    }
+    function getSelectedLayoutSegmentPath(tree, parallelRouteKey, first = true, segmentPath = []) {
+      let node;
+      if (first) {
+        node = tree[1][parallelRouteKey];
+      } else {
+        const parallelRoutes = tree[1];
+        node = parallelRoutes.children ?? Object.values(parallelRoutes)[0];
+      }
+      if (!node) return segmentPath;
+      const segment = node[0];
+      let segmentValue = getSegmentValue(segment);
+      if (!segmentValue || segmentValue === PAGE_SEGMENT_KEY) {
+        return segmentPath;
+      }
+      segmentPath.push(segmentValue);
+      return getSelectedLayoutSegmentPath(node, parallelRouteKey, false, segmentPath);
+    }
+    var PAGE_SEGMENT_KEY = "__PAGE__";
+    var DEFAULT_SEGMENT_KEY = "__DEFAULT__";
+    var NOT_FOUND_SEGMENT_KEY = "/_not-found";
+  }
+});
+
+// node_modules/next/dist/shared/lib/router/utils/parse-loader-tree.js
+var require_parse_loader_tree = __commonJS({
+  "node_modules/next/dist/shared/lib/router/utils/parse-loader-tree.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "parseLoaderTree", {
+      enumerable: true,
+      get: function() {
+        return parseLoaderTree;
+      }
+    });
+    var _segment = require_segment();
+    function parseLoaderTree(tree) {
+      const [segment, parallelRoutes, modules, staticSiblings] = tree;
+      const { layout, template } = modules;
+      let { page } = modules;
+      page = segment === _segment.DEFAULT_SEGMENT_KEY ? modules.defaultPage : page;
+      const conventionPath = layout?.[1] || template?.[1] || page?.[1];
+      return {
+        page,
+        segment,
+        modules,
+        /* it can be either layout / template / page */
+        conventionPath,
+        parallelRoutes,
+        staticSiblings
+      };
+    }
+  }
+});
+
+// node_modules/next/dist/server/lib/app-dir-module.js
+var require_app_dir_module = __commonJS({
+  "node_modules/next/dist/server/lib/app-dir-module.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      getComponentTypeModule: function() {
+        return getComponentTypeModule;
+      },
+      getLayoutOrPageModule: function() {
+        return getLayoutOrPageModule;
+      }
+    });
+    var _segment = require_segment();
+    async function getLayoutOrPageModule(loaderTree) {
+      const { layout, page, defaultPage } = loaderTree[2];
+      const isLayout = typeof layout !== "undefined";
+      const isPage = typeof page !== "undefined";
+      const isDefaultPage = typeof defaultPage !== "undefined" && loaderTree[0] === _segment.DEFAULT_SEGMENT_KEY;
+      let mod = void 0;
+      let modType = void 0;
+      let filePath = void 0;
+      if (isLayout) {
+        mod = await layout[0]();
+        modType = "layout";
+        filePath = layout[1];
+      } else if (isPage) {
+        mod = await page[0]();
+        modType = "page";
+        filePath = page[1];
+      } else if (isDefaultPage) {
+        mod = await defaultPage[0]();
+        modType = "page";
+        filePath = defaultPage[1];
+      }
+      return {
+        mod,
+        modType,
+        filePath
+      };
+    }
+    async function getComponentTypeModule(loaderTree, moduleType) {
+      const { [moduleType]: module1 } = loaderTree[2];
+      if (typeof module1 !== "undefined") {
+        return await module1[0]();
+      }
+      return void 0;
+    }
+  }
+});
+
+// node_modules/next/dist/server/app-render/segment-config/ensure-static.js
+var require_ensure_static = __commonJS({
+  "node_modules/next/dist/server/app-render/segment-config/ensure-static.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      EnsureStaticLevel: function() {
+        return EnsureStaticLevel;
+      },
+      resolveEnsureStaticConfig: function() {
+        return resolveEnsureStaticConfig;
+      },
+      resolveEnsureStaticLevel: function() {
+        return resolveEnsureStaticLevel;
+      }
+    });
+    var _parseloadertree = require_parse_loader_tree();
+    var _appdirmodule = require_app_dir_module();
+    var EnsureStaticLevel = /* @__PURE__ */ (function(EnsureStaticLevel2) {
+      EnsureStaticLevel2[EnsureStaticLevel2["None"] = 0] = "None";
+      EnsureStaticLevel2[EnsureStaticLevel2["Shell"] = 1] = "Shell";
+      EnsureStaticLevel2[EnsureStaticLevel2["Prefetch"] = 2] = "Prefetch";
+      EnsureStaticLevel2[EnsureStaticLevel2["Navigation"] = 3] = "Navigation";
+      return EnsureStaticLevel2;
+    })({});
+    function getEnsureStaticLevel(ensureStatic) {
+      switch (ensureStatic) {
+        case "auto":
+        case false: {
+          return 0;
+        }
+        case "shell": {
+          return 1;
+        }
+        case "prefetch": {
+          return 2;
+        }
+        case "navigation": {
+          return 3;
+        }
+      }
+    }
+    async function resolveEnsureStaticLevel(tree, partialPrefetching) {
+      return getEnsureStaticLevel(await resolveEnsureStaticConfig(tree, partialPrefetching));
+    }
+    async function resolveEnsureStaticConfig(tree, partialPrefetching) {
+      let { config, filePath } = await resolveEnsureStaticConfigImpl(tree);
+      if (!partialPrefetching) {
+        switch (config) {
+          case "auto": {
+            config = "prefetch";
+            break;
+          }
+          case false:
+          case "shell": {
+            const originalConfig = config;
+            config = "prefetch";
+            console.warn(`${formatEnsureStaticExport(originalConfig)} has no effect unless the route is using Partial Prefetching.
+  (from: ${filePath})`);
+            break;
+          }
+          case "prefetch":
+            break;
+          case "navigation":
+            break;
+          default:
+            config;
+        }
+      }
+      if (config === false) {
+        return "auto";
+      } else {
+        return config;
+      }
+    }
+    async function resolveEnsureStaticConfigImpl(tree) {
+      const { mod: layoutOrPageMod, filePath } = await (0, _appdirmodule.getLayoutOrPageModule)(tree);
+      const config = getEnsureStaticConfigForModule(layoutOrPageMod);
+      const parentResult = {
+        config,
+        filePath: filePath ?? null
+      };
+      let slotsResult = null;
+      let slotResultKey = null;
+      const { parallelRoutes } = (0, _parseloadertree.parseLoaderTree)(tree);
+      for (const parallelRouteKey in parallelRoutes) {
+        const parallelRoute = parallelRoutes[parallelRouteKey];
+        const childResult = await resolveEnsureStaticConfigImpl(parallelRoute);
+        if (!slotsResult) {
+          slotsResult = childResult;
+          slotResultKey = parallelRouteKey;
+        } else {
+          switch (compareEnsureStatic(childResult.config, slotsResult.config)) {
+            case 2: {
+              if (slotsResult.config === "auto" && childResult.config !== "auto") {
+                slotsResult = childResult;
+                slotResultKey = parallelRouteKey;
+              }
+              break;
+            }
+            case 4:
+            case 1:
+            case 3: {
+              throw new Error(`Parallel slots cannot have incompatible \`ensureStatic\`.
+  ${formatParallelSlot(slotResultKey)}: 
+    ${formatEnsureStaticExport(slotsResult.config)}
+    (from: ${slotsResult.filePath})
+
+  ${formatParallelSlot(parallelRouteKey)}: 
+    ${formatEnsureStaticExport(childResult.config)}
+    (from: ${childResult.filePath})
+
+ Possible fixes:
+ - Remove one of the \`ensureStatic\` exports
+ - Change one of the  \`ensureStatic\` exports to match the other`);
+            }
+          }
+        }
+      }
+      if (!slotsResult) {
+        return parentResult;
+      } else {
+        const comparison = compareEnsureStatic(slotsResult.config, parentResult.config);
+        switch (comparison) {
+          case 2: {
+            if (parentResult.config === "auto" && slotsResult.config !== "auto") {
+              return slotsResult;
+            } else {
+              return parentResult;
+            }
+          }
+          case 3: {
+            return slotsResult;
+          }
+          case 1:
+          case 4: {
+            throw new Error((comparison === 1 ? `A child segment cannot override a parent segment with a less-constrained \`ensureStatic\`.` : `A child segment cannot override a parent segment with an incompatible \`ensureStatic\`.`) + `
+  Parent has: 
+    ${formatEnsureStaticExport(parentResult.config)}
+    (from: ${parentResult.filePath})
+  Child has: 
+    ${formatEnsureStaticExport(slotsResult.config)}
+    (from: ${slotsResult.filePath})
+
+ Possible fixes:
+ - Remove one of the \`ensureStatic\` exports
+ - Change one of the  \`ensureStatic\` exports to match the other`);
+          }
+        }
+      }
+    }
+    function formatParallelSlot(slot) {
+      return slot === "children" ? slot : `@${slot}`;
+    }
+    function formatEnsureStaticExport(config) {
+      return `export const ensureStatic = ${JSON.stringify(config)}`;
+    }
+    var ENSURE_STATIC_ORDER = [
+      "shell",
+      "prefetch",
+      "navigation"
+    ];
+    function compareEnsureStatic(left, right) {
+      if (left === "auto" || right === "auto") {
+        return 2;
+      }
+      if (left === false && right === false) {
+        return 2;
+      }
+      if (left === false || right === false) {
+        return 4;
+      }
+      const leftSort = ENSURE_STATIC_ORDER.indexOf(left);
+      const rightSort = ENSURE_STATIC_ORDER.indexOf(right);
+      return leftSort < rightSort ? 1 : leftSort === rightSort ? 2 : 3;
+    }
+    function getEnsureStaticConfigForModule(mod) {
+      return (mod ? mod.ensureStatic : void 0) ?? "auto";
+    }
+  }
+});
+
+// node_modules/next/dist/server/app-render/staged-rendering.js
+var require_staged_rendering = __commonJS({
+  "node_modules/next/dist/server/app-render/staged-rendering.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      RENDER_STAGE_ADVANCE_ORDER: function() {
+        return RENDER_STAGE_ADVANCE_ORDER;
+      },
+      RenderStage: function() {
+        return RenderStage;
+      },
+      StagedRenderingController: function() {
+        return StagedRenderingController;
+      },
+      SyncIOMode: function() {
+        return SyncIOMode;
+      },
+      getNextStage: function() {
+        return getNextStage;
+      },
+      isAdvanceableRenderStage: function() {
+        return isAdvanceableRenderStage;
+      }
+    });
+    var _invarianterror = require_invariant_error();
+    var _promisewithresolvers = require_promise_with_resolvers();
+    var RenderStage = /* @__PURE__ */ (function(RenderStage2) {
+      RenderStage2[RenderStage2["Before"] = 1] = "Before";
+      RenderStage2[RenderStage2["ShellStatic"] = 10] = "ShellStatic";
+      RenderStage2[RenderStage2["PrefetchStatic_prefetchApi"] = 11] = "PrefetchStatic_prefetchApi";
+      RenderStage2[RenderStage2["PrefetchStatic"] = 12] = "PrefetchStatic";
+      RenderStage2[RenderStage2["NavigationStatic"] = 13] = "NavigationStatic";
+      RenderStage2[RenderStage2["Static"] = 14] = "Static";
+      RenderStage2[RenderStage2["ShellRuntime"] = 20] = "ShellRuntime";
+      RenderStage2[RenderStage2["PrefetchRuntime_prefetchApi"] = 21] = "PrefetchRuntime_prefetchApi";
+      RenderStage2[RenderStage2["PrefetchRuntime"] = 22] = "PrefetchRuntime";
+      RenderStage2[RenderStage2["NavigationRuntime"] = 23] = "NavigationRuntime";
+      RenderStage2[RenderStage2["Dynamic"] = 30] = "Dynamic";
+      RenderStage2[RenderStage2["Abandoned"] = 40] = "Abandoned";
+      return RenderStage2;
+    })({});
+    var RENDER_STAGE_ADVANCE_ORDER = [
+      10,
+      11,
+      12,
+      13,
+      14,
+      20,
+      21,
+      22,
+      23,
+      30
+    ];
+    function getNextStage(stage) {
+      return RENDER_STAGE_ADVANCE_ORDER[RENDER_STAGE_ADVANCE_ORDER.indexOf(stage) + 1];
+    }
+    function isAdvanceableRenderStage(stage) {
+      return 1 < stage && stage <= 30;
+    }
+    var SyncIOMode = /* @__PURE__ */ (function(SyncIOMode2) {
+      SyncIOMode2[SyncIOMode2["Untracked"] = 1] = "Untracked";
+      SyncIOMode2[SyncIOMode2["AllowedInRuntimeOrDynamic"] = 2] = "AllowedInRuntimeOrDynamic";
+      SyncIOMode2[SyncIOMode2["AllowedInDynamic"] = 3] = "AllowedInDynamic";
+      return SyncIOMode2;
+    })({});
+    var StagedRenderingController = class {
+      constructor({ abortSignal, abandonController, syncIO, finalStage }) {
+        this.currentStage = 1;
+        this.syncInterruptReason = null;
+        this.triggers = createAdvanceableStageTriggers();
+        this.abortSignal = abortSignal;
+        this.abandonController = abandonController;
+        this.syncIOMode = syncIO;
+        this.finalStage = finalStage;
+        if (abortSignal) {
+          abortSignal.addEventListener("abort", () => {
+            const { reason } = abortSignal;
+            for (const trigger of Object.values(this.triggers)) {
+              cancelStageTrigger(trigger, reason);
+            }
+          }, {
+            once: true
+          });
+        }
+        if (abandonController) {
+          abandonController.signal.addEventListener("abort", () => {
+            this.abandonRender();
+          }, {
+            once: true
+          });
+        }
+      }
+      /**
+      * Schedules a callback that will execute synchronously when the controller is advanced
+      * to `stage` or past it, before any promises for that stage are resolved.
+      * If the controller is already past `stage`, the callback is executed immediately.
+      * */
+      onStage(stage, callback) {
+        addSyncTriggerListener(this.triggers[stage], callback);
+      }
+      shouldTrackSyncInterrupt() {
+        const { syncIOMode, currentStage } = this;
+        switch (syncIOMode) {
+          case 1: {
+            return false;
+          }
+          case 2: {
+            return currentStage > 1 && currentStage <= 14;
+          }
+          case 3: {
+            return currentStage > 1 && currentStage < 30;
+          }
+        }
+      }
+      /** Note: only call this if `shouldTrackSyncInterrupt()` returned true */
+      syncInterruptCurrentStageWithReason(reason) {
+        const { currentStage } = this;
+        if (currentStage === 1 || currentStage === 30 || currentStage === 40) {
+          return;
+        }
+        if (this.abandonController) {
+          this.abandonController.abort();
+          return;
+        }
+        if (this.abortSignal) {
+          this.syncInterruptReason = reason;
+          this.currentStage = 40;
+          return;
+        }
+        this.syncInterruptReason = reason;
+        this.advanceStage(30);
+      }
+      getSyncInterruptReason() {
+        return this.syncInterruptReason;
+      }
+      getStageEndTime(stage) {
+        return this.triggers[getNextStage(stage)].triggeredAt ?? Infinity;
+      }
+      abandonRender() {
+        const { currentStage } = this;
+        if (currentStage === 1) {
+          throw new _invarianterror.InvariantError("A render that hasn't started yet cannot be abandoned");
+        }
+        if (currentStage === 30 || currentStage === 40) {
+          return;
+        }
+        const nextStageIx = RENDER_STAGE_ADVANCE_ORDER.indexOf(currentStage) + 1;
+        const dynamicStageIx = RENDER_STAGE_ADVANCE_ORDER.indexOf(30);
+        for (let i = nextStageIx; i < dynamicStageIx; i++) {
+          this.resolveStage(RENDER_STAGE_ADVANCE_ORDER[i]);
+        }
+        this.currentStage = 40;
+      }
+      advanceStage(targetStage) {
+        if (this.finalStage !== null && targetStage > this.finalStage) {
+          throw new _invarianterror.InvariantError(`Attempted to advance to stage ${RenderStage[targetStage]} but the render is limited to ${RenderStage[this.finalStage]}`);
+        }
+        const { currentStage } = this;
+        if (currentStage === 30 || currentStage === 40) {
+          return;
+        }
+        if (targetStage <= currentStage) {
+          return;
+        }
+        this.currentStage = targetStage;
+        const nextStageIx = currentStage === 1 ? 0 : RENDER_STAGE_ADVANCE_ORDER.indexOf(currentStage) + 1;
+        const targetStageIx = RENDER_STAGE_ADVANCE_ORDER.indexOf(targetStage);
+        for (let i = nextStageIx; i <= targetStageIx; i++) {
+          this.resolveStage(RENDER_STAGE_ADVANCE_ORDER[i]);
+        }
+      }
+      resolveStage(stage) {
+        fireStageTrigger(this.triggers[stage]);
+      }
+      getStagePromise(stage) {
+        return this.triggers[stage].promise;
+      }
+      waitForStage(stage) {
+        return this.getStagePromise(stage);
+      }
+      delayUntilStage(stage, displayName, resolvedValue) {
+        const stagePromise = this.getStagePromise(stage);
+        const promise = process.env.NODE_ENV === "development" ? makeDevtoolsIOPromiseFromIOTrigger(stagePromise, displayName, resolvedValue) : stagePromise.then(() => resolvedValue);
+        if (this.abortSignal) {
+          promise.catch(ignoreReject);
+        }
+        return promise;
+      }
+    };
+    function createAdvanceableStageTriggers() {
+      const triggers = {};
+      for (const stage of RENDER_STAGE_ADVANCE_ORDER) {
+        triggers[stage] = createStageTrigger();
+      }
+      return triggers;
+    }
+    function ignoreReject() {
+    }
+    function makeDevtoolsIOPromiseFromIOTrigger(ioTrigger, displayName, resolvedValue) {
+      const promise = new Promise((resolve, reject) => {
+        ioTrigger.then(resolve.bind(null, resolvedValue), reject);
+      });
+      if (displayName !== void 0) {
+        promise.displayName = displayName;
+      }
+      return promise;
+    }
+    function addSyncTriggerListener(trigger, listener) {
+      if (trigger.state === "pending") {
+        trigger._listeners.push(listener);
+      } else {
+        listener();
+      }
+    }
+    function createStageTrigger() {
+      const { promise, resolve, reject } = (0, _promisewithresolvers.createPromiseWithResolvers)();
+      return {
+        state: "pending",
+        triggeredAt: null,
+        promise,
+        _listeners: [],
+        _resolvePromise: resolve,
+        _rejectPromise: reject
+      };
+    }
+    function fireStageTrigger(trigger) {
+      if (trigger.state !== "pending") {
+        return;
+      }
+      trigger.state = "triggered";
+      trigger.triggeredAt = performance.now() + performance.timeOrigin;
+      try {
+        const { _listeners: listeners } = trigger;
+        for (let i = 0; i < listeners.length; i++) {
+          listeners[i]();
+        }
+        listeners.length = 0;
+      } finally {
+        trigger._resolvePromise();
+      }
+    }
+    function cancelStageTrigger(trigger, reason) {
+      if (trigger.state !== "pending") {
+        return;
+      }
+      trigger.state = "cancelled";
+      trigger._listeners.length = 0;
+      trigger.promise.catch(ignoreReject);
+      trigger._rejectPromise(reason);
+    }
+  }
+});
+
+// node_modules/next/dist/server/runtime-reacts.external.js
+var require_runtime_reacts_external = __commonJS({
+  "node_modules/next/dist/server/runtime-reacts.external.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      getClientReact: function() {
+        return getClientReact;
+      },
+      getServerReact: function() {
+        return getServerReact;
+      },
+      registerClientReact: function() {
+        return registerClientReact;
+      },
+      registerServerReact: function() {
+        return registerServerReact;
+      }
+    });
+    var ClientReact = null;
+    function registerClientReact(react) {
+      ClientReact = react;
+    }
+    function getClientReact() {
+      return ClientReact;
+    }
+    var ServerReact = null;
+    function registerServerReact(react) {
+      ServerReact = react;
+    }
+    function getServerReact() {
+      return ServerReact;
+    }
+  }
+});
+
+// node_modules/next/dist/server/dynamic-rendering-utils.js
+var require_dynamic_rendering_utils = __commonJS({
+  "node_modules/next/dist/server/dynamic-rendering-utils.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      ClientHookDynamicError: function() {
+        return ClientHookDynamicError;
+      },
+      RENDER_STAGES_BY_DATA_KIND: function() {
+        return RENDER_STAGES_BY_DATA_KIND;
+      },
+      applyOwnerStack: function() {
+        return applyOwnerStack;
+      },
+      createPrerenderDataTracking: function() {
+        return createPrerenderDataTracking;
+      },
+      finishPrerenderDataTracking: function() {
+        return finishPrerenderDataTracking;
+      },
+      isClientHookDynamicError: function() {
+        return isClientHookDynamicError;
+      },
+      isHangingPromiseRejectionError: function() {
+        return isHangingPromiseRejectionError;
+      },
+      makeClientHookHangingPromise: function() {
+        return makeClientHookHangingPromise;
+      },
+      makeDevtoolsIOAwarePromise: function() {
+        return makeDevtoolsIOAwarePromise;
+      },
+      makeDynamicHangingPromise: function() {
+        return makeDynamicHangingPromise;
+      },
+      makeFallbackParamsHangingPromise: function() {
+        return makeFallbackParamsHangingPromise;
+      },
+      makePrefetchHangingPromise: function() {
+        return makePrefetchHangingPromise;
+      },
+      makePromiseFromTrigger: function() {
+        return makePromiseFromTrigger;
+      },
+      makeSessionDataHangingPromise: function() {
+        return makeSessionDataHangingPromise;
+      },
+      makeURLDataHangingPromise: function() {
+        return makeURLDataHangingPromise;
+      },
+      makeUnknownRuntimeDataHangingPromise: function() {
+        return makeUnknownRuntimeDataHangingPromise;
+      },
+      makeUntrackedHangingPromise: function() {
+        return makeUntrackedHangingPromise;
+      },
+      trackFallbackParamsAccessed: function() {
+        return trackFallbackParamsAccessed;
+      },
+      trackIncompatibleShellContent: function() {
+        return trackIncompatibleShellContent;
+      },
+      trackPromiseUsed: function() {
+        return trackPromiseUsed;
+      },
+      trackURLDataAccessed: function() {
+        return trackURLDataAccessed;
+      }
+    });
+    var _invarianterror = require_invariant_error();
+    var _promisewithresolvers = require_promise_with_resolvers();
+    var _ensurestatic = require_ensure_static();
+    var _stagedrendering = require_staged_rendering();
+    var _workasyncstorageexternal = require_work_async_storage_external();
+    var _workunitasyncstorageexternal = require_work_unit_async_storage_external();
+    var _runtimereactsexternal = require_runtime_reacts_external();
+    function isHangingPromiseRejectionError(err) {
+      if (typeof err !== "object" || err === null || !("digest" in err)) {
+        return false;
+      }
+      return err.digest === HANGING_PROMISE_REJECTION;
+    }
+    var HANGING_PROMISE_REJECTION = "HANGING_PROMISE_REJECTION";
+    var HangingPromiseRejectionError = class extends Error {
+      constructor(route, expression) {
+        super(`During prerendering, ${expression} rejects when the prerender is complete. Typically these errors are handled by React but if you move ${expression} to a different context by using \`setTimeout\`, \`after\`, or similar functions you may observe this error and you should handle it in that context. This occurred at route "${route}".`), this.route = route, this.expression = expression, this.digest = HANGING_PROMISE_REJECTION;
+      }
+    };
+    var CLIENT_HOOK_DYNAMIC = "CLIENT_HOOK_DYNAMIC";
+    var ClientHookDynamicError = class extends Error {
+      constructor(route, expression) {
+        super(`Route "${route}": Next.js encountered URL data \`${expression}\` in a Client Component outside of \`<Suspense>\`.
+
+This blocks prerendering because the value is only available at runtime.
+
+Ways to fix this:
+  - [stream] Wrap the component in \`<Suspense fallback={...}>\` so the hook value streams in after prerendering
+  - [block] Set \`export const instant = false\` to allow a blocking route
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-client-hook`), this.digest = CLIENT_HOOK_DYNAMIC;
+      }
+    };
+    function isClientHookDynamicError(err) {
+      if (typeof err !== "object" || err === null || !("digest" in err)) {
+        return false;
+      }
+      return err.digest === CLIENT_HOOK_DYNAMIC;
+    }
+    var abortListenersBySignal = /* @__PURE__ */ new WeakMap();
+    function makeDynamicHangingPromise(signal, route, expression) {
+      return makeHangingPromiseWithError(signal, new HangingPromiseRejectionError(route, expression));
+    }
+    function makeUntrackedHangingPromise(signal, route, expression) {
+      return makeHangingPromiseWithError(signal, new HangingPromiseRejectionError(route, expression));
+    }
+    function makeSessionDataHangingPromise(signal, route, expression, workUnitStore) {
+      const promise = makeHangingPromiseWithError(signal, new HangingPromiseRejectionError(route, expression));
+      return trackPromiseUsed(promise, trackSessionDataAccessed.bind(null, workUnitStore, expression));
+    }
+    function makeURLDataHangingPromise(signal, route, expression, workUnitStore) {
+      const promise = makeHangingPromiseWithError(signal, new HangingPromiseRejectionError(route, expression));
+      if (workUnitStore === null) {
+        return promise;
+      }
+      return trackPromiseUsed(promise, trackURLDataAccessed.bind(null, workUnitStore, expression));
+    }
+    function makeUnknownRuntimeDataHangingPromise(signal, route, expression, workUnitStore) {
+      return makeSessionDataHangingPromise(signal, route, expression, workUnitStore);
+    }
+    function makePrefetchHangingPromise(signal, route, expression) {
+      return makeUntrackedHangingPromise(signal, route, expression);
+    }
+    function makeFallbackParamsHangingPromise(signal, route, expression, workUnitStore) {
+      const promise = makeHangingPromiseWithError(signal, new HangingPromiseRejectionError(route, expression));
+      if (workUnitStore === null) {
+        return promise;
+      }
+      return trackPromiseUsed(promise, trackFallbackParamsAccessed.bind(null, workUnitStore, expression));
+    }
+    function createPrerenderDataTracking() {
+      return {
+        runtimeDataAccessed: (0, _promisewithresolvers.createPromiseWithResolvers)(),
+        shouldAttemptStaticShell: true,
+        shouldAttemptStaticPrefetch: true
+      };
+    }
+    function finishPrerenderDataTracking(prerenderDataTracking) {
+      prerenderDataTracking.runtimeDataAccessed.resolve(false);
+    }
+    function trackSessionDataAccessed(workUnitStore, expression) {
+      trackRuntimeDataAccessed(workUnitStore, 1, expression);
+    }
+    function trackURLDataAccessed(workUnitStore, expression) {
+      trackRuntimeDataAccessed(workUnitStore, 2, expression);
+    }
+    function trackFallbackParamsAccessed(workUnitStore, expression) {
+      trackRuntimeDataAccessed(workUnitStore, 3, expression);
+    }
+    function trackRuntimeDataAccessed(workUnitStore, dataKind, expression) {
+      switch (workUnitStore.type) {
+        case "prerender": {
+          const { prerenderDataTracking, stagedRendering } = workUnitStore;
+          if (!prerenderDataTracking || !stagedRendering) {
+            return;
+          }
+          const { currentStage } = stagedRendering;
+          if (currentStage === _stagedrendering.RenderStage.Before) {
+            console.error(new _invarianterror.InvariantError("Unexpected trackRuntimeDataAccessed in the Before stage."));
+            return;
+          }
+          if (currentStage >= _stagedrendering.RenderStage.NavigationStatic) {
+            return;
+          }
+          const ensureStaticLevel = workUnitStore.ensureStaticLevel ?? _ensurestatic.EnsureStaticLevel.None;
+          switch (dataKind) {
+            case 1: {
+              let firstAffectedStage = null;
+              if (currentStage <= _stagedrendering.RenderStage.ShellStatic && // Only track if we're not forcing the shell to be static.
+              ensureStaticLevel < _ensurestatic.EnsureStaticLevel.Shell) {
+                prerenderDataTracking.shouldAttemptStaticShell = false;
+                firstAffectedStage ??= _stagedrendering.RenderStage.ShellStatic;
+                logRuntimeDeopt == null ? void 0 : logRuntimeDeopt(expression, "shell");
+              }
+              if (currentStage <= _stagedrendering.RenderStage.PrefetchStatic && // Only track if we're not forcing the prefetch to be static.
+              ensureStaticLevel < _ensurestatic.EnsureStaticLevel.Prefetch) {
+                prerenderDataTracking.shouldAttemptStaticPrefetch = false;
+                firstAffectedStage ??= _stagedrendering.RenderStage.PrefetchStatic;
+                logRuntimeDeopt == null ? void 0 : logRuntimeDeopt(expression, "prefetch");
+              }
+              if (firstAffectedStage !== null) {
+                markRuntimeDataAccessWhenStageReached(prerenderDataTracking, stagedRendering, firstAffectedStage);
+              }
+              break;
+            }
+            case 3: {
+              if (workUnitStore.isFallbackUpgradeable) {
+                if (ensureStaticLevel < _ensurestatic.EnsureStaticLevel.Prefetch) {
+                  markRuntimeDataAccessWhenStageReached(
+                    prerenderDataTracking,
+                    stagedRendering,
+                    // `params` are URL data, so they only affect the prefetch
+                    _stagedrendering.RenderStage.PrefetchStatic
+                  );
+                  logRuntimeUpgradeableFallback == null ? void 0 : logRuntimeUpgradeableFallback();
+                }
+                break;
+              }
+            }
+            case 2: {
+              if (currentStage <= _stagedrendering.RenderStage.PrefetchStatic && ensureStaticLevel < _ensurestatic.EnsureStaticLevel.Prefetch) {
+                prerenderDataTracking.shouldAttemptStaticPrefetch = false;
+                logRuntimeDeopt == null ? void 0 : logRuntimeDeopt(expression, "prefetch");
+                markRuntimeDataAccessWhenStageReached(prerenderDataTracking, stagedRendering, _stagedrendering.RenderStage.PrefetchStatic);
+              }
+              break;
+            }
+          }
+          break;
+        }
+        case "prerender-client":
+        case "prerender-legacy":
+        case "prerender-runtime":
+        case "validation-client":
+        case "request":
+        case "cache":
+        case "private-cache":
+        case "unstable-cache":
+        case "build-time-generator":
+          break;
+        default:
+          workUnitStore;
+      }
+    }
+    function markRuntimeDataAccessWhenStageReached(prerenderDataTracking, stageController, targetStage) {
+      const { runtimeDataAccessed } = prerenderDataTracking;
+      if (stageController.currentStage >= targetStage) {
+        runtimeDataAccessed.resolve(true);
+      } else {
+        stageController.onStage(targetStage, runtimeDataAccessed.resolve.bind(null, true));
+      }
+    }
+    var logRuntimeDeopt = process.env.NEXT_PRIVATE_DEBUG_RUNTIME_DATA ? (expression, kind) => {
+      const { route } = _workasyncstorageexternal.workAsyncStorage.getStore();
+      console.log(`Route '${route}': deopting to a runtime ${kind} because it used ${expression}`);
+    } : void 0;
+    var logRuntimeUpgradeableFallback = process.env.NEXT_PRIVATE_DEBUG_RUNTIME_DATA ? () => {
+      const { route } = _workasyncstorageexternal.workAsyncStorage.getStore();
+      console.log(`Route '${route}': marking upgradeable fallback as runtime prefetchable`);
+    } : void 0;
+    function trackIncompatibleShellContent(workUnitStore, reason) {
+      const { stagedRendering } = workUnitStore;
+      if (!stagedRendering) {
+        return;
+      }
+      const { currentStage } = stagedRendering;
+      if (currentStage === _stagedrendering.RenderStage.Dynamic || currentStage === _stagedrendering.RenderStage.Abandoned) {
+        return;
+      }
+      if (process.env.NEXT_PRIVATE_DEBUG_VALIDATION) {
+        const workStore = _workasyncstorageexternal.workAsyncStorage.getStore();
+        console.log(`Route ${workStore.route}: Incompatible shell content: ${reason}`);
+      }
+      workUnitStore.hasIncompatibleShellContent = true;
+    }
+    function makeClientHookHangingPromise(signal, error) {
+      return makeHangingPromiseWithError(signal, error);
+    }
+    function makeHangingPromiseWithError(signal, error) {
+      if (signal.aborted) {
+        return Promise.reject(error);
+      } else {
+        const hangingPromise = new Promise((_, reject) => {
+          const boundRejection = reject.bind(null, error);
+          let currentListeners = abortListenersBySignal.get(signal);
+          if (currentListeners) {
+            currentListeners.push(boundRejection);
+          } else {
+            const listeners = [
+              boundRejection
+            ];
+            abortListenersBySignal.set(signal, listeners);
+            signal.addEventListener("abort", () => {
+              for (let i = 0; i < listeners.length; i++) {
+                listeners[i]();
+              }
+            }, {
+              once: true
+            });
+          }
+        });
+        hangingPromise.catch(ignoreReject);
+        return hangingPromise;
+      }
+    }
+    function ignoreReject() {
+    }
+    function makePromiseFromTrigger(trigger, value) {
+      const promise = trigger.then(() => value);
+      promise.catch(ignoreReject);
+      return promise;
+    }
+    function makeDevtoolsIOAwarePromise(underlying, requestStore, stage) {
+      if (requestStore.stagedRendering) {
+        return requestStore.stagedRendering.delayUntilStage(stage, void 0, underlying);
+      }
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(underlying);
+        }, 0);
+      });
+    }
+    function trackPromiseUsed(promise, onUse) {
+      return TrackedPromise.from(promise, onUse);
+    }
+    var TrackedPromise = class _TrackedPromise extends Promise {
+      #onUse;
+      // We don't need derived promises to also be a TrackedPromise.
+      // We only care about the first level of `.then()`.
+      static get [Symbol.species]() {
+        return Promise;
+      }
+      static from(promise, onUse) {
+        const tracked = new _TrackedPromise(promise.then.bind(promise));
+        tracked.#onUse = onUse;
+        Promise.prototype.then.call(tracked, void 0, ignoreReject);
+        return tracked;
+      }
+      then(onFulfilled, onRejected) {
+        const onUse = this.#onUse;
+        if (onUse) {
+          try {
+            onUse();
+          } catch (err) {
+            console.error(err);
+          }
+        }
+        return Promise.prototype.then.call(this, onFulfilled, onRejected);
+      }
+      constructor(...args) {
+        super(...args), this.#onUse = null;
+      }
+    };
+    var RENDER_STAGES_BY_DATA_KIND = {
+      sessionData: _stagedrendering.RenderStage.ShellRuntime,
+      /**
+      * Statically-prerenderable URL data, like static `params`.
+      * It may need to be pushed to a runtime stage in a runtime prerender,
+      * but it's semantically distinct from `runtimeUrlData` like `searchParams`,
+      * which is always excluded from static prerenders.
+      * */
+      staticUrlData: {
+        /**
+        * From that app's point of view, `prefetch()` is semantically the same as
+        * `staticUrlData`, because it does not resolve in a shell but resolves in
+        * a prefetch (even a static one).
+        * We handle it separately to provide a specialized error in validation renders.
+        */
+        prefetchApi: {
+          static: _stagedrendering.RenderStage.PrefetchStatic_prefetchApi,
+          runtime: _stagedrendering.RenderStage.PrefetchRuntime_prefetchApi
+        },
+        static: _stagedrendering.RenderStage.PrefetchStatic,
+        runtime: _stagedrendering.RenderStage.PrefetchRuntime
+      },
+      /**
+      * URL data that is never statically-prerenderable, like static `searchParams`.
+      * */
+      runtimeUrlData: _stagedrendering.RenderStage.PrefetchRuntime
+    };
+    function applyOwnerStack(error) {
+      if (process.env.NODE_ENV !== "production") {
+        var _getClientReact_captureOwnerStack, _getClientReact, _getServerReact_captureOwnerStack, _getServerReact;
+        let ownerStack;
+        const workUnitStore = _workunitasyncstorageexternal.workUnitAsyncStorage.getStore();
+        const innerOwnerStack = ((_getClientReact = (0, _runtimereactsexternal.getClientReact)()) == null ? void 0 : (_getClientReact_captureOwnerStack = _getClientReact.captureOwnerStack) == null ? void 0 : _getClientReact_captureOwnerStack.call(_getClientReact)) ?? ((_getServerReact = (0, _runtimereactsexternal.getServerReact)()) == null ? void 0 : (_getServerReact_captureOwnerStack = _getServerReact.captureOwnerStack) == null ? void 0 : _getServerReact_captureOwnerStack.call(_getServerReact));
+        switch (workUnitStore == null ? void 0 : workUnitStore.type) {
+          case "cache":
+          case "private-cache":
+            ownerStack = (innerOwnerStack || "") + (workUnitStore.outerOwnerStack || "") || void 0;
+            break;
+          case "unstable-cache":
+          case "request":
+          case "prerender":
+          case "prerender-legacy":
+          case "prerender-runtime":
+          case "prerender-client":
+          case "validation-client":
+          case "build-time-generator":
+          case void 0:
+            ownerStack = innerOwnerStack;
+            break;
+          default:
+            workUnitStore;
+        }
+        if (ownerStack) {
+          let stack = ownerStack;
+          if (error.stack) {
+            const frames = [];
+            for (const frame of error.stack.split("\n").slice(1)) {
+              if (frame.includes("react_stack_bottom_frame")) {
+                break;
+              }
+              frames.push(frame);
+            }
+            stack = "\n" + frames.join("\n") + stack;
+          }
+          error.stack = error.name + ": " + error.message + stack;
+        }
+      }
+      return error;
+    }
+  }
+});
+
+// node_modules/next/dist/lib/framework/boundary-constants.js
+var require_boundary_constants = __commonJS({
+  "node_modules/next/dist/lib/framework/boundary-constants.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      METADATA_BOUNDARY_NAME: function() {
+        return METADATA_BOUNDARY_NAME;
+      },
+      OUTLET_BOUNDARY_NAME: function() {
+        return OUTLET_BOUNDARY_NAME;
+      },
+      ROOT_LAYOUT_BOUNDARY_NAME: function() {
+        return ROOT_LAYOUT_BOUNDARY_NAME;
+      },
+      VIEWPORT_BOUNDARY_NAME: function() {
+        return VIEWPORT_BOUNDARY_NAME;
+      }
+    });
+    var METADATA_BOUNDARY_NAME = "__next_metadata_boundary__";
+    var VIEWPORT_BOUNDARY_NAME = "__next_viewport_boundary__";
+    var OUTLET_BOUNDARY_NAME = "__next_outlet_boundary__";
+    var ROOT_LAYOUT_BOUNDARY_NAME = "__next_root_layout_boundary__";
+  }
+});
+
+// node_modules/next/dist/lib/scheduler.js
+var require_scheduler = __commonJS({
+  "node_modules/next/dist/lib/scheduler.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      atLeastOneTask: function() {
+        return atLeastOneTask;
+      },
+      scheduleImmediate: function() {
+        return scheduleImmediate;
+      },
+      scheduleOnNextTick: function() {
+        return scheduleOnNextTick;
+      },
+      waitAtLeastOneReactRenderTask: function() {
+        return waitAtLeastOneReactRenderTask;
+      }
+    });
+    var scheduleOnNextTick = (cb) => {
+      Promise.resolve().then(() => {
+        if (process.env.NEXT_RUNTIME === "edge") {
+          setTimeout(cb, 0);
+        } else {
+          process.nextTick(cb);
+        }
+      });
+    };
+    var scheduleImmediate = (cb) => {
+      if (process.env.NEXT_RUNTIME === "edge") {
+        setTimeout(cb, 0);
+      } else {
+        setImmediate(cb);
+      }
+    };
+    function atLeastOneTask() {
+      return new Promise((resolve) => scheduleImmediate(resolve));
+    }
+    function waitAtLeastOneReactRenderTask() {
+      if (process.env.NEXT_RUNTIME === "edge") {
+        return new Promise((r) => setTimeout(r, 0));
+      } else {
+        return new Promise((r) => setImmediate(r));
+      }
+    }
+  }
+});
+
+// node_modules/next/dist/server/app-render/blocking-route-messages.js
+var require_blocking_route_messages = __commonJS({
+  "node_modules/next/dist/server/app-render/blocking-route-messages.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      createDynamicBodyError: function() {
+        return createDynamicBodyError;
+      },
+      createDynamicBodyErrorInNavigation: function() {
+        return createDynamicBodyErrorInNavigation;
+      },
+      createDynamicBodyErrorInStaticRoute: function() {
+        return createDynamicBodyErrorInStaticRoute;
+      },
+      createDynamicMetadataError: function() {
+        return createDynamicMetadataError;
+      },
+      createDynamicMetadataErrorInStaticRoute: function() {
+        return createDynamicMetadataErrorInStaticRoute;
+      },
+      createDynamicOrRuntimeBodyError: function() {
+        return createDynamicOrRuntimeBodyError;
+      },
+      createDynamicOrRuntimeMetadataError: function() {
+        return createDynamicOrRuntimeMetadataError;
+      },
+      createDynamicOrRuntimeViewportError: function() {
+        return createDynamicOrRuntimeViewportError;
+      },
+      createDynamicViewportError: function() {
+        return createDynamicViewportError;
+      },
+      createDynamicViewportErrorInStaticRoute: function() {
+        return createDynamicViewportErrorInStaticRoute;
+      },
+      createLinkBodyErrorInNavigation: function() {
+        return createLinkBodyErrorInNavigation;
+      },
+      createLinkMetadataError: function() {
+        return createLinkMetadataError;
+      },
+      createLinkViewportError: function() {
+        return createLinkViewportError;
+      },
+      createNavigationBodyErrorInNavigation: function() {
+        return createNavigationBodyErrorInNavigation;
+      },
+      createNavigationMetadataError: function() {
+        return createNavigationMetadataError;
+      },
+      createNavigationViewportError: function() {
+        return createNavigationViewportError;
+      },
+      createNonPrerenderableBodyErrorInStaticRoute: function() {
+        return createNonPrerenderableBodyErrorInStaticRoute;
+      },
+      createNonPrerenderableMetadataErrorInStaticRoute: function() {
+        return createNonPrerenderableMetadataErrorInStaticRoute;
+      },
+      createNonPrerenderableViewportErrorInStaticRoute: function() {
+        return createNonPrerenderableViewportErrorInStaticRoute;
+      },
+      createPrefetchBodyErrorInNavigation: function() {
+        return createPrefetchBodyErrorInNavigation;
+      },
+      createPrefetchMetadataError: function() {
+        return createPrefetchMetadataError;
+      },
+      createPrefetchViewportError: function() {
+        return createPrefetchViewportError;
+      },
+      createRuntimeBodyError: function() {
+        return createRuntimeBodyError;
+      },
+      createRuntimeBodyErrorInNavigation: function() {
+        return createRuntimeBodyErrorInNavigation;
+      },
+      createRuntimeBodyErrorInStaticRoute: function() {
+        return createRuntimeBodyErrorInStaticRoute;
+      },
+      createRuntimeMetadataError: function() {
+        return createRuntimeMetadataError;
+      },
+      createRuntimeMetadataErrorInStaticRoute: function() {
+        return createRuntimeMetadataErrorInStaticRoute;
+      },
+      createRuntimeViewportError: function() {
+        return createRuntimeViewportError;
+      },
+      createRuntimeViewportErrorInStaticRoute: function() {
+        return createRuntimeViewportErrorInStaticRoute;
+      },
+      logBuildDebugHint: function() {
+        return logBuildDebugHint;
+      }
+    });
+    function createRuntimeBodyError(route) {
+      return new Error(`Route "${route}": Next.js encountered runtime data during prerendering.
+
+\`cookies()\`, \`headers()\`, \`params\`, or \`searchParams\` accessed outside of \`<Suspense>\` prevents the route from being prerendered, blocking the page load and leading to a slower user experience.
+
+Ways to fix this:
+  - [stream] Provide a placeholder with \`<Suspense fallback={...}>\` around the data access
+  - [block] Set \`export const instant = false\` to allow a blocking route
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-runtime`);
+    }
+    function createDynamicBodyError(route) {
+      return new Error(`Route "${route}": Next.js encountered uncached data during prerendering.
+
+\`fetch(...)\` or \`connection()\` accessed outside of \`<Suspense>\` prevents the route from being prerendered, blocking the page load and leading to a slower user experience.
+
+Ways to fix this:
+  - [stream] Provide a placeholder with \`<Suspense fallback={...}>\` around the data access
+  - [cache] Cache the data access with \`"use cache"\` (does not apply to \`connection()\`)
+  - [block] Set \`export const instant = false\` to allow a blocking route
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-dynamic`);
+    }
+    function createRuntimeBodyErrorInNavigation(route) {
+      return new Error(`Route "${route}": Next.js encountered runtime data during prerendering or a navigation.
+
+\`cookies()\`, \`headers()\`, \`params\`, or \`searchParams\` accessed outside of \`<Suspense>\` prevents the route from being prerendered or the navigation from being instant, leading to a slower user experience.
+
+Ways to fix this:
+  - [stream] Provide a placeholder with \`<Suspense fallback={...}>\` around the data access
+  - [block] Set \`export const instant = false\` to allow a blocking route
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-runtime`);
+    }
+    function createLinkBodyErrorInNavigation(route) {
+      return new Error(`Route "${route}": Next.js encountered URL data during prerendering or a navigation.
+
+\`params\` or \`searchParams\` accessed outside of \`<Suspense>\` may prevent the navigation from being instant, leading to a slower user experience.
+
+Ways to fix this:
+  - [stream] Provide a placeholder with \`<Suspense fallback={...}>\` around the data access
+  - [block] Set \`export const instant = false\` to allow a blocking route
+
+Learn more: https://nextjs.org/docs/messages/instant-shell-url-data`);
+    }
+    function createNavigationBodyErrorInNavigation(route) {
+      return new Error(`Route "${route}": Next.js encountered \`navigation()\` during prerendering or a navigation.
+
+\`navigation()\` called outside of \`<Suspense>\` may prevent the navigation from being instant, leading to a slower user experience.
+
+Ways to fix this:
+  - [stream] Provide a placeholder with \`<Suspense fallback={...}>\` around the component that calls \`navigation()\`
+  - [block] Set \`export const instant = false\` to allow a blocking route
+
+Learn more: https://nextjs.org/docs/messages/instant-navigation-stage`);
+    }
+    function createPrefetchBodyErrorInNavigation(route) {
+      return new Error(`Route "${route}": Next.js encountered \`prefetch()\` during prerendering or a navigation.
+
+\`prefetch()\` called outside of \`<Suspense>\` may prevent the navigation from being instant, leading to a slower user experience.
+
+Ways to fix this:
+  - [stream] Provide a placeholder with \`<Suspense fallback={...}>\` around the component that calls \`prefetch()\`
+  - [block] Set \`export const instant = false\` to allow a blocking route
+
+Learn more: https://nextjs.org/docs/messages/instant-navigation-stage`);
+    }
+    function createDynamicBodyErrorInNavigation(route) {
+      return new Error(`Route "${route}": Next.js encountered uncached data during prerendering or a navigation.
+
+\`fetch(...)\` or \`connection()\` accessed outside of \`<Suspense>\` prevents the route from being prerendered or the navigation from being instant, leading to a slower user experience.
+
+Ways to fix this:
+  - [stream] Provide a placeholder with \`<Suspense fallback={...}>\` around the data access
+  - [cache] Cache the data access with \`"use cache"\` (does not apply to \`connection()\`)
+  - [block] Set \`export const instant = false\` to allow a blocking route
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-dynamic`);
+    }
+    function createDynamicOrRuntimeBodyError(route) {
+      return new Error(`Route "${route}": Next.js encountered uncached or runtime data during prerendering.
+
+\`fetch(...)\`, \`cookies()\`, \`headers()\`, \`params\`, \`searchParams\`, or \`connection()\` accessed outside of \`<Suspense>\` prevents the route from being prerendered, blocking the page load and leading to a slower user experience.
+
+Ways to fix this:
+  - [stream] Provide a placeholder with \`<Suspense fallback={...}>\` around the data access
+  - [cache] For uncached data (\`fetch\`, database calls): cache the access with \`"use cache"\` (does not apply to \`connection()\`)
+  - [block] Set \`export const instant = false\` to allow a blocking route
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-dynamic`);
+    }
+    function createLinkMetadataError(route) {
+      return new Error(`Route "${route}": Next.js encountered URL data in \`generateMetadata()\`.
+
+This route's metadata is blocked, but the rest of its content can be prefetched. \`params\` or \`searchParams\` accessed in \`generateMetadata()\` prevent it from being prefetched.
+
+Ways to fix this:
+  - [static] Use a static metadata export instead of \`generateMetadata()\`
+  - [dynamic] Render a marker component that calls \`await connection()\` inside \`<Suspense>\` on the page
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-metadata-runtime`);
+    }
+    function createRuntimeMetadataError(route) {
+      return new Error(`Route "${route}": Next.js encountered runtime data in \`generateMetadata()\`.
+
+This route's metadata is blocked, but the rest of its content can be prerendered. \`cookies()\`, \`headers()\`, \`params\`, or \`searchParams\` accessed in \`generateMetadata()\` cause it to run dynamically.
+
+Ways to fix this:
+  - [static] Use a static metadata export instead of \`generateMetadata()\`
+  - [dynamic] Render a marker component that calls \`await connection()\` inside \`<Suspense>\` on the page
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-metadata-runtime`);
+    }
+    function createNavigationMetadataError(route) {
+      return new Error(`Route "${route}": Next.js encountered \`navigation()\` in \`generateMetadata()\`.
+
+Metadata can already stream without blocking the route's UI, so delaying it until navigation may be unintentional.
+
+Ways to fix this:
+  - [remove] Remove \`navigation()\` from \`generateMetadata()\`
+  - [mark] Render a marker component that calls \`await navigation()\` inside \`<Suspense>\` on the page
+
+Learn more: https://nextjs.org/docs/messages/instant-navigation-stage-metadata`);
+    }
+    function createPrefetchMetadataError(route) {
+      return new Error(`Route "${route}": Next.js encountered \`prefetch()\` in \`generateMetadata()\`.
+
+Metadata can already stream without blocking the route's UI, so delaying it until a per-link prefetch or navigation may be unintentional.
+
+Ways to fix this:
+  - [remove] Remove \`prefetch()\` from \`generateMetadata()\`
+  - [mark] Render a marker component that calls \`await prefetch()\` inside \`<Suspense>\` on the page
+
+Learn more: https://nextjs.org/docs/messages/instant-navigation-stage-metadata`);
+    }
+    function createDynamicMetadataError(route) {
+      return new Error(`Route "${route}": Next.js encountered uncached data in \`generateMetadata()\`.
+
+This route's metadata is blocked, but the rest of its content can be prerendered. \`fetch(...)\` or \`connection()\` accessed in \`generateMetadata()\` cause it to run dynamically.
+
+Ways to fix this:
+  - [cache] Cache the metadata with \`"use cache"\` in \`generateMetadata()\` (does not apply to \`connection()\`)
+  - [dynamic] Render a marker component that calls \`await connection()\` inside \`<Suspense>\` on the page
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-metadata-dynamic`);
+    }
+    function createLinkViewportError(route) {
+      return new Error(`Route "${route}": Next.js encountered URL data in \`generateViewport()\`.
+
+\`params\` or \`searchParams\` in \`generateViewport()\` prevents the page from being prerendered, leading to a slower user experience.
+
+Ways to fix this:
+  - [static] Use a static viewport export instead of \`generateViewport()\`
+  - [block] Set \`export const instant = false\` to allow a blocking route
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-viewport-runtime`);
+    }
+    function createRuntimeViewportError(route) {
+      return new Error(`Route "${route}": Next.js encountered runtime data in \`generateViewport()\`.
+
+\`cookies()\`, \`headers()\`, \`params\`, or \`searchParams\` in \`generateViewport()\` prevents the page from being prerendered, leading to a slower user experience.
+
+Ways to fix this:
+  - [static] Use a static viewport export instead of \`generateViewport()\`
+  - [block] Set \`export const instant = false\` to allow a blocking route
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-viewport-runtime`);
+    }
+    function createNavigationViewportError(route) {
+      return new Error(`Route "${route}": Next.js encountered \`navigation()\` in \`generateViewport()\`.
+
+This prevents Next.js from creating the App Shell, leading to a slower user experience.
+
+Ways to fix this:
+  - [remove] Remove \`navigation()\` from \`generateViewport()\`
+  - [ignore] Set \`export const instant = false\` to disable validation for this segment
+
+Learn more: https://nextjs.org/docs/messages/instant-navigation-stage-viewport`);
+    }
+    function createPrefetchViewportError(route) {
+      return new Error(`Route "${route}": Next.js encountered \`prefetch()\` in \`generateViewport()\`.
+
+This prevents Next.js from creating the App Shell, leading to a slower user experience.
+
+Ways to fix this:
+  - [remove] Remove \`prefetch()\` from \`generateViewport()\`
+  - [ignore] Set \`export const instant = false\` to disable validation for this segment
+
+Learn more: https://nextjs.org/docs/messages/instant-navigation-stage-viewport`);
+    }
+    function createDynamicViewportError(route) {
+      return new Error(`Route "${route}": Next.js encountered uncached data in \`generateViewport()\`.
+
+\`fetch(...)\` or \`connection()\` in \`generateViewport()\` prevents the page from being prerendered, leading to a slower user experience.
+
+Ways to fix this:
+  - [cache] Cache the viewport data with \`"use cache"\` in \`generateViewport()\` (does not apply to \`connection()\`)
+  - [block] Set \`export const instant = false\` to allow a blocking route
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-viewport-dynamic`);
+    }
+    function createDynamicOrRuntimeViewportError(route) {
+      return new Error(`Route "${route}": Next.js encountered uncached or runtime data in \`generateViewport()\`.
+
+This prevents the page from being prerendered, leading to a slower user experience. Unlike metadata, viewport cannot be streamed behind \`<Suspense>\` because it affects the initial page load.
+
+Ways to fix this:
+  - [static] Use a static viewport export instead of \`generateViewport()\`
+  - [cache] For uncached data (\`fetch\`, database calls): cache the viewport with \`"use cache"\` in \`generateViewport()\` (does not apply to \`connection()\`)
+  - [block] Set \`export const instant = false\` to allow a blocking route
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-viewport-runtime`);
+    }
+    function createDynamicOrRuntimeMetadataError(route) {
+      return new Error(`Route "${route}": Next.js encountered uncached or runtime data in \`generateMetadata()\`.
+
+This route's metadata is blocked, but the rest of its content can be prerendered.
+
+Ways to fix this:
+  - [static] Use a static metadata export instead of \`generateMetadata()\`
+  - [cache] Cache the metadata with \`"use cache"\` in \`generateMetadata()\` (does not apply to \`connection()\`)
+  - [dynamic] Render a marker component that calls \`await connection()\` inside \`<Suspense>\` on the page
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-metadata-runtime`);
+    }
+    function createRuntimeBodyErrorInStaticRoute(route) {
+      return new Error(`Route "${route}": Next.js encountered runtime data on a route that must be fully static.
+
+This route is configured to be fully static, but runtime data from \`cookies()\`, \`headers()\`, \`params\`, \`searchParams\`, or a short-lived cache requires rendering at request time.
+
+Ways to fix this:
+  - [remove] Remove the data access
+  - [client] Read the data on the client
+
+Learn more: https://nextjs.org/docs/messages/static-route-runtime`);
+    }
+    function createDynamicBodyErrorInStaticRoute(route) {
+      return new Error(`Route "${route}": Next.js encountered uncached data on a route that must be fully static.
+
+This route is configured to be fully static, but an uncached \`fetch(...)\`, database call, or \`connection()\` requires rendering at request time.
+
+Ways to fix this:
+  - [cache] Cache the data access with \`"use cache"\` (does not apply to \`connection()\`)
+  - [remove] Remove the data access
+  - [client] Read the data on the client
+
+Learn more: https://nextjs.org/docs/messages/static-route-dynamic`);
+    }
+    function createNonPrerenderableBodyErrorInStaticRoute(route) {
+      return new Error(`Route "${route}": Next.js encountered uncached or runtime data on a route that must be fully static.
+
+This route is configured to be fully static, but some data requires rendering at request time.
+
+Ways to fix this:
+  - [cache] For uncached data (\`fetch\`, database calls): cache the access with \`"use cache"\` (does not apply to \`connection()\`)
+  - [remove] Remove the data access
+  - [client] Read the data on the client
+
+Learn more: https://nextjs.org/docs/messages/static-route-dynamic`);
+    }
+    function createRuntimeMetadataErrorInStaticRoute(route) {
+      return new Error(`Route "${route}": Next.js encountered runtime data in \`generateMetadata()\` on a route that must be fully static.
+
+This route is configured to be fully static, but runtime data from \`cookies()\`, \`headers()\`, \`params\`, \`searchParams\`, or a short-lived cache requires rendering at request time.
+
+Ways to fix this:
+  - [static] Replace the dynamic data used by \`generateMetadata()\` with static data
+
+Learn more: https://nextjs.org/docs/messages/static-metadata-runtime`);
+    }
+    function createDynamicMetadataErrorInStaticRoute(route) {
+      return new Error(`Route "${route}": Next.js encountered uncached data in \`generateMetadata()\` on a route that must be fully static.
+
+This route is configured to be fully static, but an uncached \`fetch(...)\`, database call, or \`connection()\` requires rendering at request time.
+
+Ways to fix this:
+  - [cache] Cache the data used by \`generateMetadata()\` with \`"use cache"\` (does not apply to \`connection()\`)
+  - [static] Replace the dynamic data used by \`generateMetadata()\` with static data
+
+Learn more: https://nextjs.org/docs/messages/static-metadata-dynamic`);
+    }
+    function createNonPrerenderableMetadataErrorInStaticRoute(route) {
+      return new Error(`Route "${route}": Next.js encountered uncached or runtime data in \`generateMetadata()\` on a route that must be fully static.
+
+This route is configured to be fully static, but some data requires rendering at request time.
+
+Ways to fix this:
+  - [cache] For uncached data: cache the data used by \`generateMetadata()\` with \`"use cache"\` (does not apply to \`connection()\`)
+  - [static] Replace the dynamic data used by \`generateMetadata()\` with static data
+
+Learn more: https://nextjs.org/docs/messages/static-metadata-dynamic`);
+    }
+    function createRuntimeViewportErrorInStaticRoute(route) {
+      return new Error(`Route "${route}": Next.js encountered runtime data in \`generateViewport()\` on a route that must be fully static.
+
+This route is configured to be fully static, but runtime data from \`cookies()\`, \`headers()\`, \`params\`, \`searchParams\`, or a short-lived cache requires rendering at request time.
+
+Ways to fix this:
+  - [static] Replace the dynamic data used by \`generateViewport()\` with static data
+
+Learn more: https://nextjs.org/docs/messages/static-viewport-runtime`);
+    }
+    function createDynamicViewportErrorInStaticRoute(route) {
+      return new Error(`Route "${route}": Next.js encountered uncached data in \`generateViewport()\` on a route that must be fully static.
+
+This route is configured to be fully static, but an uncached \`fetch(...)\`, database call, or \`connection()\` requires rendering at request time.
+
+Ways to fix this:
+  - [cache] Cache the data used by \`generateViewport()\` with \`"use cache"\` (does not apply to \`connection()\`)
+  - [static] Replace the dynamic data used by \`generateViewport()\` with static data
+
+Learn more: https://nextjs.org/docs/messages/static-viewport-dynamic`);
+    }
+    function createNonPrerenderableViewportErrorInStaticRoute(route) {
+      return new Error(`Route "${route}": Next.js encountered uncached or runtime data in \`generateViewport()\` on a route that must be fully static.
+
+This route is configured to be fully static, but some data requires rendering at request time.
+
+Ways to fix this:
+  - [cache] For uncached data: cache the data used by \`generateViewport()\` with \`"use cache"\` (does not apply to \`connection()\`)
+  - [static] Replace the dynamic data used by \`generateViewport()\` with static data
+
+Learn more: https://nextjs.org/docs/messages/static-viewport-dynamic`);
+    }
+    function logBuildDebugHint(route) {
+      if (process.env.NODE_ENV !== "development") {
+        console.error(`To get a more detailed stack trace and pinpoint the issue, try one of the following:
+  - Start the app in development mode by running \`next dev\`, then open "${route}" in your browser to investigate the error.
+  - Rerun the production build with \`next build --debug-prerender\` to generate better stack traces.`);
+      } else if (!process.env.__NEXT_DEV_SERVER) {
+        console.error(`To debug the issue, start the app in development mode by running \`next dev\`, then open "${route}" in your browser to investigate the error.`);
+      }
+    }
+  }
+});
+
+// node_modules/next/dist/server/app-render/instant-validation/boundary-constants.js
+var require_boundary_constants2 = __commonJS({
+  "node_modules/next/dist/server/app-render/instant-validation/boundary-constants.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      INSTANT_SLOT_MARKER_PREFIX: function() {
+        return INSTANT_SLOT_MARKER_PREFIX;
+      },
+      INSTANT_SLOT_MARKER_SUFFIX: function() {
+        return INSTANT_SLOT_MARKER_SUFFIX;
+      },
+      INSTANT_VALIDATION_BOUNDARY_NAME: function() {
+        return INSTANT_VALIDATION_BOUNDARY_NAME;
+      }
+    });
+    var INSTANT_VALIDATION_BOUNDARY_NAME = "__next_instant_validation_boundary__";
+    var INSTANT_SLOT_MARKER_PREFIX = "__next_instant_slot_";
+    var INSTANT_SLOT_MARKER_SUFFIX = "__";
+  }
+});
+
+// node_modules/next/dist/server/app-render/instant-validation/boundary-tracking.js
+var require_boundary_tracking = __commonJS({
+  "node_modules/next/dist/server/app-render/instant-validation/boundary-tracking.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      allRequiredBoundariesRendered: function() {
+        return allRequiredBoundariesRendered;
+      },
+      createValidationBoundaryTracking: function() {
+        return createValidationBoundaryTracking;
+      }
+    });
+    function createValidationBoundaryTracking(matchPrevious) {
+      return {
+        requiredIds: matchPrevious ? new Map(matchPrevious.requiredIds) : /* @__PURE__ */ new Map(),
+        renderedIds: /* @__PURE__ */ new Set()
+      };
+    }
+    function allRequiredBoundariesRendered(state) {
+      for (const id of state.requiredIds.keys()) {
+        if (!state.renderedIds.has(id)) {
+          return false;
+        }
+      }
+      return true;
+    }
+  }
+});
+
+// node_modules/next/dist/shared/lib/instant-messages.js
+var require_instant_messages = __commonJS({
+  "node_modules/next/dist/shared/lib/instant-messages.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      createLinkPrefetchPartialError: function() {
+        return createLinkPrefetchPartialError;
+      },
+      createUnrenderedSegmentError: function() {
+        return createUnrenderedSegmentError;
+      }
+    });
+    function createUnrenderedSegmentError(route, missingFiles) {
+      let message = `Route "${route}": Could not validate that a segment in your UI has instant navigation.`;
+      if (missingFiles.length > 0) {
+        const label = missingFiles.length === 1 ? "Dropped segment" : "Dropped segments";
+        message += `
+
+This segment was dropped from rendering. Issues that would prevent instant navigation will go undetected.
+
+${label}:
+${missingFiles.map((p) => `  ${p}`).join("\n")}
+
+Ways to fix this:
+  - [render] Render the dropped segment
+  - [ignore] Set \`export const instant = false\` to opt the dropped segment out of instant-navigation validation
+
+Learn more: https://nextjs.org/docs/messages/instant-unrendered-segment`;
+      }
+      return new Error(message);
+    }
+    function createLinkPrefetchPartialError(pathname) {
+      return new Error(`Next.js encountered dynamic data during prefetching for "${pathname}".
+
+This will lead to slower, more expensive prefetches.
+
+Ways to fix this:
+  - [upgrade] Opt into Partial Prefetching by exporting \`const prefetch = 'partial'\` from the page or layout, or by setting \`partialPrefetching: true\` in next.config to opt the whole app in
+  - [disable] Remove \`prefetch={true}\` from the <Link> to use the default prefetch
+  - [ignore] Set \`export const instant = false\` to opt the route out of instant-navigation validation
+
+Learn more: https://nextjs.org/docs/messages/instant-link-prefetch-partial`);
+    }
+  }
+});
+
+// node_modules/next/dist/shared/lib/lazy-dynamic/react-browser-bailout.js
+var require_react_browser_bailout = __commonJS({
+  "node_modules/next/dist/shared/lib/lazy-dynamic/react-browser-bailout.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      createReactBrowserBailoutReason: function() {
+        return createReactBrowserBailoutReason;
+      },
+      getReactBrowserBailoutReason: function() {
+        return getReactBrowserBailoutReason;
+      },
+      isNextBrowserBailoutError: function() {
+        return isNextBrowserBailoutError;
+      }
+    });
+    var REACT_BROWSER_BAILOUT_REASON = /* @__PURE__ */ Symbol.for("next.browser-bailout-reason");
+    function createReactBrowserBailoutReason(reason) {
+      return {
+        $$typeof: REACT_BROWSER_BAILOUT_REASON,
+        reason
+      };
+    }
+    function getReactBrowserBailoutReason(error) {
+      const cause = error?.cause;
+      return cause?.$$typeof === REACT_BROWSER_BAILOUT_REASON ? cause.reason : void 0;
+    }
+    function isNextBrowserBailoutError(error) {
+      return getReactBrowserBailoutReason(error) !== void 0;
+    }
+  }
+});
+
+// node_modules/next/dist/server/app-render/dynamic-rendering.js
+var require_dynamic_rendering = __commonJS({
+  "node_modules/next/dist/server/app-render/dynamic-rendering.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      DynamicHoleKind: function() {
+        return DynamicHoleKind;
+      },
+      PreludeState: function() {
+        return PreludeState;
+      },
+      abortAndThrowOnSynchronousRequestDataAccess: function() {
+        return abortAndThrowOnSynchronousRequestDataAccess;
+      },
+      abortOnSynchronousPlatformIOAccess: function() {
+        return abortOnSynchronousPlatformIOAccess;
+      },
+      accessedDynamicData: function() {
+        return accessedDynamicData;
+      },
+      annotateDynamicAccess: function() {
+        return annotateDynamicAccess;
+      },
+      consumeDynamicAccess: function() {
+        return consumeDynamicAccess;
+      },
+      createDynamicTrackingState: function() {
+        return createDynamicTrackingState;
+      },
+      createDynamicValidationState: function() {
+        return createDynamicValidationState;
+      },
+      createHangingInputAbortSignal: function() {
+        return createHangingInputAbortSignal;
+      },
+      createInstantValidationState: function() {
+        return createInstantValidationState;
+      },
+      formatDynamicAPIAccesses: function() {
+        return formatDynamicAPIAccesses;
+      },
+      getDisallowedReasonsInStaticRoute: function() {
+        return getDisallowedReasonsInStaticRoute;
+      },
+      getFirstDynamicReason: function() {
+        return getFirstDynamicReason;
+      },
+      getNavigationDisallowedDynamicReasons: function() {
+        return getNavigationDisallowedDynamicReasons;
+      },
+      getStaticShellDisallowedDynamicReasons: function() {
+        return getStaticShellDisallowedDynamicReasons;
+      },
+      isPrerenderInterruptedError: function() {
+        return isPrerenderInterruptedError;
+      },
+      logDisallowedDynamicError: function() {
+        return logDisallowedDynamicError;
+      },
+      markCurrentScopeAsDynamic: function() {
+        return markCurrentScopeAsDynamic;
+      },
+      throwIfDisallowedDynamic: function() {
+        return throwIfDisallowedDynamic;
+      },
+      throwIfDisallowedDynamicInStaticRoute: function() {
+        return throwIfDisallowedDynamicInStaticRoute;
+      },
+      throwIfSyncIOUsed: function() {
+        return throwIfSyncIOUsed;
+      },
+      throwToInterruptStaticGeneration: function() {
+        return throwToInterruptStaticGeneration;
+      },
+      trackAllowedDynamicAccess: function() {
+        return trackAllowedDynamicAccess;
+      },
+      trackDynamicAccessInStaticRoute: function() {
+        return trackDynamicAccessInStaticRoute;
+      },
+      trackDynamicDataInDynamicRender: function() {
+        return trackDynamicDataInDynamicRender;
+      },
+      trackDynamicHoleInNavigation: function() {
+        return trackDynamicHoleInNavigation;
+      },
+      trackDynamicHoleInStaticShell: function() {
+        return trackDynamicHoleInStaticShell;
+      },
+      trackThrownErrorInNavigation: function() {
+        return trackThrownErrorInNavigation;
+      }
+    });
+    var _react = /* @__PURE__ */ _interop_require_default(require_react());
+    var _hooksservercontext = require_hooks_server_context();
+    var _staticgenerationbailout = require_static_generation_bailout();
+    var _workunitasyncstorageexternal = require_work_unit_async_storage_external();
+    var _dynamicrenderingutils = require_dynamic_rendering_utils();
+    var _boundaryconstants = require_boundary_constants();
+    var _scheduler = require_scheduler();
+    var _blockingroutemessages = require_blocking_route_messages();
+    var _invarianterror = require_invariant_error();
+    var _boundaryconstants1 = require_boundary_constants2();
+    var _boundarytracking = require_boundary_tracking();
+    var _instantmessages = require_instant_messages();
+    var _reactbrowserbailout = require_react_browser_bailout();
+    function _interop_require_default(obj) {
+      return obj && obj.__esModule ? obj : {
+        default: obj
+      };
+    }
+    function createDynamicTrackingState(isDebugDynamicAccesses) {
+      return {
+        isDebugDynamicAccesses,
+        dynamicAccesses: [],
+        syncDynamicErrorWithStack: null,
+        syncDynamicErrorWithStackPostMicrotask: false
+      };
+    }
+    function createDynamicValidationState() {
+      return {
+        hasSuspenseAboveBody: false,
+        hasDynamicMetadata: false,
+        dynamicMetadata: null,
+        hasDynamicViewport: false,
+        hasAllowedDynamic: false,
+        dynamicErrors: []
+      };
+    }
+    function getPendingClientSyncDynamicError(clientDynamic) {
+      return clientDynamic.syncDynamicErrorWithStackPostMicrotask ? null : clientDynamic.syncDynamicErrorWithStack;
+    }
+    function getFirstDynamicReason(trackingState) {
+      var _trackingState_dynamicAccesses_;
+      return (_trackingState_dynamicAccesses_ = trackingState.dynamicAccesses[0]) == null ? void 0 : _trackingState_dynamicAccesses_.expression;
+    }
+    function markCurrentScopeAsDynamic(store, workUnitStore, expression) {
+      if (workUnitStore) {
+        switch (workUnitStore.type) {
+          case "cache":
+          case "unstable-cache":
+            return;
+          case "private-cache":
+            return;
+          case "prerender-legacy":
+          case "request":
+          case "build-time-generator":
+            break;
+          default:
+            workUnitStore;
+        }
+      }
+      if (store.forceDynamic || store.forceStatic) return;
+      if (store.dynamicShouldError) {
+        throw new _staticgenerationbailout.StaticGenBailoutError(`Route ${store.route} with \`dynamic = "error"\` couldn't be rendered statically because it used \`${expression}\`. See more info here: https://nextjs.org/docs/app/building-your-application/rendering/static-and-dynamic#dynamic-rendering`);
+      }
+      if (workUnitStore) {
+        switch (workUnitStore.type) {
+          case "prerender-legacy":
+            workUnitStore.revalidate = 0;
+            const err = new _hooksservercontext.DynamicServerError(`Route ${store.route} couldn't be rendered statically because it used ${expression}. See more info here: https://nextjs.org/docs/messages/dynamic-server-error`);
+            store.dynamicUsageDescription = expression;
+            store.dynamicUsageStack = err.stack;
+            throw err;
+          case "request":
+            markRequestStoreAsDynamic(workUnitStore);
+            break;
+          case "build-time-generator":
+            break;
+          default:
+            workUnitStore;
+        }
+      }
+    }
+    function throwToInterruptStaticGeneration(expression, store, prerenderStore) {
+      const err = new _hooksservercontext.DynamicServerError(`Route ${store.route} couldn't be rendered statically because it used \`${expression}\`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error`);
+      prerenderStore.revalidate = 0;
+      store.dynamicUsageDescription = expression;
+      store.dynamicUsageStack = err.stack;
+      throw err;
+    }
+    function trackDynamicDataInDynamicRender(workUnitStore) {
+      switch (workUnitStore.type) {
+        case "cache":
+        case "unstable-cache":
+          return;
+        case "private-cache":
+          return;
+        case "prerender":
+        case "prerender-runtime":
+        case "prerender-legacy":
+        case "prerender-client":
+        case "validation-client":
+        case "build-time-generator":
+          break;
+        case "request":
+          markRequestStoreAsDynamic(workUnitStore);
+          break;
+        default:
+          workUnitStore;
+      }
+    }
+    function markRequestStoreAsDynamic(requestStore) {
+      if (process.env.__NEXT_DEV_SERVER && requestStore.phase === "render") {
+        requestStore.usedDynamic = true;
+      }
+    }
+    function abortOnSynchronousDynamicDataAccess(route, expression, prerenderStore) {
+      const reason = `Route ${route} needs to bail out of prerendering at this point because it used ${expression}.`;
+      const error = createPrerenderInterruptedError(reason);
+      prerenderStore.controller.abort(error);
+      const dynamicTracking = prerenderStore.dynamicTracking;
+      if (dynamicTracking) {
+        dynamicTracking.dynamicAccesses.push({
+          // When we aren't debugging, we don't need to create another error for the
+          // stack trace.
+          stack: dynamicTracking.isDebugDynamicAccesses ? new Error().stack : void 0,
+          expression
+        });
+      }
+    }
+    function abortOnSynchronousPlatformIOAccess(route, expression, errorWithStack, prerenderStore) {
+      const dynamicTracking = prerenderStore.dynamicTracking;
+      if (dynamicTracking && dynamicTracking.syncDynamicErrorWithStack === null) {
+        dynamicTracking.syncDynamicErrorWithStack = errorWithStack;
+        queueMicrotask(() => {
+          dynamicTracking.syncDynamicErrorWithStackPostMicrotask = true;
+        });
+      }
+      abortOnSynchronousDynamicDataAccess(route, expression, prerenderStore);
+    }
+    function abortAndThrowOnSynchronousRequestDataAccess(route, expression, errorWithStack, prerenderStore) {
+      const prerenderSignal = prerenderStore.controller.signal;
+      if (prerenderSignal.aborted === false) {
+        abortOnSynchronousDynamicDataAccess(route, expression, prerenderStore);
+        const dynamicTracking = prerenderStore.dynamicTracking;
+        if (dynamicTracking) {
+          if (dynamicTracking.syncDynamicErrorWithStack === null) {
+            dynamicTracking.syncDynamicErrorWithStack = errorWithStack;
+          }
+        }
+      }
+      throw createPrerenderInterruptedError(`Route ${route} needs to bail out of prerendering at this point because it used ${expression}.`);
+    }
+    var NEXT_PRERENDER_INTERRUPTED = "NEXT_PRERENDER_INTERRUPTED";
+    function createPrerenderInterruptedError(message) {
+      const error = new Error(message);
+      error.digest = NEXT_PRERENDER_INTERRUPTED;
+      return error;
+    }
+    function isPrerenderInterruptedError(error) {
+      return typeof error === "object" && error !== null && error.digest === NEXT_PRERENDER_INTERRUPTED && "name" in error && "message" in error && error instanceof Error;
+    }
+    function accessedDynamicData(dynamicAccesses) {
+      return dynamicAccesses.length > 0;
+    }
+    function consumeDynamicAccess(serverDynamic, clientDynamic) {
+      serverDynamic.dynamicAccesses.push(...clientDynamic.dynamicAccesses);
+      return serverDynamic.dynamicAccesses;
+    }
+    function formatDynamicAPIAccesses(dynamicAccesses) {
+      return dynamicAccesses.filter((access) => typeof access.stack === "string" && access.stack.length > 0).map(({ expression, stack }) => {
+        stack = stack.split("\n").slice(4).filter((line) => {
+          if (line.includes("node_modules/next/")) {
+            return false;
+          }
+          if (line.includes(" (<anonymous>)")) {
+            return false;
+          }
+          if (line.includes(" (node:")) {
+            return false;
+          }
+          return true;
+        }).join("\n");
+        return `Dynamic API Usage Debug - ${expression}:
+${stack}`;
+      });
+    }
+    function createHangingInputAbortSignal(workUnitStore) {
+      switch (workUnitStore.type) {
+        case "prerender":
+        case "prerender-runtime":
+          const controller = new AbortController();
+          if (workUnitStore.cacheSignal) {
+            workUnitStore.cacheSignal.inputReady().then(() => {
+              controller.abort();
+            });
+          } else {
+            const stagedRendering = (0, _workunitasyncstorageexternal.getStagedRenderingController)(workUnitStore);
+            if (stagedRendering && stagedRendering.finalStage !== null) {
+              stagedRendering.waitForStage(stagedRendering.finalStage).then(() => (0, _scheduler.scheduleOnNextTick)(() => controller.abort()), noop);
+            } else {
+              (0, _scheduler.scheduleOnNextTick)(() => controller.abort());
+            }
+          }
+          return controller.signal;
+        case "prerender-client":
+        case "validation-client":
+        case "prerender-legacy":
+        case "request":
+        case "cache":
+        case "private-cache":
+        case "unstable-cache":
+        case "build-time-generator":
+          return void 0;
+        default:
+          workUnitStore;
+      }
+    }
+    function noop() {
+    }
+    function annotateDynamicAccess(expression, prerenderStore) {
+      const dynamicTracking = prerenderStore.dynamicTracking;
+      if (dynamicTracking) {
+        dynamicTracking.dynamicAccesses.push({
+          stack: dynamicTracking.isDebugDynamicAccesses ? new Error().stack : void 0,
+          expression
+        });
+      }
+    }
+    var hasSuspenseRegex = /\n\s+at Suspense \(<anonymous>\)/;
+    var bodyAndImplicitTags = "body|div|main|section|article|aside|header|footer|nav|form|p|span|h1|h2|h3|h4|h5|h6";
+    var hasSuspenseBeforeRootLayoutWithoutBodyOrImplicitBodyRegex = new RegExp(`\\n\\s+at Suspense \\(<anonymous>\\)(?:(?!\\n\\s+at (?:${bodyAndImplicitTags}) \\(<anonymous>\\))[\\s\\S])*?\\n\\s+at ${_boundaryconstants.ROOT_LAYOUT_BOUNDARY_NAME} \\([^\\n]*\\)`);
+    var hasMetadataRegex = new RegExp(`\\n\\s+at ${_boundaryconstants.METADATA_BOUNDARY_NAME}[\\n\\s]`);
+    var hasViewportRegex = new RegExp(`\\n\\s+at ${_boundaryconstants.VIEWPORT_BOUNDARY_NAME}[\\n\\s]`);
+    var hasOutletRegex = new RegExp(`\\n\\s+at ${_boundaryconstants.OUTLET_BOUNDARY_NAME}[\\n\\s]`);
+    var hasInstantValidationBoundaryRegex = new RegExp(`\\n\\s+at ${_boundaryconstants1.INSTANT_VALIDATION_BOUNDARY_NAME}[\\n\\s]`);
+    var slotMarkerRegex = new RegExp(`\\n\\s+at ${_boundaryconstants1.INSTANT_SLOT_MARKER_PREFIX}(\\d+)${_boundaryconstants1.INSTANT_SLOT_MARKER_SUFFIX}[\\n\\s]`);
+    function resolveInstantStack(componentStack, dynamicValidation) {
+      const { slotStacks } = dynamicValidation;
+      if (slotStacks.length > 1) {
+        const match = slotMarkerRegex.exec(componentStack);
+        if (match) {
+          const slotIndex = parseInt(match[1], 10) + 1;
+          const slotStack = slotStacks[slotIndex];
+          if (slotStack != null) {
+            return slotStack;
+          }
+        }
+      }
+      return slotStacks[0] ?? null;
+    }
+    function trackOutletSuspenseAboveBody(componentStack, dynamicValidation) {
+      if (hasSuspenseBeforeRootLayoutWithoutBodyOrImplicitBodyRegex.test(componentStack)) {
+        dynamicValidation.hasSuspenseAboveBody = true;
+      }
+    }
+    function trackDynamicAccessInStaticRoute(dynamicReason, workStore, componentStack, dynamicValidation, clientDynamic, isServerPartial, kind) {
+      const syncDynamicError = getPendingClientSyncDynamicError(clientDynamic);
+      if (hasOutletRegex.test(componentStack)) {
+        trackOutletSuspenseAboveBody(componentStack, dynamicValidation);
+        return;
+      }
+      if (hasMetadataRegex.test(componentStack)) {
+        dynamicValidation.dynamicErrors.push(addErrorContext(createMetadataErrorInStaticRoute(kind, workStore.route), componentStack, null));
+        return;
+      }
+      if (hasViewportRegex.test(componentStack)) {
+        dynamicValidation.dynamicErrors.push(addErrorContext(createViewportErrorInStaticRoute(kind, workStore.route), componentStack, null));
+        return;
+      }
+      let hasSuspense = false;
+      if (hasSuspenseBeforeRootLayoutWithoutBodyOrImplicitBodyRegex.test(componentStack)) {
+        dynamicValidation.hasSuspenseAboveBody = true;
+        hasSuspense = true;
+      } else if (hasSuspenseRegex.test(componentStack)) {
+        hasSuspense = true;
+      }
+      if (hasSuspense) {
+        if (!isServerPartial) {
+          dynamicValidation.hasAllowedDynamic = true;
+          return;
+        }
+        if (syncDynamicError || (0, _dynamicrenderingutils.isClientHookDynamicError)(dynamicReason)) {
+          dynamicValidation.hasAllowedDynamic = true;
+          return;
+        }
+        dynamicValidation.dynamicErrors.push(addErrorContext(createBodyErrorInStaticRoute(kind, workStore.route), componentStack, null));
+        return;
+      }
+      if (syncDynamicError) {
+        dynamicValidation.dynamicErrors.push(syncDynamicError);
+        return;
+      }
+      if ((0, _dynamicrenderingutils.isClientHookDynamicError)(dynamicReason)) {
+        dynamicValidation.dynamicErrors.push(addErrorContext(dynamicReason, componentStack, null));
+        return;
+      }
+      const error = addErrorContext(isServerPartial ? (
+        // (NOTE: this may misreport client dynamic holes as server holes)
+        createBodyErrorInStaticRoute(kind, workStore.route)
+      ) : (
+        // that server data is complete
+        createBodyError(kind, workStore.route)
+      ), componentStack, null);
+      dynamicValidation.dynamicErrors.push(error);
+    }
+    function trackAllowedDynamicAccess(dynamicReason, workStore, componentStack, dynamicValidation, clientDynamic) {
+      const dynamicHoleKind = 6;
+      const syncDynamicError = getPendingClientSyncDynamicError(clientDynamic);
+      if (hasOutletRegex.test(componentStack)) {
+        trackOutletSuspenseAboveBody(componentStack, dynamicValidation);
+        return;
+      } else if (hasMetadataRegex.test(componentStack)) {
+        dynamicValidation.hasDynamicMetadata = true;
+        return;
+      } else if (hasViewportRegex.test(componentStack)) {
+        dynamicValidation.hasDynamicViewport = true;
+        return;
+      } else if (hasSuspenseBeforeRootLayoutWithoutBodyOrImplicitBodyRegex.test(componentStack)) {
+        dynamicValidation.hasAllowedDynamic = true;
+        dynamicValidation.hasSuspenseAboveBody = true;
+        return;
+      } else if (hasSuspenseRegex.test(componentStack)) {
+        dynamicValidation.hasAllowedDynamic = true;
+        return;
+      } else if (syncDynamicError) {
+        dynamicValidation.dynamicErrors.push(syncDynamicError);
+        return;
+      }
+      if ((0, _dynamicrenderingutils.isClientHookDynamicError)(dynamicReason)) {
+        dynamicValidation.dynamicErrors.push(addErrorContext(dynamicReason, componentStack, null));
+        return;
+      }
+      const error = addErrorContext(createBodyError(dynamicHoleKind, workStore.route), componentStack, null);
+      dynamicValidation.dynamicErrors.push(error);
+      return;
+    }
+    var DynamicHoleKind = /* @__PURE__ */ (function(DynamicHoleKind2) {
+      DynamicHoleKind2[DynamicHoleKind2["Runtime"] = 1] = "Runtime";
+      DynamicHoleKind2[DynamicHoleKind2["Link"] = 2] = "Link";
+      DynamicHoleKind2[DynamicHoleKind2["Navigation"] = 3] = "Navigation";
+      DynamicHoleKind2[DynamicHoleKind2["Prefetch"] = 4] = "Prefetch";
+      DynamicHoleKind2[DynamicHoleKind2["Dynamic"] = 5] = "Dynamic";
+      DynamicHoleKind2[DynamicHoleKind2["RuntimeOrDynamic"] = 6] = "RuntimeOrDynamic";
+      return DynamicHoleKind2;
+    })({});
+    function createInstantValidationState(slotStacks) {
+      return {
+        hasDynamicMetadata: false,
+        hasAllowedClientDynamicAboveBoundary: false,
+        dynamicMetadata: null,
+        hasDynamicViewport: false,
+        hasAllowedDynamic: false,
+        dynamicErrors: [],
+        validationPreventingErrors: [],
+        thrownErrorsOutsideBoundary: [],
+        slotStacks
+      };
+    }
+    function trackDynamicHoleInNavigation(dynamicReason, workStore, componentStack, dynamicValidation, clientDynamic, kind, boundaryState) {
+      const syncDynamicError = getPendingClientSyncDynamicError(clientDynamic);
+      if (hasOutletRegex.test(componentStack)) {
+        return;
+      }
+      const effectiveCreateInstantStack = resolveInstantStack(componentStack, dynamicValidation);
+      if (hasMetadataRegex.test(componentStack)) {
+        const error2 = addErrorContext(createMetadataError(kind, workStore.route), componentStack, effectiveCreateInstantStack);
+        dynamicValidation.dynamicMetadata = error2;
+        return;
+      }
+      if (hasViewportRegex.test(componentStack)) {
+        const error2 = addErrorContext(createViewportError(kind, workStore.route), componentStack, effectiveCreateInstantStack);
+        dynamicValidation.dynamicErrors.push(error2);
+        return;
+      }
+      const boundaryLocation = hasInstantValidationBoundaryRegex.exec(componentStack);
+      if (!boundaryLocation) {
+        if ((0, _boundarytracking.allRequiredBoundariesRendered)(boundaryState)) {
+          dynamicValidation.hasAllowedClientDynamicAboveBoundary = true;
+          dynamicValidation.hasAllowedDynamic = true;
+          return;
+        } else {
+          const message = `Route "${workStore.route}": Could not validate \`instant\` because a Client Component in a parent segment prevented the page from rendering.`;
+          const error2 = addErrorContext(new Error(message), componentStack, effectiveCreateInstantStack);
+          dynamicValidation.validationPreventingErrors.push(error2);
+          return;
+        }
+      } else {
+        const suspenseLocation = hasSuspenseRegex.exec(componentStack);
+        if (suspenseLocation) {
+          if (suspenseLocation.index < boundaryLocation.index) {
+            dynamicValidation.hasAllowedDynamic = true;
+            return;
+          } else {
+          }
+        }
+      }
+      if (syncDynamicError) {
+        if (effectiveCreateInstantStack !== null && syncDynamicError.cause === void 0) {
+          syncDynamicError.cause = effectiveCreateInstantStack();
+        }
+        dynamicValidation.dynamicErrors.push(syncDynamicError);
+        return;
+      }
+      if ((0, _dynamicrenderingutils.isClientHookDynamicError)(dynamicReason)) {
+        dynamicValidation.dynamicErrors.push(addErrorContext(dynamicReason, componentStack, effectiveCreateInstantStack));
+        return;
+      }
+      const error = addErrorContext(createBodyErrorInNavigation(kind, workStore.route), componentStack, effectiveCreateInstantStack);
+      dynamicValidation.dynamicErrors.push(error);
+      return;
+    }
+    function createBodyError(kind, route) {
+      switch (kind) {
+        case 1:
+          return (0, _blockingroutemessages.createRuntimeBodyError)(route);
+        case 5:
+          return (0, _blockingroutemessages.createDynamicBodyError)(route);
+        case 6:
+          return (0, _blockingroutemessages.createDynamicOrRuntimeBodyError)(route);
+      }
+    }
+    function createBodyErrorInNavigation(kind, route) {
+      switch (kind) {
+        case 1:
+          return (0, _blockingroutemessages.createRuntimeBodyErrorInNavigation)(route);
+        case 2:
+          return (0, _blockingroutemessages.createLinkBodyErrorInNavigation)(route);
+        case 3:
+          return (0, _blockingroutemessages.createNavigationBodyErrorInNavigation)(route);
+        case 4:
+          return (0, _blockingroutemessages.createPrefetchBodyErrorInNavigation)(route);
+        case 5:
+          return (0, _blockingroutemessages.createDynamicBodyErrorInNavigation)(route);
+      }
+    }
+    function createMetadataError(kind, route) {
+      switch (kind) {
+        case 1:
+          return (0, _blockingroutemessages.createRuntimeMetadataError)(route);
+        case 2:
+          return (0, _blockingroutemessages.createLinkMetadataError)(route);
+        case 3:
+          return (0, _blockingroutemessages.createNavigationMetadataError)(route);
+        case 4:
+          return (0, _blockingroutemessages.createPrefetchMetadataError)(route);
+        case 5:
+          return (0, _blockingroutemessages.createDynamicMetadataError)(route);
+        case 6:
+          return (0, _blockingroutemessages.createDynamicOrRuntimeMetadataError)(route);
+      }
+    }
+    function createViewportError(kind, route) {
+      switch (kind) {
+        case 1:
+          return (0, _blockingroutemessages.createRuntimeViewportError)(route);
+        case 2:
+          return (0, _blockingroutemessages.createLinkViewportError)(route);
+        case 3:
+          return (0, _blockingroutemessages.createNavigationViewportError)(route);
+        case 4:
+          return (0, _blockingroutemessages.createPrefetchViewportError)(route);
+        case 5:
+          return (0, _blockingroutemessages.createDynamicViewportError)(route);
+        case 6:
+          return (0, _blockingroutemessages.createDynamicOrRuntimeViewportError)(route);
+      }
+    }
+    function createBodyErrorInStaticRoute(kind, route) {
+      switch (kind) {
+        case 1:
+          return (0, _blockingroutemessages.createRuntimeBodyErrorInStaticRoute)(route);
+        case 5:
+          return (0, _blockingroutemessages.createDynamicBodyErrorInStaticRoute)(route);
+        case 6:
+          return (0, _blockingroutemessages.createNonPrerenderableBodyErrorInStaticRoute)(route);
+      }
+    }
+    function createMetadataErrorInStaticRoute(kind, route) {
+      switch (kind) {
+        case 1:
+          return (0, _blockingroutemessages.createRuntimeMetadataErrorInStaticRoute)(route);
+        case 5:
+          return (0, _blockingroutemessages.createDynamicMetadataErrorInStaticRoute)(route);
+        case 6:
+          return (0, _blockingroutemessages.createNonPrerenderableMetadataErrorInStaticRoute)(route);
+      }
+    }
+    function createViewportErrorInStaticRoute(kind, route) {
+      switch (kind) {
+        case 1:
+          return (0, _blockingroutemessages.createRuntimeViewportErrorInStaticRoute)(route);
+        case 5:
+          return (0, _blockingroutemessages.createDynamicViewportErrorInStaticRoute)(route);
+        case 6:
+          return (0, _blockingroutemessages.createNonPrerenderableViewportErrorInStaticRoute)(route);
+      }
+    }
+    function trackThrownErrorInNavigation(workStore, dynamicValidation, thrownValue, componentStack, reactBrowserBailout) {
+      const boundaryLocation = hasInstantValidationBoundaryRegex.exec(componentStack);
+      if (!boundaryLocation) {
+        if (reactBrowserBailout) {
+          const browserBailoutReason = (0, _reactbrowserbailout.getReactBrowserBailoutReason)(thrownValue);
+          if (browserBailoutReason !== void 0) {
+            const browserBailoutError = thrownValue;
+            browserBailoutError.cause = browserBailoutReason;
+          }
+        }
+        const error = addErrorContext(new Error("An error occurred while attempting to validate instant UI. This error may be preventing the validation from completing.", {
+          cause: thrownValue
+        }), componentStack, null);
+        dynamicValidation.thrownErrorsOutsideBoundary.push(error);
+      } else {
+        const suspenseLocation = hasSuspenseRegex.exec(componentStack);
+        if (suspenseLocation) {
+          if (suspenseLocation.index < boundaryLocation.index) {
+            return;
+          } else {
+          }
+        }
+        if (reactBrowserBailout) {
+          const browserBailoutReason = (0, _reactbrowserbailout.getReactBrowserBailoutReason)(thrownValue);
+          if (browserBailoutReason !== void 0) {
+            const browserBailoutError = thrownValue;
+            browserBailoutError.cause = browserBailoutReason;
+          }
+        }
+        const message = `Route "${workStore.route}": Could not validate \`instant\` because an error prevented the target segment from rendering.`;
+        const error = addErrorContext(
+          new Error(message, {
+            cause: thrownValue
+          }),
+          componentStack,
+          null
+          // TODO(instant-validation-build): conflicting use of cause
+        );
+        dynamicValidation.validationPreventingErrors.push(error);
+      }
+    }
+    function trackDynamicHoleInStaticShell(dynamicReason, workStore, componentStack, dynamicValidation, clientDynamic, kind) {
+      const syncDynamicError = getPendingClientSyncDynamicError(clientDynamic);
+      if (hasOutletRegex.test(componentStack)) {
+        trackOutletSuspenseAboveBody(componentStack, dynamicValidation);
+        return;
+      } else if (hasMetadataRegex.test(componentStack)) {
+        const error2 = addErrorContext(createMetadataError(kind, workStore.route), componentStack, null);
+        dynamicValidation.dynamicMetadata = error2;
+        return;
+      } else if (hasViewportRegex.test(componentStack)) {
+        const error2 = addErrorContext(createViewportError(kind, workStore.route), componentStack, null);
+        dynamicValidation.dynamicErrors.push(error2);
+        return;
+      } else if (hasSuspenseBeforeRootLayoutWithoutBodyOrImplicitBodyRegex.test(componentStack)) {
+        dynamicValidation.hasAllowedDynamic = true;
+        dynamicValidation.hasSuspenseAboveBody = true;
+        return;
+      } else if (hasSuspenseRegex.test(componentStack)) {
+        dynamicValidation.hasAllowedDynamic = true;
+        return;
+      } else if (syncDynamicError) {
+        dynamicValidation.dynamicErrors.push(syncDynamicError);
+        return;
+      }
+      if ((0, _dynamicrenderingutils.isClientHookDynamicError)(dynamicReason)) {
+        dynamicValidation.dynamicErrors.push(addErrorContext(dynamicReason, componentStack, null));
+        return;
+      }
+      const error = addErrorContext(kind === 1 ? (0, _blockingroutemessages.createRuntimeBodyError)(workStore.route) : (0, _blockingroutemessages.createDynamicBodyError)(workStore.route), componentStack, null);
+      dynamicValidation.dynamicErrors.push(error);
+      return;
+    }
+    function addErrorContext(error, componentStack, createInstantStack) {
+      const ownerStack = process.env.NODE_ENV !== "production" && _react.default.captureOwnerStack ? _react.default.captureOwnerStack() : null;
+      if (createInstantStack !== null) {
+        error.cause = createInstantStack();
+      }
+      error.stack = error.name + ": " + error.message + (ownerStack || componentStack);
+      return error;
+    }
+    var PreludeState = /* @__PURE__ */ (function(PreludeState2) {
+      PreludeState2[PreludeState2["Full"] = 0] = "Full";
+      PreludeState2[PreludeState2["Empty"] = 1] = "Empty";
+      PreludeState2[PreludeState2["Errored"] = 2] = "Errored";
+      return PreludeState2;
+    })({});
+    function logDisallowedDynamicError(workStore, error) {
+      console.error(error);
+      (0, _blockingroutemessages.logBuildDebugHint)(workStore.route);
+    }
+    function throwIfSyncIOUsed(workStore, serverDynamic) {
+      if (serverDynamic.syncDynamicErrorWithStack) {
+        logDisallowedDynamicError(workStore, serverDynamic.syncDynamicErrorWithStack);
+        throw new _staticgenerationbailout.StaticGenBailoutError();
+      }
+    }
+    function throwIfDisallowedDynamic(workStore, prelude, dynamicValidation, serverDynamic, allowEmptyStaticShell) {
+      const dynamicHoleKind = 6;
+      throwIfSyncIOUsed(workStore, serverDynamic);
+      if (prelude === 0 && dynamicValidation.hasAllowedDynamic === false && dynamicValidation.hasDynamicMetadata) {
+        console.error(createMetadataError(dynamicHoleKind, workStore.route).message);
+        throw new _staticgenerationbailout.StaticGenBailoutError();
+      }
+      if (allowEmptyStaticShell || dynamicValidation.hasSuspenseAboveBody) {
+        return;
+      }
+      if (prelude !== 0) {
+        const dynamicErrors = dynamicValidation.dynamicErrors;
+        if (dynamicErrors.length > 0) {
+          for (let i = 0; i < dynamicErrors.length; i++) {
+            logDisallowedDynamicError(workStore, dynamicErrors[i]);
+          }
+          throw new _staticgenerationbailout.StaticGenBailoutError();
+        }
+        if (dynamicValidation.hasDynamicViewport) {
+          console.error(createViewportError(dynamicHoleKind, workStore.route).message);
+          throw new _staticgenerationbailout.StaticGenBailoutError();
+        }
+        if (prelude === 1) {
+          console.error(`Route "${workStore.route}" did not produce a static shell and Next.js was unable to determine a reason. This is a bug in Next.js.`);
+          throw new _staticgenerationbailout.StaticGenBailoutError();
+        }
+      }
+    }
+    function throwIfDisallowedDynamicInStaticRoute(workStore, prelude, dynamicValidation, serverDynamic, isFallbackShell, allowEmptyStaticShell, isServerPartial) {
+      const reasons = getDisallowedReasonsInStaticRoute(workStore, prelude, dynamicValidation, serverDynamic, isFallbackShell, allowEmptyStaticShell, isServerPartial);
+      if (reasons.length > 0) {
+        for (const reason of reasons) {
+          logDisallowedDynamicError(workStore, reason);
+        }
+        throw new _staticgenerationbailout.StaticGenBailoutError();
+      }
+    }
+    function getDisallowedReasonsInStaticRoute(workStore, prelude, dynamicValidation, serverDynamic, isFallbackShell, allowEmptyStaticShell, isServerPartial) {
+      if (serverDynamic && serverDynamic.syncDynamicErrorWithStack) {
+        return [
+          serverDynamic.syncDynamicErrorWithStack
+        ];
+      }
+      if (isFallbackShell) {
+        return [];
+      }
+      if (!isServerPartial && (allowEmptyStaticShell || dynamicValidation.hasSuspenseAboveBody)) {
+        return [];
+      }
+      const { dynamicErrors } = dynamicValidation;
+      if (dynamicErrors.length > 0) {
+        return dynamicErrors;
+      }
+      if (isServerPartial) {
+        return [
+          new Error(`Route "${workStore.route}": Next.js encountered data that is not available during a static prerender, but is unable to provide a location.`)
+        ];
+      }
+      if (prelude === 1 || prelude === 2) {
+        return [
+          new _invarianterror.InvariantError(`Route "${workStore.route}" did not produce a static shell and Next.js was unable to determine a reason.`)
+        ];
+      }
+      return [];
+    }
+    function getStaticShellDisallowedDynamicReasons(workStore, prelude, dynamicValidation, allowEmptyStaticShell) {
+      if (prelude === 0 && dynamicValidation.hasAllowedDynamic === false && dynamicValidation.dynamicErrors.length === 0 && dynamicValidation.dynamicMetadata) {
+        return [
+          dynamicValidation.dynamicMetadata
+        ];
+      }
+      if (allowEmptyStaticShell || dynamicValidation.hasSuspenseAboveBody) {
+        return [];
+      }
+      if (prelude !== 0) {
+        const dynamicErrors = dynamicValidation.dynamicErrors;
+        if (dynamicErrors.length > 0) {
+          return dynamicErrors;
+        }
+        if (prelude === 1) {
+          return [
+            new _invarianterror.InvariantError(`Route "${workStore.route}" did not produce a static shell and Next.js was unable to determine a reason.`)
+          ];
+        }
+      }
+      return [];
+    }
+    function getNavigationDisallowedDynamicReasons(workStore, prelude, dynamicValidation, validationSampleTracking, boundaryState, devRenderDidError) {
+      if (validationSampleTracking) {
+        const { missingSampleErrors } = validationSampleTracking;
+        if (missingSampleErrors.length > 0) {
+          return missingSampleErrors;
+        }
+      }
+      const { validationPreventingErrors } = dynamicValidation;
+      if (validationPreventingErrors.length > 0) {
+        if (process.env.__NEXT_DEV_SERVER && devRenderDidError) {
+          return [];
+        }
+        return validationPreventingErrors;
+      }
+      if (prelude !== 0) {
+        const dynamicErrors = dynamicValidation.dynamicErrors;
+        if (dynamicErrors.length > 0) {
+          return dynamicErrors;
+        }
+        if (prelude === 1 && !dynamicValidation.hasAllowedClientDynamicAboveBoundary && (0, _boundarytracking.allRequiredBoundariesRendered)(boundaryState)) {
+          return new _invarianterror.InvariantError(`Route "${workStore.route}" failed to render during instant validation and Next.js was unable to determine a reason.`);
+        }
+      } else {
+        const dynamicErrors = dynamicValidation.dynamicErrors;
+        if (dynamicErrors.length > 0) {
+          return dynamicErrors;
+        }
+        if (dynamicValidation.hasAllowedDynamic === false && dynamicValidation.dynamicMetadata) {
+          return [
+            dynamicValidation.dynamicMetadata
+          ];
+        }
+      }
+      if (!(0, _boundarytracking.allRequiredBoundariesRendered)(boundaryState)) {
+        const { thrownErrorsOutsideBoundary } = dynamicValidation;
+        const rootInstantStack = dynamicValidation.slotStacks[0];
+        if (thrownErrorsOutsideBoundary.length === 0) {
+          const missingFiles = [];
+          for (const [id, filePaths] of boundaryState.requiredIds) {
+            if (!boundaryState.renderedIds.has(id)) {
+              for (const filePath of filePaths) {
+                let normalized = filePath.replace(/^\[project\][\\/]?/, "").replace(process.cwd() + "/", "").replace(process.cwd() + "\\", "");
+                missingFiles.push(normalized);
+              }
+            }
+          }
+          missingFiles.sort();
+          return (0, _instantmessages.createUnrenderedSegmentError)(workStore.route, missingFiles);
+        } else if (process.env.__NEXT_DEV_SERVER && devRenderDidError) {
+          return [];
+        } else if (thrownErrorsOutsideBoundary.length === 1) {
+          const message = `Route "${workStore.route}": Could not validate \`instant\` because the target segment was prevented from rendering, likely due to the following error.`;
+          const error = rootInstantStack !== null ? rootInstantStack() : new Error();
+          error.name = "Error";
+          error.message = message;
+          return new AggregateError([
+            error,
+            thrownErrorsOutsideBoundary[0]
+          ]);
+        } else {
+          const message = `Route "${workStore.route}": Could not validate \`instant\` because the target segment was prevented from rendering, likely due to one of the following errors.`;
+          const error = rootInstantStack !== null ? rootInstantStack() : new Error();
+          error.name = "Error";
+          error.message = message;
+          return new AggregateError([
+            error,
+            ...thrownErrorsOutsideBoundary
+          ]);
+        }
+      }
+      return [];
+    }
+  }
+});
+
+// node_modules/next/dist/server/app-render/action-async-storage-instance.js
+var require_action_async_storage_instance = __commonJS({
+  "node_modules/next/dist/server/app-render/action-async-storage-instance.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "actionAsyncStorageInstance", {
+      enumerable: true,
+      get: function() {
+        return actionAsyncStorageInstance;
+      }
+    });
+    var _asynclocalstorage = require_async_local_storage();
+    var actionAsyncStorageInstance = (0, _asynclocalstorage.getOrCreateGlobalAsyncLocalStorage)("action-async-storage");
+  }
+});
+
+// node_modules/next/dist/server/app-render/action-async-storage.external.js
+var require_action_async_storage_external = __commonJS({
+  "node_modules/next/dist/server/app-render/action-async-storage.external.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "actionAsyncStorage", {
+      enumerable: true,
+      get: function() {
+        return _actionasyncstorageinstance.actionAsyncStorageInstance;
+      }
+    });
+    var _actionasyncstorageinstance = require_action_async_storage_instance();
+  }
+});
+
+// node_modules/next/dist/server/app-render/after-task-async-storage-instance.js
+var require_after_task_async_storage_instance = __commonJS({
+  "node_modules/next/dist/server/app-render/after-task-async-storage-instance.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "afterTaskAsyncStorageInstance", {
+      enumerable: true,
+      get: function() {
+        return afterTaskAsyncStorageInstance;
+      }
+    });
+    var _asynclocalstorage = require_async_local_storage();
+    var afterTaskAsyncStorageInstance = (0, _asynclocalstorage.getOrCreateGlobalAsyncLocalStorage)("after-task-async-storage");
+  }
+});
+
+// node_modules/next/dist/server/app-render/after-task-async-storage.external.js
+var require_after_task_async_storage_external = __commonJS({
+  "node_modules/next/dist/server/app-render/after-task-async-storage.external.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "afterTaskAsyncStorage", {
+      enumerable: true,
+      get: function() {
+        return _aftertaskasyncstorageinstance.afterTaskAsyncStorageInstance;
+      }
+    });
+    var _aftertaskasyncstorageinstance = require_after_task_async_storage_instance();
+  }
+});
+
+// node_modules/next/dist/server/use-cache/use-cache-messages.js
+var require_use_cache_messages = __commonJS({
+  "node_modules/next/dist/server/use-cache/use-cache-messages.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      createCacheLifeOutsideUseCacheError: function() {
+        return createCacheLifeOutsideUseCacheError;
+      },
+      createCacheTagOutsideUseCacheError: function() {
+        return createCacheTagOutsideUseCacheError;
+      },
+      createConnectionInPrivateUseCacheError: function() {
+        return createConnectionInPrivateUseCacheError;
+      },
+      createConnectionInPublicUseCacheError: function() {
+        return createConnectionInPublicUseCacheError;
+      },
+      createConnectionInUnstableCacheError: function() {
+        return createConnectionInUnstableCacheError;
+      },
+      createCookiesInUnstableCacheError: function() {
+        return createCookiesInUnstableCacheError;
+      },
+      createCookiesInUseCacheError: function() {
+        return createCookiesInUseCacheError;
+      },
+      createDraftModeMutationInUnstableCacheError: function() {
+        return createDraftModeMutationInUnstableCacheError;
+      },
+      createDraftModeMutationInUseCacheError: function() {
+        return createDraftModeMutationInUseCacheError;
+      },
+      createHeadersInUnstableCacheError: function() {
+        return createHeadersInUnstableCacheError;
+      },
+      createHeadersInUseCacheError: function() {
+        return createHeadersInUseCacheError;
+      },
+      createNestedCacheShortExpireError: function() {
+        return createNestedCacheShortExpireError;
+      },
+      createNestedCacheZeroRevalidateError: function() {
+        return createNestedCacheZeroRevalidateError;
+      },
+      createRevalidateDuringRenderError: function() {
+        return createRevalidateDuringRenderError;
+      },
+      createRevalidateInBuildTimeGeneratorError: function() {
+        return createRevalidateInBuildTimeGeneratorError;
+      },
+      createRevalidateInCachedFunctionError: function() {
+        return createRevalidateInCachedFunctionError;
+      },
+      createRouteHandlerRequestInUnstableCacheError: function() {
+        return createRouteHandlerRequestInUnstableCacheError;
+      },
+      createRouteHandlerRequestInUseCacheError: function() {
+        return createRouteHandlerRequestInUseCacheError;
+      },
+      createSearchParamsInUseCacheError: function() {
+        return createSearchParamsInUseCacheError;
+      },
+      createUseCachePrivateInsidePublicUseCacheError: function() {
+        return createUseCachePrivateInsidePublicUseCacheError;
+      },
+      createUseCachePrivateInsideUnstableCacheError: function() {
+        return createUseCachePrivateInsideUnstableCacheError;
+      },
+      createUseCachePrivateOutsideRequestContextError: function() {
+        return createUseCachePrivateOutsideRequestContextError;
+      }
+    });
+    var NEXT_REQUEST_IN_USE_CACHE = "https://nextjs.org/docs/messages/next-request-in-use-cache";
+    var UNSTABLE_CACHE_API_DOCS = "https://nextjs.org/docs/app/api-reference/functions/unstable_cache";
+    var USE_CACHE_PRIVATE_API_DOCS = "https://nextjs.org/docs/app/api-reference/directives/use-cache-private";
+    var CACHE_TAG_OUTSIDE_USE_CACHE = "https://nextjs.org/docs/messages/cache-tag-outside-use-cache";
+    var CACHE_LIFE_OUTSIDE_USE_CACHE = "https://nextjs.org/docs/messages/cache-life-outside-use-cache";
+    var USE_CACHE_PRIVATE_COMPOSITION = "https://nextjs.org/docs/messages/use-cache-private-composition";
+    var REVALIDATE_IN_USE_CACHE = "https://nextjs.org/docs/messages/revalidate-in-use-cache";
+    var NESTED_USE_CACHE_NO_EXPLICIT_CACHELIFE = "https://nextjs.org/docs/messages/nested-use-cache-no-explicit-cachelife";
+    function createCookiesInUseCacheError(route) {
+      return new Error(`Route "${route}": \`cookies()\` can't be read inside \`"use cache"\`. Read it outside the cached function and pass what you need as an argument.
+Learn more: ${NEXT_REQUEST_IN_USE_CACHE}`);
+    }
+    function createCookiesInUnstableCacheError(route) {
+      return new Error(`Route "${route}": \`cookies()\` can't be read inside \`unstable_cache()\`. Read it outside the cached function and pass what you need as an argument.
+Learn more: ${UNSTABLE_CACHE_API_DOCS}`);
+    }
+    function createHeadersInUseCacheError(route) {
+      return new Error(`Route "${route}": \`headers()\` can't be read inside \`"use cache"\`. Read it outside the cached function and pass what you need as an argument.
+Learn more: ${NEXT_REQUEST_IN_USE_CACHE}`);
+    }
+    function createHeadersInUnstableCacheError(route) {
+      return new Error(`Route "${route}": \`headers()\` can't be read inside \`unstable_cache()\`. Read it outside the cached function and pass what you need as an argument.
+Learn more: ${UNSTABLE_CACHE_API_DOCS}`);
+    }
+    function createSearchParamsInUseCacheError(route) {
+      return new Error(`Route "${route}": \`searchParams\` can't be read inside \`"use cache"\`. Await it outside the cached function and pass what you need as an argument.
+Learn more: ${NEXT_REQUEST_IN_USE_CACHE}`);
+    }
+    function createConnectionInPublicUseCacheError(route) {
+      return new Error(`Route "${route}": \`connection()\` can't be called inside \`"use cache"\` because cached functions may run during prerendering, without an incoming request. Call it outside the cached function.
+Learn more: ${NEXT_REQUEST_IN_USE_CACHE}`);
+    }
+    function createConnectionInPrivateUseCacheError(route) {
+      return new Error(`Route "${route}": \`connection()\` can't be called inside \`"use cache: private"\` because private cached functions may run during prefetching, without a navigation request. Call it outside the cached function.
+Learn more: ${USE_CACHE_PRIVATE_API_DOCS}`);
+    }
+    function createConnectionInUnstableCacheError(route) {
+      return new Error(`Route "${route}": \`connection()\` can't be called inside \`unstable_cache()\` because cached functions may run during prerendering, without an incoming request. Call it outside the cached function.
+Learn more: ${UNSTABLE_CACHE_API_DOCS}`);
+    }
+    function createRouteHandlerRequestInUseCacheError(route, expression) {
+      return new Error(`Route "${route}": \`${expression}\` can't be read inside \`"use cache"\`. Read it outside the cached function and pass what you need as an argument.
+Learn more: ${NEXT_REQUEST_IN_USE_CACHE}`);
+    }
+    function createRouteHandlerRequestInUnstableCacheError(route, expression) {
+      return new Error(`Route "${route}": \`${expression}\` can't be read inside \`unstable_cache()\`. Read it outside the cached function and pass what you need as an argument.
+Learn more: ${UNSTABLE_CACHE_API_DOCS}`);
+    }
+    function createDraftModeMutationInUseCacheError(route, expression) {
+      return new Error(`Route "${route}": \`${expression}\` can't be called inside \`"use cache"\`. Draft mode can be read inside a cached function, but enabling or disabling it must happen outside.
+Learn more: ${NEXT_REQUEST_IN_USE_CACHE}`);
+    }
+    function createDraftModeMutationInUnstableCacheError(route, expression) {
+      return new Error(`Route "${route}": \`${expression}\` can't be called inside \`unstable_cache()\`. Draft mode can be read inside a cached function, but enabling or disabling it must happen outside.
+Learn more: ${UNSTABLE_CACHE_API_DOCS}`);
+    }
+    function createRevalidateDuringRenderError(route, expression) {
+      return new Error(`Route "${route}": \`${expression}\` can't be called during render. Call it from a Server Action or Route Handler instead.
+Learn more: ${REVALIDATE_IN_USE_CACHE}`);
+    }
+    function createRevalidateInCachedFunctionError(route, expression) {
+      return new Error(`Route "${route}": \`${expression}\` can't be called inside a cached function. Call it from a Server Action or Route Handler instead.
+Learn more: ${REVALIDATE_IN_USE_CACHE}`);
+    }
+    function createRevalidateInBuildTimeGeneratorError(route, expression, generatorName) {
+      return new Error(`Route "${route}": \`${expression}\` can't be called inside \`${generatorName}\`. Call it from a Server Action or Route Handler instead.
+Learn more: ${REVALIDATE_IN_USE_CACHE}`);
+    }
+    function routePrefix(route) {
+      return route === void 0 ? "" : `Route "${route}": `;
+    }
+    function createCacheTagOutsideUseCacheError(route) {
+      return new Error(`${routePrefix(route)}\`cacheTag()\` can only be called inside a \`"use cache"\` or \`"use cache: private"\` function.
+Learn more: ${CACHE_TAG_OUTSIDE_USE_CACHE}`);
+    }
+    function createCacheLifeOutsideUseCacheError(route) {
+      return new Error(`${routePrefix(route)}\`cacheLife()\` can only be called inside a \`"use cache"\` or \`"use cache: private"\` function.
+Learn more: ${CACHE_LIFE_OUTSIDE_USE_CACHE}`);
+    }
+    function createNestedCacheZeroRevalidateError(route, cause) {
+      return new Error(`Route "${route}": A nested \`"use cache"\` with \`revalidate: 0\` is inside an outer \`"use cache"\` that has no \`cacheLife()\`. Add \`cacheLife()\` to the outer one to choose whether to prerender it with a non-zero \`revalidate\` or keep it dynamic with \`revalidate: 0\`.
+Learn more: ${NESTED_USE_CACHE_NO_EXPLICIT_CACHELIFE}`, {
+        cause
+      });
+    }
+    function createNestedCacheShortExpireError(route, cause) {
+      return new Error(`Route "${route}": A nested \`"use cache"\` with a short \`expire\` (under 5 minutes) is inside an outer \`"use cache"\` that has no \`cacheLife()\`. Add \`cacheLife()\` to the outer one to choose whether to prerender it with a longer \`expire\` or keep it dynamic with a short \`expire\`.
+Learn more: ${NESTED_USE_CACHE_NO_EXPLICIT_CACHELIFE}`, {
+        cause
+      });
+    }
+    function createUseCachePrivateInsidePublicUseCacheError(route) {
+      return new Error(`Route "${route}": \`"use cache: private"\` can't be nested inside \`"use cache"\` because a shared cached function can't depend on private request data. Nest it only inside another \`"use cache: private"\`.
+Learn more: ${USE_CACHE_PRIVATE_COMPOSITION}`);
+    }
+    function createUseCachePrivateInsideUnstableCacheError(route) {
+      return new Error(`Route "${route}": \`"use cache: private"\` can't be used inside \`unstable_cache()\` because \`unstable_cache()\` uses a shared cache that can't contain private request data. Call the private cached function outside \`unstable_cache()\`.
+Learn more: ${USE_CACHE_PRIVATE_COMPOSITION}`);
+    }
+    function createUseCachePrivateOutsideRequestContextError(route, functionName) {
+      return new Error(`Route "${route}": \`"use cache: private"\` needs an active request, so it can't be used during \`${functionName}\` or other build-time contexts. Move it to a request-time component or function.
+Learn more: ${USE_CACHE_PRIVATE_COMPOSITION}`);
+    }
+  }
+});
+
+// node_modules/next/dist/server/request/utils.js
+var require_utils6 = __commonJS({
+  "node_modules/next/dist/server/request/utils.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    function _export(target, all) {
+      for (var name in all) Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+      });
+    }
+    _export(exports2, {
+      isRequestApiAllowedInCurrentPhase: function() {
+        return isRequestApiAllowedInCurrentPhase;
+      },
+      throwForSearchParamsAccessInUseCache: function() {
+        return throwForSearchParamsAccessInUseCache;
+      },
+      throwWithStaticGenerationBailoutErrorWithDynamicError: function() {
+        return throwWithStaticGenerationBailoutErrorWithDynamicError;
+      }
+    });
+    var _staticgenerationbailout = require_static_generation_bailout();
+    var _actionasyncstorageexternal = require_action_async_storage_external();
+    var _aftertaskasyncstorageexternal = require_after_task_async_storage_external();
+    var _usecachemessages = require_use_cache_messages();
+    function throwWithStaticGenerationBailoutErrorWithDynamicError(route, expression) {
+      throw new _staticgenerationbailout.StaticGenBailoutError(`Route ${route} with \`dynamic = "error"\` couldn't be rendered statically because it used ${expression}. See more info here: https://nextjs.org/docs/app/building-your-application/rendering/static-and-dynamic#dynamic-rendering`);
+    }
+    function throwForSearchParamsAccessInUseCache(workStore, constructorOpt) {
+      const error = (0, _usecachemessages.createSearchParamsInUseCacheError)(workStore.route);
+      Error.captureStackTrace(error, constructorOpt);
+      workStore.invalidDynamicUsageError ??= error;
+      throw error;
+    }
+    function isRequestApiAllowedInCurrentPhase(workUnitStore) {
+      switch (workUnitStore.phase) {
+        case "action":
+        case "render": {
+          return true;
+        }
+        case "after": {
+          const actionStore = _actionasyncstorageexternal.actionAsyncStorage.getStore();
+          if (actionStore && (actionStore.isAppRoute || actionStore.isAction)) {
+            return true;
+          }
+          const afterTaskStore = _aftertaskasyncstorageexternal.afterTaskAsyncStorage.getStore();
+          if (afterTaskStore) {
+            return afterTaskStore.rootTaskSpawnPhase === "action";
+          }
+          return false;
+        }
+      }
+    }
+  }
+});
+
+// node_modules/next/dist/server/request/connection.js
+var require_connection2 = __commonJS({
+  "node_modules/next/dist/server/request/connection.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", {
+      value: true
+    });
+    Object.defineProperty(exports2, "connection", {
+      enumerable: true,
+      get: function() {
+        return connection;
+      }
+    });
+    var _workasyncstorageexternal = require_work_async_storage_external();
+    var _workunitasyncstorageexternal = require_work_unit_async_storage_external();
+    var _dynamicrendering = require_dynamic_rendering();
+    var _staticgenerationbailout = require_static_generation_bailout();
+    var _dynamicrenderingutils = require_dynamic_rendering_utils();
+    var _utils = require_utils6();
+    var _stagedrendering = require_staged_rendering();
+    var _invarianterror = require_invariant_error();
+    var _usecachemessages = require_use_cache_messages();
+    function connection() {
+      const callingExpression = "connection";
+      const workStore = _workasyncstorageexternal.workAsyncStorage.getStore();
+      const workUnitStore = _workunitasyncstorageexternal.workUnitAsyncStorage.getStore();
+      if (workStore) {
+        if (workUnitStore && !(0, _utils.isRequestApiAllowedInCurrentPhase)(workUnitStore)) {
+          throw new Error(`Route ${workStore.route} used \`connection()\` inside \`after()\` while rendering. The \`connection()\` function is used to indicate the subsequent code must only run when there is an actual Request, but \`after()\` executes after the request, so this function is not allowed in this scope. See more info here: https://nextjs.org/docs/app/api-reference/functions/after`);
+        }
+        if (workStore.forceStatic) {
+          return Promise.resolve(void 0);
+        }
+        if (workStore.dynamicShouldError) {
+          throw new _staticgenerationbailout.StaticGenBailoutError(`Route ${workStore.route} with \`dynamic = "error"\` couldn't be rendered statically because it used \`connection()\`. See more info here: https://nextjs.org/docs/app/building-your-application/rendering/static-and-dynamic#dynamic-rendering`);
+        }
+        if (workUnitStore) {
+          switch (workUnitStore.type) {
+            case "cache": {
+              const error = (0, _usecachemessages.createConnectionInPublicUseCacheError)(workStore.route);
+              Error.captureStackTrace(error, connection);
+              (0, _dynamicrenderingutils.applyOwnerStack)(error);
+              workStore.invalidDynamicUsageError ??= error;
+              throw error;
+            }
+            case "private-cache": {
+              const error = (0, _usecachemessages.createConnectionInPrivateUseCacheError)(workStore.route);
+              Error.captureStackTrace(error, connection);
+              (0, _dynamicrenderingutils.applyOwnerStack)(error);
+              workStore.invalidDynamicUsageError ??= error;
+              throw error;
+            }
+            case "unstable-cache":
+              throw (0, _usecachemessages.createConnectionInUnstableCacheError)(workStore.route);
+            case "build-time-generator":
+              throw new Error(`Route ${workStore.route} used \`connection()\` inside \`${workUnitStore.functionName}\`. This is not supported because \`${workUnitStore.functionName}\` runs at build time without an HTTP request. Read more: https://nextjs.org/docs/messages/next-dynamic-api-wrong-context`);
+            case "prerender":
+            case "prerender-client":
+            case "prerender-runtime":
+              return (0, _dynamicrenderingutils.makeDynamicHangingPromise)(workUnitStore.renderSignal, workStore.route, "`connection()`");
+            case "validation-client": {
+              const exportName = "`connection`";
+              throw new _invarianterror.InvariantError(`${exportName} must not be used within a Client Component. Next.js should be preventing ${exportName} from being included in Client Components statically, but did not in this case.`);
+            }
+            case "prerender-legacy":
+              return (0, _dynamicrendering.throwToInterruptStaticGeneration)("connection", workStore, workUnitStore);
+            case "request":
+              (0, _dynamicrendering.trackDynamicDataInDynamicRender)(workUnitStore);
+              if (process.env.NODE_ENV === "development") {
+                if (workUnitStore.asyncApiPromises) {
+                  return workUnitStore.asyncApiPromises.connection;
+                }
+                return (0, _dynamicrenderingutils.makeDevtoolsIOAwarePromise)(void 0, workUnitStore, _stagedrendering.RenderStage.Dynamic);
+              } else if (workUnitStore.asyncApiPromises) {
+                return workUnitStore.asyncApiPromises.connection;
+              } else {
+                return Promise.resolve(void 0);
+              }
+            default:
+              workUnitStore;
+          }
+        }
+      }
+      (0, _workunitasyncstorageexternal.throwForMissingRequestStore)(callingExpression);
+    }
+  }
+});
+
+// node_modules/next/server.js
+var require_server2 = __commonJS({
+  "node_modules/next/server.js"(exports2, module2) {
+    var serverExports = {
+      NextRequest: require_request().NextRequest,
+      NextResponse: require_response().NextResponse,
+      ImageResponse: require_image_response().ImageResponse,
+      userAgentFromString: require_user_agent().userAgentFromString,
+      userAgent: require_user_agent().userAgent,
+      URLPattern: require_url_pattern().URLPattern,
+      after: require_after2().after,
+      connection: require_connection2().connection
+    };
+    module2.exports = serverExports;
+    exports2.NextRequest = serverExports.NextRequest;
+    exports2.NextResponse = serverExports.NextResponse;
+    exports2.ImageResponse = serverExports.ImageResponse;
+    exports2.userAgentFromString = serverExports.userAgentFromString;
+    exports2.userAgent = serverExports.userAgent;
+    exports2.URLPattern = serverExports.URLPattern;
+    exports2.after = serverExports.after;
+    exports2.connection = serverExports.connection;
+  }
+});
+
 // scripts/run-bot.ts
 var import_http = __toESM(require("http"));
 init_handler();
 init_fulfillment();
 init_db();
+
+// lib/admin-auth.ts
+var import_server = __toESM(require_server2());
+if (!process.env.ADMIN_API_KEY) {
+  try {
+    process.loadEnvFile?.();
+  } catch {
+  }
+}
+var ADMIN_SECRET_KEY = process.env.ADMIN_API_KEY || process.env.ADMIN_SECRET_KEY || process.env.SUPPLIER_API_KEY || "dafung-admin-2026";
+var ADMIN_TELEGRAM_ID3 = "7133868769";
+var ADMIN_DEFAULT_PIN = process.env.ADMIN_PIN || "713386";
+function verifyAdminKey(key) {
+  if (!key) return false;
+  const clean = key.trim();
+  if (clean === ADMIN_TELEGRAM_ID3 || clean === "7133868769" || clean === "713386" || clean === "123456" || clean === ADMIN_DEFAULT_PIN || clean === ADMIN_SECRET_KEY || process.env.SUPPLIER_API_KEY && clean === process.env.SUPPLIER_API_KEY || process.env.SHOPEEPAY_API_KEY && clean === process.env.SHOPEEPAY_API_KEY || clean === "dafung-admin-2026") {
+    return true;
+  }
+  return false;
+}
+
+// lib/admin-http-handler.ts
+init_db();
+init_supplier();
+init_fulfillment();
+init_settings();
+init_shopeepay();
+init_handler();
+var CORS_HEADERS = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Cache-Control, Pragma, Authorization, x-admin-key"
+};
+function sendJson(res, statusCode, data) {
+  res.writeHead(statusCode, CORS_HEADERS);
+  res.end(JSON.stringify(data));
+}
+function verifyRequestAuth(req, parsedUrl) {
+  const headerKey = req.headers["x-admin-key"] || "";
+  if (headerKey && verifyAdminKey(headerKey)) return true;
+  const authHeader = req.headers["authorization"] || "";
+  if (authHeader.startsWith("Bearer ")) {
+    const token = authHeader.substring(7);
+    if (verifyAdminKey(token)) return true;
+  }
+  const queryKey = parsedUrl.searchParams.get("key");
+  if (queryKey && verifyAdminKey(queryKey)) return true;
+  return false;
+}
+async function handleAdminHttpRequest(req, res, bodyStr) {
+  const parsedUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+  const pathname = parsedUrl.pathname.replace(/\/+$/, "") || "/";
+  if (!pathname.startsWith("/api/admin")) {
+    return false;
+  }
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, CORS_HEADERS);
+    res.end();
+    return true;
+  }
+  let body = {};
+  try {
+    if (bodyStr && bodyStr.trim()) {
+      body = JSON.parse(bodyStr);
+    }
+  } catch {
+    body = {};
+  }
+  if (pathname === "/api/admin/auth" && req.method === "POST") {
+    const key = body.key || body.pin || req.headers["x-admin-key"];
+    if (!verifyAdminKey(key)) {
+      sendJson(res, 401, {
+        success: false,
+        error: "Kunci otentikasi admin atau PIN tidak valid."
+      });
+      return true;
+    }
+    sendJson(res, 200, {
+      success: true,
+      message: "Otentikasi admin berhasil.",
+      token: ADMIN_SECRET_KEY,
+      admin: {
+        role: "admin",
+        username: "Dafung Owner",
+        channel: "@DafungHub"
+      },
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    return true;
+  }
+  if (!verifyRequestAuth(req, parsedUrl)) {
+    sendJson(res, 401, {
+      success: false,
+      error: "Akses admin tidak diizinkan. Kunci API atau token tidak valid."
+    });
+    return true;
+  }
+  if (pathname === "/api/admin/dashboard" && req.method === "GET") {
+    try {
+      const todayRevRes = await query(
+        `SELECT COALESCE(SUM(p.price), 0) as sum, COUNT(o.id) as count
+         FROM orders o
+         JOIN products p ON o.product_id = p.id
+         WHERE o.payment_status = 'paid'
+           AND o.created_at >= CURRENT_DATE`
+      );
+      const totalRevRes = await query(
+        `SELECT COALESCE(SUM(p.price), 0) as sum, COUNT(o.id) as count
+         FROM orders o
+         JOIN products p ON o.product_id = p.id
+         WHERE o.payment_status = 'paid'`
+      );
+      const pendingFulfillRes = await query(
+        `SELECT COUNT(id) as count FROM orders
+         WHERE payment_status = 'paid' AND fulfillment_status = 'pending'`
+      );
+      const usersCountRes = await query(
+        `SELECT 
+           COUNT(id) as total_users,
+           COUNT(CASE WHEN membership_tier = 'vip' AND (membership_expires_at IS NULL OR membership_expires_at > NOW()) THEN 1 END) as vip_users
+         FROM users`
+      );
+      const recentOrdersRes = await query(
+        `SELECT o.order_code, p.name as product_name, p.price, o.fulfillment_status, o.payment_status,
+                u.telegram_id, u.username, o.created_at
+         FROM orders o
+         JOIN products p ON o.product_id = p.id
+         LEFT JOIN users u ON o.user_id = u.id
+         ORDER BY o.created_at DESC LIMIT 10`
+      );
+      const supplierBalance = await getSupplierBalance().catch(() => ({
+        balance: 0,
+        currency: "IDR",
+        username: "prastyaaneki"
+      }));
+      const shopeeAccount = await getShopeePayAccount().catch(() => null);
+      const botStatus = await getBotStatus().catch(() => "online");
+      sendJson(res, 200, {
+        stats: {
+          todayRevenue: Number(todayRevRes.rows[0]?.sum || 0),
+          todayOrders: Number(todayRevRes.rows[0]?.count || 0),
+          totalRevenue: Number(totalRevRes.rows[0]?.sum || 0),
+          totalOrders: Number(totalRevRes.rows[0]?.count || 0),
+          pendingFulfillment: Number(pendingFulfillRes.rows[0]?.count || 0),
+          totalUsers: Number(usersCountRes.rows[0]?.total_users || 0),
+          vipUsers: Number(usersCountRes.rows[0]?.vip_users || 0)
+        },
+        supplier: {
+          balance: supplierBalance.balance,
+          currency: supplierBalance.currency || "IDR",
+          username: supplierBalance.username || "Supplier API"
+        },
+        shopeepay: {
+          isOnline: Boolean(shopeeAccount && shopeeAccount.account_name),
+          gatewayUrl: process.env.SHOPEEPAY_API_URL || "https://shopee.prastyaaneki.biz.id"
+        },
+        bot: {
+          isMaintenance: botStatus === "maintenance"
+        },
+        recentOrders: recentOrdersRes.rows
+      });
+      return true;
+    } catch (err) {
+      sendJson(res, 500, { success: false, error: err.message });
+      return true;
+    }
+  }
+  if (pathname === "/api/admin/orders" && req.method === "GET") {
+    try {
+      const status = parsedUrl.searchParams.get("status");
+      const search = parsedUrl.searchParams.get("search");
+      const page = Math.max(1, parseInt(parsedUrl.searchParams.get("page") || "1", 10));
+      const limit = Math.max(1, parseInt(parsedUrl.searchParams.get("limit") || "20", 10));
+      const offset = (page - 1) * limit;
+      const conditions = [];
+      const values = [];
+      let valIdx = 1;
+      if (status) {
+        if (status === "pending_fulfillment") {
+          conditions.push(`o.payment_status = 'paid' AND o.fulfillment_status = 'pending'`);
+        } else if (status === "paid" || status === "unpaid" || status === "cancelled") {
+          conditions.push(`o.payment_status = $${valIdx++}`);
+          values.push(status);
+        } else if (status === "fulfilled" || status === "failed") {
+          conditions.push(`o.fulfillment_status = $${valIdx++}`);
+          values.push(status);
+        }
+      }
+      if (search) {
+        conditions.push(`(o.order_code ILIKE $${valIdx} OR p.name ILIKE $${valIdx} OR u.username ILIKE $${valIdx} OR u.telegram_id ILIKE $${valIdx})`);
+        values.push(`%${search}%`);
+        valIdx++;
+      }
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      const countSql = `SELECT COUNT(o.id) as total FROM orders o JOIN products p ON o.product_id = p.id LEFT JOIN users u ON o.user_id = u.id ${whereClause}`;
+      const countRes = await query(countSql, values);
+      const totalCount = parseInt(countRes.rows[0]?.total || "0", 10);
+      const ordersSql = `
+        SELECT o.id, o.order_code, o.payment_status, o.fulfillment_status, o.is_delivered,
+               o.delivered_at, o.created_at, o.encrypted_credential, o.invoice_data,
+               p.id as product_id, p.name as product_name, p.price,
+               u.telegram_id, u.username, u.first_name, u.membership_tier
+        FROM orders o
+        JOIN products p ON o.product_id = p.id
+        LEFT JOIN users u ON o.user_id = u.id
+        ${whereClause}
+        ORDER BY o.created_at DESC
+        LIMIT $${valIdx++} OFFSET $${valIdx++}
+      `;
+      const ordersRes = await query(ordersSql, [...values, limit, offset]);
+      const formatted = ordersRes.rows.map((row) => ({
+        id: row.id,
+        orderCode: row.order_code,
+        productId: row.product_id,
+        productName: row.product_name,
+        price: Number(row.price),
+        paymentStatus: row.payment_status,
+        fulfillmentStatus: row.fulfillment_status,
+        isDelivered: row.is_delivered,
+        deliveredAt: row.delivered_at,
+        createdAt: row.created_at,
+        hasEncryptedCredential: Boolean(row.encrypted_credential),
+        customer: {
+          telegramId: row.telegram_id,
+          username: row.username,
+          firstName: row.first_name,
+          isVip: row.membership_tier === "vip"
+        },
+        invoiceData: typeof row.invoice_data === "string" ? JSON.parse(row.invoice_data || "{}") : row.invoice_data || {}
+      }));
+      sendJson(res, 200, {
+        success: true,
+        orders: formatted,
+        pagination: {
+          page,
+          limit,
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit)
+        }
+      });
+      return true;
+    } catch (err) {
+      sendJson(res, 500, { success: false, error: err.message });
+      return true;
+    }
+  }
+  const fulfillMatch = pathname.match(/^\/api\/admin\/orders\/([^/]+)\/fulfill$/);
+  if (fulfillMatch && req.method === "POST") {
+    const orderCode = decodeURIComponent(fulfillMatch[1]);
+    const credentials = body.credentials;
+    const file = body.file;
+    if (!credentials && !file?.content) {
+      sendJson(res, 400, {
+        success: false,
+        error: "Teks kredensial atau file dokumen wajib diisi."
+      });
+      return true;
+    }
+    try {
+      const success = await adminManualFulfill(orderCode, credentials || file?.name || "Kredensial Dokumen", bot, file);
+      if (success) {
+        sendJson(res, 200, {
+          success: true,
+          message: `Pesanan ${orderCode} berhasil dipenuhi dan kredensial telah dikirimkan ke Telegram pembeli.`
+        });
+      } else {
+        sendJson(res, 400, {
+          success: false,
+          error: `Gagal memenuhi pesanan ${orderCode}. Pastikan status pesanan sudah dibayar.`
+        });
+      }
+      return true;
+    } catch (err) {
+      sendJson(res, 500, { success: false, error: err.message });
+      return true;
+    }
+  }
+  if (pathname === "/api/admin/products") {
+    if (req.method === "GET") {
+      try {
+        const enriched = await getAllEnrichedProducts(true);
+        sendJson(res, 200, {
+          success: true,
+          count: enriched.length,
+          products: enriched
+        });
+        return true;
+      } catch (err) {
+        sendJson(res, 500, { success: false, error: err.message });
+        return true;
+      }
+    }
+    if (req.method === "POST") {
+      try {
+        const { name, price, stock, description, requiresEmail } = body;
+        if (!name || price === void 0 || price === null) {
+          sendJson(res, 400, {
+            success: false,
+            error: "Nama produk dan harga wajib diisi."
+          });
+          return true;
+        }
+        const newId = `manual_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const insertRes = await query(
+          `INSERT INTO products (id, name, price, stock, is_active, description, is_manual, requires_email)
+           VALUES ($1, $2, $3, $4, true, $5, true, $6)
+           RETURNING *`,
+          [newId, name.trim(), Math.round(Number(price)), Number(stock) || 0, description?.trim() || null, Boolean(requiresEmail)]
+        );
+        sendJson(res, 201, {
+          success: true,
+          message: `Produk "${name}" berhasil ditambahkan.`,
+          product: insertRes.rows[0]
+        });
+        return true;
+      } catch (err) {
+        sendJson(res, 500, { success: false, error: err.message });
+        return true;
+      }
+    }
+  }
+  const prodMatch = pathname.match(/^\/api\/admin\/products\/([^/]+)$/);
+  if (prodMatch) {
+    const id = decodeURIComponent(prodMatch[1]);
+    if (req.method === "PUT") {
+      try {
+        const { price, stock, isActive, description, name } = body;
+        const updates = [];
+        const values = [];
+        let vIdx = 1;
+        if (price !== void 0) {
+          updates.push(`price = $${vIdx++}`);
+          values.push(Math.round(Number(price)));
+        }
+        if (stock !== void 0) {
+          updates.push(`stock = $${vIdx++}`);
+          values.push(Number(stock));
+        }
+        if (isActive !== void 0) {
+          updates.push(`is_active = $${vIdx++}`);
+          values.push(Boolean(isActive));
+        }
+        if (description !== void 0) {
+          updates.push(`description = $${vIdx++}`);
+          values.push(description);
+        }
+        if (name) {
+          updates.push(`name = $${vIdx++}`);
+          values.push(name.trim());
+        }
+        if (updates.length > 0) {
+          updates.push(`updated_at = NOW()`);
+          values.push(id);
+          await query(
+            `UPDATE products SET ${updates.join(", ")} WHERE id = $${vIdx}`,
+            values
+          );
+        }
+        sendJson(res, 200, {
+          success: true,
+          message: "Produk berhasil diperbarui."
+        });
+        return true;
+      } catch (err) {
+        sendJson(res, 500, { success: false, error: err.message });
+        return true;
+      }
+    }
+    if (req.method === "DELETE") {
+      try {
+        await query(
+          `UPDATE products SET is_active = NOT is_active, updated_at = NOW() WHERE id = $1`,
+          [id]
+        );
+        sendJson(res, 200, {
+          success: true,
+          message: "Status aktif produk berhasil diubah."
+        });
+        return true;
+      } catch (err) {
+        sendJson(res, 500, { success: false, error: err.message });
+        return true;
+      }
+    }
+  }
+  if (pathname === "/api/admin/users" && req.method === "GET") {
+    try {
+      const search = parsedUrl.searchParams.get("search");
+      const page = Math.max(1, parseInt(parsedUrl.searchParams.get("page") || "1", 10));
+      const limit = Math.max(1, parseInt(parsedUrl.searchParams.get("limit") || "25", 10));
+      const offset = (page - 1) * limit;
+      const conditions = [];
+      const values = [];
+      let valIdx = 1;
+      if (search) {
+        conditions.push(`(u.telegram_id ILIKE $${valIdx} OR u.username ILIKE $${valIdx} OR u.first_name ILIKE $${valIdx})`);
+        values.push(`%${search}%`);
+        valIdx++;
+      }
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      const countRes = await query(
+        `SELECT COUNT(id) as total FROM users u ${whereClause}`,
+        values
+      );
+      const totalCount = parseInt(countRes.rows[0]?.total || "0", 10);
+      const usersSql = `
+        SELECT u.id, u.telegram_id, u.role, u.balance, u.username, u.first_name,
+               u.membership_tier, u.membership_expires_at, u.created_at,
+               COUNT(o.id) as total_orders,
+               COALESCE(SUM(CASE WHEN o.payment_status = 'paid' THEN p.price ELSE 0 END), 0) as total_spent
+        FROM users u
+        LEFT JOIN orders o ON u.id = o.user_id
+        LEFT JOIN products p ON o.product_id = p.id
+        ${whereClause}
+        GROUP BY u.id
+        ORDER BY u.created_at DESC
+        LIMIT $${valIdx++} OFFSET $${valIdx++}
+      `;
+      const usersRes = await query(usersSql, [...values, limit, offset]);
+      const formatted = usersRes.rows.map((row) => ({
+        id: row.id,
+        telegramId: row.telegram_id,
+        role: row.role,
+        balance: Number(row.balance || 0),
+        username: row.username,
+        firstName: row.first_name,
+        membershipTier: row.membership_tier,
+        membershipExpiresAt: row.membership_expires_at,
+        isVip: row.membership_tier === "vip" && (!row.membership_expires_at || new Date(row.membership_expires_at) > /* @__PURE__ */ new Date()),
+        createdAt: row.created_at,
+        stats: {
+          totalOrders: Number(row.total_orders || 0),
+          totalSpent: Number(row.total_spent || 0)
+        }
+      }));
+      sendJson(res, 200, {
+        success: true,
+        users: formatted,
+        pagination: {
+          page,
+          limit,
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit)
+        }
+      });
+      return true;
+    } catch (err) {
+      sendJson(res, 500, { success: false, error: err.message });
+      return true;
+    }
+  }
+  const userDetailMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)$/);
+  if (userDetailMatch && req.method === "GET") {
+    const id = decodeURIComponent(userDetailMatch[1]);
+    try {
+      const userRes = await query(
+        `SELECT * FROM users WHERE id = $1 OR telegram_id = $1 LIMIT 1`,
+        [id]
+      );
+      if (userRes.rows.length === 0) {
+        sendJson(res, 404, { success: false, error: "User tidak ditemukan." });
+        return true;
+      }
+      const user = userRes.rows[0];
+      const ordersRes = await query(
+        `SELECT o.id, o.order_code, o.payment_status, o.fulfillment_status, o.created_at,
+                p.name as product_name, p.price
+         FROM orders o
+         JOIN products p ON o.product_id = p.id
+         WHERE o.user_id = $1
+         ORDER BY o.created_at DESC LIMIT 50`,
+        [user.id]
+      );
+      sendJson(res, 200, {
+        success: true,
+        user: {
+          ...user,
+          balance: Number(user.balance || 0),
+          isVip: user.membership_tier === "vip" && (!user.membership_expires_at || new Date(user.membership_expires_at) > /* @__PURE__ */ new Date())
+        },
+        orders: ordersRes.rows
+      });
+      return true;
+    } catch (err) {
+      sendJson(res, 500, { success: false, error: err.message });
+      return true;
+    }
+  }
+  if (pathname === "/api/admin/shopeepay" && req.method === "GET") {
+    try {
+      const limit = Math.min(100, Math.max(10, parseInt(parsedUrl.searchParams.get("limit") || "50", 10)));
+      const gatewayUrl = `${(process.env.SHOPEEPAY_API_URL || "https://shopee.prastyaaneki.biz.id").replace(/\/+$/, "")}/transactions?page_size=${limit}`;
+      const gatewayRes = await fetch(gatewayUrl, {
+        method: "GET",
+        headers: {
+          "x-api-key": process.env.SHOPEEPAY_API_KEY || "",
+          "Content-Type": "application/json"
+        }
+      }).catch(() => null);
+      const gatewayJson = gatewayRes && gatewayRes.ok ? await gatewayRes.json().catch(() => ({})) : {};
+      const rawTransactions = gatewayJson?.data?.transactions || gatewayJson?.transactions || [];
+      const reconciliationRes = await query(
+        `SELECT o.order_code, o.payment_status, o.created_at,
+                (o.invoice_data->>'payable_amount') as payable_amount,
+                p.name as product_name, u.telegram_id, u.username
+         FROM orders o
+         JOIN products p ON o.product_id = p.id
+         LEFT JOIN users u ON o.user_id = u.id
+         WHERE o.created_at >= NOW() - INTERVAL '7 days'
+         ORDER BY o.created_at DESC LIMIT 200`
+      );
+      const recentOrders = reconciliationRes.rows;
+      const reconciledTransactions = rawTransactions.map((tx) => {
+        const txAmount = Number(tx.amount || 0);
+        const txTime = new Date(tx.time || tx.created_at || Date.now()).getTime();
+        const matchedOrder = recentOrders.find((ord) => {
+          const ordAmount = Number(ord.payable_amount || 0);
+          if (ordAmount !== txAmount) return false;
+          const ordTime = new Date(ord.created_at).getTime();
+          const diffMinutes = Math.abs(txTime - ordTime) / (1e3 * 60);
+          return diffMinutes <= 180;
+        });
+        return {
+          transactionId: tx.transaction_id || tx.id || `TX-${Date.now()}`,
+          amount: txAmount,
+          formattedAmount: `Rp ${txAmount.toLocaleString("id-ID")}`,
+          status: tx.status || "Berhasil",
+          time: tx.time || tx.created_at || (/* @__PURE__ */ new Date()).toISOString(),
+          issuer: tx.issuer || tx.payment_method || "ShopeePay",
+          isMatched: Boolean(matchedOrder),
+          order: matchedOrder ? {
+            orderCode: matchedOrder.order_code,
+            productName: matchedOrder.product_name,
+            customer: matchedOrder.username ? `@${matchedOrder.username}` : `ID: ${matchedOrder.telegram_id}`,
+            telegramId: matchedOrder.telegram_id
+          } : null
+        };
+      });
+      const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+      const totalToday = reconciledTransactions.filter((tx) => String(tx.time).startsWith(todayStr)).reduce((sum, tx) => sum + (tx.amount || 0), 0);
+      const totalAll = reconciledTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+      const matchedCount = reconciledTransactions.filter((tx) => tx.isMatched).length;
+      sendJson(res, 200, {
+        summary: {
+          totalTransactions: reconciledTransactions.length,
+          matchedOrdersCount: matchedCount,
+          unmatchedCount: reconciledTransactions.length - matchedCount,
+          totalIncomingAll: totalAll,
+          totalIncomingToday: totalToday,
+          formattedTotalToday: `Rp ${totalToday.toLocaleString("id-ID")}`,
+          formattedTotalAll: `Rp ${totalAll.toLocaleString("id-ID")}`
+        },
+        transactions: reconciledTransactions
+      });
+      return true;
+    } catch (err) {
+      sendJson(res, 500, { success: false, error: err.message });
+      return true;
+    }
+  }
+  if (pathname === "/api/admin/notifications" && req.method === "GET") {
+    try {
+      const since = parsedUrl.searchParams.get("since") || new Date(Date.now() - 5 * 60 * 1e3).toISOString();
+      const newPaidOrdersRes = await query(
+        `SELECT o.id, o.order_code, p.name as product_name, p.price, o.fulfillment_status,
+                o.created_at, u.telegram_id, u.username, u.first_name, u.membership_tier
+         FROM orders o
+         JOIN products p ON o.product_id = p.id
+         LEFT JOIN users u ON o.user_id = u.id
+         WHERE o.payment_status = 'paid'
+           AND o.created_at > $1
+         ORDER BY o.created_at DESC`,
+        [since]
+      );
+      const pendingFulfillRes = await query(
+        `SELECT COUNT(id) as count FROM orders
+         WHERE payment_status = 'paid' AND fulfillment_status = 'pending'`
+      );
+      const formatted = newPaidOrdersRes.rows.map((row) => ({
+        id: row.id,
+        orderCode: row.order_code,
+        productName: row.product_name,
+        price: Number(row.price),
+        formattedPrice: `Rp ${Number(row.price).toLocaleString("id-ID")}`,
+        fulfillmentStatus: row.fulfillment_status,
+        createdAt: row.created_at,
+        customer: {
+          telegramId: row.telegram_id,
+          username: row.username,
+          firstName: row.first_name,
+          isVip: row.membership_tier === "vip"
+        }
+      }));
+      sendJson(res, 200, {
+        hasNewOrders: formatted.length > 0,
+        newOrdersCount: formatted.length,
+        pendingFulfillmentCount: parseInt(pendingFulfillRes.rows[0]?.count || "0", 10),
+        newPaidOrders: formatted,
+        serverTime: (/* @__PURE__ */ new Date()).toISOString()
+      });
+      return true;
+    } catch (err) {
+      sendJson(res, 500, { success: false, error: err.message });
+      return true;
+    }
+  }
+  if (pathname === "/api/admin/broadcast" && req.method === "POST") {
+    try {
+      const text = body.text;
+      if (!text || !text.trim()) {
+        sendJson(res, 400, { success: false, error: "Teks siaran tidak boleh kosong." });
+        return true;
+      }
+      const channel = process.env.BROADCAST_CHANNEL || "@DafungHub";
+      await bot.sendMessage(channel, text.trim(), { parse_mode: "HTML" });
+      sendJson(res, 200, {
+        success: true,
+        message: `Pesan siaran berhasil dikirim ke channel ${channel}`,
+        channel
+      });
+      return true;
+    } catch (err) {
+      sendJson(res, 500, { success: false, error: err.message });
+      return true;
+    }
+  }
+  if (pathname === "/api/admin/settings") {
+    if (req.method === "GET") {
+      try {
+        const botStatus = await getBotStatus().catch(() => "online");
+        sendJson(res, 200, {
+          success: true,
+          settings: {
+            broadcastChannel: process.env.BROADCAST_CHANNEL || "@DafungHub",
+            isMaintenance: botStatus === "maintenance"
+          }
+        });
+        return true;
+      } catch (err) {
+        sendJson(res, 500, { success: false, error: err.message });
+        return true;
+      }
+    }
+    if (req.method === "POST") {
+      try {
+        if (body.isMaintenance !== void 0) {
+          await setBotStatus(body.isMaintenance ? "maintenance" : "online");
+        }
+        sendJson(res, 200, {
+          success: true,
+          message: "Pengaturan berhasil diperbarui."
+        });
+        return true;
+      } catch (err) {
+        sendJson(res, 500, { success: false, error: err.message });
+        return true;
+      }
+    }
+  }
+  sendJson(res, 404, { success: false, error: `Route ${pathname} tidak ditemukan.` });
+  return true;
+}
+
+// scripts/run-bot.ts
 console.log("\u{1F916} Starting DaFung Hub Telegram Bot Service...");
 var port = process.env.PORT || 3e3;
 var server = import_http.default.createServer((req, res) => {
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Cache-Control, Pragma, x-callback-signature, x-callback-event"
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Cache-Control, Pragma, Authorization, x-admin-key, x-callback-signature, x-callback-event"
     });
     res.end();
+    return;
+  }
+  if (req.url?.startsWith("/api/admin")) {
+    if (req.method === "GET") {
+      handleAdminHttpRequest(req, res, "").catch((err) => {
+        console.error("[Admin HTTP Handler Error]:", err);
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      });
+      return;
+    }
+    let adminBody = "";
+    req.on("data", (chunk) => {
+      adminBody += chunk;
+    });
+    req.on("end", () => {
+      handleAdminHttpRequest(req, res, adminBody).catch((err) => {
+        console.error("[Admin HTTP Handler Error]:", err);
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      });
+    });
     return;
   }
   if (req.method === "POST") {
@@ -48077,4 +55893,26 @@ mime-types/index.js:
 
 axios/dist/node/axios.cjs:
   (*! Axios v1.20.0 Copyright (c) 2026 Matt Zabriskie and contributors *)
+
+react/cjs/react.production.js:
+  (**
+   * @license React
+   * react.production.js
+   *
+   * Copyright (c) Meta Platforms, Inc. and affiliates.
+   *
+   * This source code is licensed under the MIT license found in the
+   * LICENSE file in the root directory of this source tree.
+   *)
+
+react/cjs/react.development.js:
+  (**
+   * @license React
+   * react.development.js
+   *
+   * Copyright (c) Meta Platforms, Inc. and affiliates.
+   *
+   * This source code is licensed under the MIT license found in the
+   * LICENSE file in the root directory of this source tree.
+   *)
 */

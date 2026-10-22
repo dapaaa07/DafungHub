@@ -2,6 +2,7 @@ import http from 'http';
 import { bot, initBot, handleWebhookUpdate } from '../bot/handler';
 import { processOrderPayment } from '../lib/fulfillment';
 import { query } from '../lib/db';
+import { handleAdminHttpRequest } from '../lib/admin-http-handler';
 
 console.log('🤖 Starting DaFung Hub Telegram Bot Service...');
 
@@ -11,10 +12,35 @@ const server = http.createServer((req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Cache-Control, Pragma, x-callback-signature, x-callback-event',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Cache-Control, Pragma, Authorization, x-admin-key, x-callback-signature, x-callback-event',
     });
     res.end();
+    return;
+  }
+
+  // Route /api/admin requests
+  if (req.url?.startsWith('/api/admin')) {
+    if (req.method === 'GET') {
+      handleAdminHttpRequest(req, res, '').catch((err) => {
+        console.error('[Admin HTTP Handler Error]:', err);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: (err as Error).message }));
+      });
+      return;
+    }
+
+    let adminBody = '';
+    req.on('data', (chunk) => {
+      adminBody += chunk;
+    });
+    req.on('end', () => {
+      handleAdminHttpRequest(req, res, adminBody).catch((err) => {
+        console.error('[Admin HTTP Handler Error]:', err);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: (err as Error).message }));
+      });
+    });
     return;
   }
 
