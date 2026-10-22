@@ -55211,12 +55211,11 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
           });
           return true;
         }
-        const newId = `manual_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
         const insertRes = await query(
-          `INSERT INTO products (id, name, price, stock, is_active, description, is_manual, requires_email)
-           VALUES ($1, $2, $3, $4, true, $5, true, $6)
+          `INSERT INTO products (name, price, stock, is_active, description, is_manual, requires_email)
+           VALUES ($1, $2, $3, true, $4, true, $5)
            RETURNING *`,
-          [newId, name.trim(), Math.round(Number(price)), Number(stock) || 0, description?.trim() || null, Boolean(requiresEmail)]
+          [name.trim(), Math.round(Number(price)), Number(stock) || 0, description?.trim() || null, Boolean(requiresEmail)]
         );
         sendJson(res, 201, {
           success: true,
