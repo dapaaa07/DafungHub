@@ -139,3 +139,135 @@ test('Buy Command: Fails gracefully when product is not found', async () => {
 
   assert.ok(repliedText.includes('tidak ditemukan'), 'Should notify that product was not found');
 });
+
+test('Buy Command: Paying with sufficient Saldo (10000) for Rp 5000 product applies Rp 200 discount (4800 deducted -> 5200 remaining)', async () => {
+  const botInstance = new Bot('dummy_token') as ExtendedBot;
+  const sentMessages: Array<{ chatId: unknown; text: string }> = [];
+
+  botInstance.sendMessage = async (chatId, text) => {
+    sentMessages.push({ chatId, text: text || '' });
+    return { message_id: sentMessages.length + 10 };
+  };
+
+  const buyerTgId = `88220001`;
+  const userRes = await query<{ id: string }>(
+    `INSERT INTO users (telegram_id, role, balance)
+     VALUES ($1, 'buyer', 10000)
+     ON CONFLICT (telegram_id) DO UPDATE SET balance = 10000
+     RETURNING id`,
+    [buyerTgId]
+  );
+  const userId = userRes.rows[0].id;
+
+  const prodRes = await query<Product>(
+    `INSERT INTO products (name, price, stock, is_active, is_manual)
+     VALUES ('Test Produk Saldo 5K', 5000, 10, true, true)
+     RETURNING *`
+  );
+  const prod = prodRes.rows[0];
+
+  try {
+    const mockCtx = {
+      chatId: Number(buyerTgId),
+      from: { id: Number(buyerTgId), is_bot: false, first_name: 'SaldoBuyer' },
+      reply: async () => {},
+    } as unknown as Context;
+
+    await handleBuy(mockCtx, prod.id, botInstance, undefined, 'balance');
+
+    const balCheck = await query<{ balance: number }>(
+      'SELECT balance FROM users WHERE id = $1 LIMIT 1',
+      [userId]
+    );
+    assert.strictEqual(
+      Number(balCheck.rows[0]?.balance),
+      5200,
+      'Balance must be reduced by exact Rp 4.800 (Rp 5.000 - Rp 200 discount)'
+    );
+
+    const ordCheck = await query<{
+      payment_status: string;
+      invoice_data: Record<string, unknown>;
+    }>(
+      'SELECT payment_status, invoice_data FROM orders WHERE product_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [prod.id]
+    );
+    assert.strictEqual(ordCheck.rows.length, 1, 'Order must be created');
+    assert.strictEqual(ordCheck.rows[0].payment_status, 'paid', 'Saldo order must be paid immediately');
+    assert.strictEqual(ordCheck.rows[0].invoice_data.payment_method, 'balance');
+    assert.strictEqual(ordCheck.rows[0].invoice_data.payable_amount, 4800);
+    assert.strictEqual(ordCheck.rows[0].invoice_data.balance_discount, 200);
+
+    const buyerMsg = sentMessages.find((m) => String(m.chatId) === buyerTgId);
+    assert.ok(buyerMsg, 'Buyer must receive payment/queue confirmation');
+    assert.ok(buyerMsg.text.includes('4.800'), 'Confirmation must show Rp 4.800 total');
+    assert.ok(buyerMsg.text.includes('5.200'), 'Confirmation must show remaining balance Rp 5.200');
+  } finally {
+    await query('DELETE FROM orders WHERE product_id = $1', [prod.id]);
+    await query('DELETE FROM products WHERE id = $1', [prod.id]);
+    await query('DELETE FROM users WHERE id = $1', [userId]);
+  }
+});
+
+test('Buy Command: Insufficient Saldo blocks purchase cleanly and shows Top up button', async () => {
+  const botInstance = new Bot('dummy_token') as ExtendedBot;
+  let sentText = '';
+  let sentMarkup: { inline_keyboard?: Array<Array<{ text: string; callback_data?: string }>> } = {};
+
+  botInstance.sendMessage = async (_chatId, text, options) => {
+    sentText = text || '';
+    sentMarkup = (options?.reply_markup as typeof sentMarkup) || {};
+    return { message_id: 99 };
+  };
+
+  const buyerTgId = `88220002`;
+  const userRes = await query<{ id: string }>(
+    `INSERT INTO users (telegram_id, role, balance)
+     VALUES ($1, 'buyer', 1500)
+     ON CONFLICT (telegram_id) DO UPDATE SET balance = 1500
+     RETURNING id`,
+    [buyerTgId]
+  );
+  const userId = userRes.rows[0].id;
+
+  const prodRes = await query<Product>(
+    `INSERT INTO products (name, price, stock, is_active, is_manual)
+     VALUES ('Test Produk Saldo Kurang 5K', 5000, 10, true, true)
+     RETURNING *`
+  );
+  const prod = prodRes.rows[0];
+
+  try {
+    const mockCtx = {
+      chatId: Number(buyerTgId),
+      from: { id: Number(buyerTgId), is_bot: false, first_name: 'LowSaldoBuyer' },
+      reply: async () => {},
+    } as unknown as Context;
+
+    await handleBuy(mockCtx, prod.id, botInstance, undefined, 'balance');
+
+    const balCheck = await query<{ balance: number }>(
+      'SELECT balance FROM users WHERE id = $1 LIMIT 1',
+      [userId]
+    );
+    assert.strictEqual(Number(balCheck.rows[0]?.balance), 1500, 'Insufficient balance must remain untouched');
+
+    const ordCheck = await query(
+      'SELECT id FROM orders WHERE product_id = $1',
+      [prod.id]
+    );
+    assert.strictEqual(ordCheck.rows.length, 0, 'No order should be inserted when balance is insufficient');
+
+    assert.ok(sentText.includes('SALDO AKUN TIDAK MENCUKUPI'), 'Must display insufficient balance alert');
+    const flatButtons = sentMarkup.inline_keyboard?.flat() || [];
+    const topUpBtn = flatButtons.find((b) =>
+      b.text.includes('Saldo (tidak mencukupi | Top up sekarang)')
+    );
+    assert.ok(topUpBtn, 'Must include exact Top up label requested by user');
+    assert.strictEqual(topUpBtn?.callback_data, 'menu_deposit', 'Top up button must route to menu_deposit');
+  } finally {
+    await query('DELETE FROM orders WHERE product_id = $1', [prod.id]);
+    await query('DELETE FROM products WHERE id = $1', [prod.id]);
+    await query('DELETE FROM users WHERE id = $1', [userId]);
+  }
+});

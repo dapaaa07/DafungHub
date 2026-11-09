@@ -1,6 +1,8 @@
 import { Context } from 'node-telegram-bot-api';
-import { query, Product, User } from '../../lib/db';
+import { query, getClient, Product, User } from '../../lib/db';
 import { ExtendedBot, sendSafeMessage, sendSafePhoto } from '../handler';
+import type { CheckoutPaymentMethod } from '../../lib/membership';
+import type { Voucher } from '../../lib/voucher';
 
 function escapeHtml(str: string): string {
   if (!str) return '';
@@ -28,56 +30,66 @@ export async function ensureUser(
   telegramId: string,
   profile?: { username?: string; firstName?: string }
 ): Promise<User> {
+  const { isAdmin } = await import('../../lib/pricing');
   const cleanUsername = profile?.username ? profile.username.replace(/^@/, '') : null;
   const cleanFirstName = profile?.firstName || null;
+  const targetRole = isAdmin(telegramId) ? 'admin' : 'buyer';
 
   const existingUser = await query<User>(
-    'SELECT * FROM users WHERE telegram_id = $1',
+    'SELECT * FROM users WHERE telegram_id = $1 LIMIT 1',
     [telegramId]
   );
 
   if (existingUser.rows.length > 0) {
-    if (cleanUsername || cleanFirstName) {
-      await query(
+    const current = existingUser.rows[0];
+    const shouldUpdateUsername = Boolean(cleanUsername && current.username !== cleanUsername);
+    const shouldUpdateFirstName = Boolean(cleanFirstName && current.first_name !== cleanFirstName);
+
+    if (shouldUpdateUsername || shouldUpdateFirstName) {
+      const updated = await query<User>(
         `UPDATE users
          SET username = COALESCE($1, username),
              first_name = COALESCE($2, first_name)
-         WHERE telegram_id = $3`,
+         WHERE telegram_id = $3
+         RETURNING *`,
         [cleanUsername, cleanFirstName, telegramId]
-      ).catch(() => {});
+      ).catch(() => null);
+      if (updated && updated.rows.length > 0) {
+        return updated.rows[0];
+      }
     }
-    return existingUser.rows[0];
+    return current;
   }
 
   const insertUser = await query<User>(
     `INSERT INTO users (telegram_id, role, username, first_name)
-     VALUES ($1, 'buyer', $2, $3)
+     VALUES ($1, $2, $3, $4)
      ON CONFLICT (telegram_id) DO UPDATE SET
        username = COALESCE(EXCLUDED.username, users.username),
        first_name = COALESCE(EXCLUDED.first_name, users.first_name)
      RETURNING *`,
-    [telegramId, cleanUsername, cleanFirstName]
+    [telegramId, targetRole, cleanUsername, cleanFirstName]
   );
 
   return insertUser.rows[0];
 }
 
 /**
- * Handle product purchase and generate Midtrans dynamic QRIS invoice
+ * Resolve & validate product for checkout (shared between payment method selector and order execution).
+ * Sends an explanatory message and returns null if maintenance/channel-gate/access/stock validation fails.
  */
-export async function handleBuy(
+export async function resolveProductForCheckout(
   ctx: Context,
   productId: string,
-  botInstance: ExtendedBot,
-  explicitVoucherCode?: string
-): Promise<void> {
+  botInstance: ExtendedBot
+): Promise<Product | null> {
   const { getBotStatus } = await import('../../lib/settings');
   const { isAdmin } = await import('../../lib/pricing');
   const status = await getBotStatus();
   if (status === 'maintenance' && !isAdmin(ctx.from?.id)) {
     const { sendMaintenanceMessage } = await import('../menu');
     await sendMaintenanceMessage(ctx, botInstance);
-    return;
+    return null;
   }
 
   // Verify channel membership for non-admin buyers
@@ -85,7 +97,7 @@ export async function handleBuy(
   const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
   if (!isMember) {
     await sendChannelJoinPrompt(ctx, botInstance);
-    return;
+    return null;
   }
 
   const trimmedId = productId?.trim();
@@ -106,7 +118,7 @@ export async function handleBuy(
         },
       }
     );
-    return;
+    return null;
   }
 
   // 1. Fetch product from database or supplier catalogue
@@ -184,7 +196,7 @@ export async function handleBuy(
               },
             }
           );
-          return;
+          return null;
         }
 
         const effectivePrice = getEffectiveSellingPrice(supp, customPrices);
@@ -235,7 +247,7 @@ export async function handleBuy(
           },
         }
       );
-      return;
+      return null;
     }
     // If product was found in local DB, check if custom price override is set
     const hasOverride = customPrices.has(product.id) || (product.name && customPrices.has(product.name));
@@ -266,7 +278,7 @@ export async function handleBuy(
         },
       }
     );
-    return;
+    return null;
   }
 
   // 2. Validate product stock
@@ -285,43 +297,74 @@ export async function handleBuy(
         },
       }
     );
-    return;
+    return null;
   }
 
-  // 3. Ensure user exists in users table
-  const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
-  const telegramId = ctx.from?.id ? String(ctx.from.id) : String(chatId);
-  const user = await ensureUser(telegramId, {
-    username: ctx.from?.username,
-    firstName: ctx.from?.first_name,
-  });
+  return product;
+}
 
-  // 4. Calculate checkout pricing (VIP discount + hidden fee Rp 100)
-  const { calculateCheckoutPrice, isMembershipProduct, isDepositProduct } = await import('../../lib/membership');
-  const checkoutPricing = await calculateCheckoutPrice(telegramId, {
-    name: product.name,
-    price: product.price,
-  });
+export interface OrderPricingBreakdown {
+  paymentMethod: CheckoutPaymentMethod;
+  basePrice: number;
+  vipDiscount: number;
+  isVipDiscountApplied: boolean;
+  voucher: Voucher | null;
+  voucherDiscount: number;
+  voucherCashback: number;
+  balanceDiscount: number;
+  isBalanceDiscountApplied: boolean;
+  fee: number;
+  priceAfterDiscounts: number;
+  balancePayableAmount: number;
+  isDeposit: boolean;
+  isMembership: boolean;
+}
 
-  // Check for applied voucher (explicit parameter or active session)
-  const { getPendingUserVoucher, clearPendingUserVoucher, validateVoucherForTransaction } = await import('../../lib/voucher');
-  const voucherCode = explicitVoucherCode || getPendingUserVoucher(telegramId);
-  let appliedVoucher: any = null;
+/**
+ * Compute checkout pricing including VIP discount, active voucher, and Saldo discount (Rp 200)
+ * without mutating/consuming the pending voucher session.
+ */
+export async function calculateOrderPricing(params: {
+  userId: string;
+  telegramId: string;
+  product: { id: string; name: string; price: number };
+  paymentMethod: CheckoutPaymentMethod;
+  explicitVoucherCode?: string;
+}): Promise<OrderPricingBreakdown> {
+  const {
+    BALANCE_PAYMENT_DISCOUNT,
+    calculateCheckoutPrice,
+    isMembershipProduct,
+    isDepositProduct,
+  } = await import('../../lib/membership');
+  const { getPendingUserVoucher, validateVoucherForTransaction } = await import('../../lib/voucher');
+
+  const isMembership = isMembershipProduct(params.product.name);
+  const isDeposit = isDepositProduct(params.product.name);
+
+  const checkoutPricing = await calculateCheckoutPrice(
+    params.telegramId,
+    {
+      name: params.product.name,
+      price: params.product.price,
+    },
+    { paymentMethod: params.paymentMethod }
+  );
+
+  const voucherCode = params.explicitVoucherCode || getPendingUserVoucher(params.telegramId);
+  let appliedVoucher: Voucher | null = null;
   let voucherDiscount = 0;
   let voucherCashback = 0;
 
   if (voucherCode) {
-    const isMembership = isMembershipProduct(product.name);
-    const isDeposit = isDepositProduct(product.name);
     const txnType = isDeposit ? 'deposit' : (isMembership ? 'membership' : 'product');
-
     const vResult = await validateVoucherForTransaction({
       code: voucherCode,
-      userId: user.id,
-      telegramId,
+      userId: params.userId,
+      telegramId: params.telegramId,
       transactionType: txnType,
-      productName: product.name,
-      productId: product.id,
+      productName: params.product.name,
+      productId: params.product.id,
       amount: checkoutPricing.basePrice,
     });
 
@@ -329,21 +372,257 @@ export async function handleBuy(
       appliedVoucher = vResult.voucher;
       voucherDiscount = vResult.discountAmount;
       voucherCashback = vResult.cashbackAmount;
-      clearPendingUserVoucher(telegramId);
     }
   }
 
-  // Calculate final payable amount: (base - vipDiscount - voucherDiscount) + hidden fee + unique code
-  const priceAfterDiscounts = Math.max(0, checkoutPricing.basePrice - checkoutPricing.discount - voucherDiscount);
-  const baseWithFee = priceAfterDiscounts + checkoutPricing.fee;
+  const priceAfterDiscounts = Math.max(
+    0,
+    checkoutPricing.basePrice - checkoutPricing.discount - voucherDiscount
+  );
 
+  const balanceDiscount =
+    params.paymentMethod === 'balance' && !isDeposit
+      ? Math.min(BALANCE_PAYMENT_DISCOUNT, priceAfterDiscounts)
+      : 0;
+  const balancePayableAmount = Math.max(0, priceAfterDiscounts - balanceDiscount);
+
+  return {
+    paymentMethod: params.paymentMethod,
+    basePrice: checkoutPricing.basePrice,
+    vipDiscount: checkoutPricing.discount,
+    isVipDiscountApplied: checkoutPricing.isVipDiscountApplied,
+    voucher: appliedVoucher,
+    voucherDiscount,
+    voucherCashback,
+    balanceDiscount,
+    isBalanceDiscountApplied: balanceDiscount > 0,
+    fee: checkoutPricing.fee,
+    priceAfterDiscounts,
+    balancePayableAmount,
+    isDeposit,
+    isMembership,
+  };
+}
+
+/**
+ * Handle product purchase using either dynamic QRIS or account balance (Saldo)
+ */
+export async function handleBuy(
+  ctx: Context,
+  productId: string,
+  botInstance: ExtendedBot,
+  explicitVoucherCode?: string,
+  paymentMethod: CheckoutPaymentMethod = 'qris'
+): Promise<void> {
+  const product = await resolveProductForCheckout(ctx, productId, botInstance);
+  if (!product) {
+    return;
+  }
+
+  // Ensure user exists in users table
+  const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
+  const telegramId = ctx.from?.id ? String(ctx.from.id) : String(chatId);
+  const user = await ensureUser(telegramId, {
+    username: ctx.from?.username,
+    firstName: ctx.from?.first_name,
+  });
+
+  const pricing = await calculateOrderPricing({
+    userId: user.id,
+    telegramId,
+    product,
+    paymentMethod,
+    explicitVoucherCode,
+  });
+
+  const { clearPendingUserVoucher } = await import('../../lib/voucher');
+
+  // === PAYMENT METHOD 1: ACCOUNT BALANCE (SALDO) ===
+  if (paymentMethod === 'balance') {
+    if (pricing.isDeposit) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '⚠️ <b>Metode Tidak Tersedia:</b> Top-up deposit saldo hanya dapat dibayar menggunakan QRIS.',
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '📱 Bayar Deposit pakai QRIS', callback_data: `pay_qris:${product.id}` }],
+              [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    const payableWithBalance = pricing.balancePayableAmount;
+    const orderCode = generateOrderCode();
+    const client = await getClient();
+    let balanceBefore = Number(user.balance ?? 0);
+    let balanceAfter = balanceBefore;
+
+    try {
+      await client.query('BEGIN');
+
+      const deductRes = await client.query<{ balance: number }>(
+        `UPDATE users
+         SET balance = balance - $1
+         WHERE id = $2 AND COALESCE(balance, 0) >= $1
+         RETURNING balance`,
+        [payableWithBalance, user.id]
+      );
+
+      if (deductRes.rows.length === 0) {
+        const latestBalRes = await client.query<{ balance: number }>(
+          'SELECT COALESCE(balance, 0)::int as balance FROM users WHERE id = $1 LIMIT 1',
+          [user.id]
+        );
+        const latestBalance = Number(latestBalRes.rows[0]?.balance ?? user.balance ?? 0);
+        await client.query('ROLLBACK');
+
+        const shortfall = Math.max(0, payableWithBalance - latestBalance);
+        const qrisDisplayPrice = pricing.priceAfterDiscounts;
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `⚠️ <b>SALDO AKUN TIDAK MENCUKUPI</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━\n` +
+          `📦 <b>Produk:</b> ${escapeHtml(product.name)}\n` +
+          `💰 <b>Total Bayar (Saldo -Rp ${pricing.balanceDiscount.toLocaleString('id-ID')}):</b> <b>Rp ${payableWithBalance.toLocaleString('id-ID')}</b>\n` +
+          `💳 <b>Saldo Anda:</b> <b>Rp ${latestBalance.toLocaleString('id-ID')}</b>\n` +
+          `❗ <b>Kurang:</b> <b>Rp ${shortfall.toLocaleString('id-ID')}</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━\n\n` +
+          `Silakan Top Up saldo terlebih dahulu atau lanjutkan pembayaran via QRIS:`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '💰 Saldo (tidak mencukupi | Top up sekarang)', callback_data: 'menu_deposit' }],
+                [{ text: `📱 Bayar dengan QRIS (Rp ${qrisDisplayPrice.toLocaleString('id-ID')})`, callback_data: `pay_qris:${product.id}` }],
+                [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+              ],
+            },
+          }
+        );
+        return;
+      }
+
+      balanceAfter = Number(deductRes.rows[0].balance ?? 0);
+      balanceBefore = balanceAfter + payableWithBalance;
+
+      await client.query(
+        `INSERT INTO orders (
+           user_id,
+           product_id,
+           order_code,
+           payment_status,
+           fulfillment_status,
+           invoice_data
+         ) VALUES ($1, $2, $3, 'unpaid', 'pending', $4)`,
+        [
+          user.id,
+          product.id,
+          orderCode,
+          JSON.stringify({
+            payment_method: 'balance',
+            gateway: 'balance',
+            customer_username: ctx.from?.username || null,
+            customer_first_name: ctx.from?.first_name || null,
+            base_price: pricing.basePrice,
+            discount: pricing.vipDiscount,
+            balance_discount: pricing.balanceDiscount,
+            fee: 0,
+            unique_code: 0,
+            payable_amount: payableWithBalance,
+            paid_with_balance: payableWithBalance,
+            balance_before: balanceBefore,
+            balance_after: balanceAfter,
+            is_vip_discount: pricing.isVipDiscountApplied,
+            is_balance_discount: pricing.isBalanceDiscountApplied,
+            voucher_id: pricing.voucher ? pricing.voucher.id : null,
+            voucher_code: pricing.voucher ? pricing.voucher.code : null,
+            voucher_discount: pricing.voucherDiscount,
+            voucher_cashback: pricing.voucherCashback,
+          }),
+        ]
+      );
+
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK').catch(() => {});
+      console.error('[Buy Command] Balance transaction error:', txErr);
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '❌ Gagal memproses pembayaran menggunakan saldo. Saldo Anda tetap aman. Silakan coba kembali.',
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🔄 Coba Lagi', callback_data: `buy_${product.id}` }],
+              [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+            ],
+          },
+        }
+      );
+      return;
+    } finally {
+      client.release();
+    }
+
+    if (pricing.voucher) {
+      clearPendingUserVoucher(telegramId);
+    }
+
+    try {
+      const { processOrderPayment } = await import('../../lib/fulfillment');
+      await processOrderPayment(orderCode, botInstance, { transactionId: `BAL-${orderCode}` });
+    } catch (fulfillErr) {
+      console.error('[Buy Command] Post-balance payment fulfillment error:', fulfillErr);
+      const statusCheck = await query<{ payment_status: string }>(
+        'SELECT payment_status FROM orders WHERE order_code = $1 LIMIT 1',
+        [orderCode]
+      ).catch(() => ({ rows: [] as Array<{ payment_status: string }> }));
+
+      if (statusCheck.rows[0]?.payment_status === 'unpaid') {
+        await query(
+          'UPDATE users SET balance = balance + $1 WHERE id = $2',
+          [payableWithBalance, user.id]
+        ).catch(() => {});
+        await query(
+          "UPDATE orders SET payment_status = 'expired' WHERE order_code = $1",
+          [orderCode]
+        ).catch(() => {});
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          '❌ Terjadi kendala saat memproses pesanan. Saldo Anda telah dikembalikan otomatis.',
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '🔄 Coba Lagi', callback_data: `buy_${product.id}` }],
+                [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+              ],
+            },
+          }
+        );
+      }
+    }
+    return;
+  }
+
+  // === PAYMENT METHOD 2: DYNAMIC QRIS ===
+  const baseWithFee = pricing.priceAfterDiscounts + pricing.fee;
   const { generateUniqueCheckoutAmount } = await import('../../lib/unique-code');
   const { payableAmount, uniqueCode } = await generateUniqueCheckoutAmount(baseWithFee);
 
-  // 5. Generate unique order_code
+  // Generate unique order_code
   const orderCode = generateOrderCode();
 
-  // 6. Create dynamic QRIS transaction via Sakurupiah (with Midtrans fallback)
+  // Create dynamic QRIS transaction via configured gateway
   let qrisResult: {
     qrCodeUrl: string;
     qrString: string;
@@ -383,7 +662,7 @@ export async function handleBuy(
         parse_mode: 'HTML',
         reply_markup: {
           inline_keyboard: [
-            [{ text: '🔄 Coba Lagi', callback_data: `buy_${trimmedId}` }],
+            [{ text: '🔄 Coba Lagi', callback_data: `pay_qris:${product.id}` }],
             [{ text: '🛍️ Buka Katalog Produk', callback_data: 'menu_products' }],
             [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
           ],
@@ -393,7 +672,11 @@ export async function handleBuy(
     return;
   }
 
-  // 7. Insert order into PostgreSQL `orders` table
+  if (pricing.voucher) {
+    clearPendingUserVoucher(telegramId);
+  }
+
+  // Insert order into PostgreSQL `orders` table
   await query(
     `INSERT INTO orders (
        user_id,
@@ -409,36 +692,39 @@ export async function handleBuy(
       orderCode,
       JSON.stringify({
         ...(qrisResult.raw || {}),
+        payment_method: 'qris',
         customer_username: ctx.from?.username || null,
         customer_first_name: ctx.from?.first_name || null,
         qr_code_url: qrisResult.qrCodeUrl,
         qr_string: qrisResult.qrString,
         checkout_url: qrisResult.checkoutUrl,
-        base_price: checkoutPricing.basePrice,
-        discount: checkoutPricing.discount,
-        fee: checkoutPricing.fee,
+        base_price: pricing.basePrice,
+        discount: pricing.vipDiscount,
+        balance_discount: 0,
+        fee: pricing.fee,
         unique_code: uniqueCode,
         payable_amount: payableAmount,
-        is_vip_discount: checkoutPricing.isVipDiscountApplied,
-        voucher_id: appliedVoucher ? appliedVoucher.id : null,
-        voucher_code: appliedVoucher ? appliedVoucher.code : null,
-        voucher_discount: voucherDiscount,
-        voucher_cashback: voucherCashback,
+        is_vip_discount: pricing.isVipDiscountApplied,
+        is_balance_discount: false,
+        voucher_id: pricing.voucher ? pricing.voucher.id : null,
+        voucher_code: pricing.voucher ? pricing.voucher.code : null,
+        voucher_discount: pricing.voucherDiscount,
+        voucher_cashback: pricing.voucherCashback,
       }),
     ]
   );
 
-  // 8. Format invoice message & send QRIS
+  // Format invoice message & send QRIS
   const formattedPrice = `Rp ${payableAmount.toLocaleString('id-ID')}`;
   let discountLabels = '';
-  if (checkoutPricing.isVipDiscountApplied) {
+  if (pricing.isVipDiscountApplied) {
     discountLabels += ` <i>(Hemat Rp 1.000 via VIP Member! 🌟)</i>`;
   }
-  if (voucherDiscount > 0 && appliedVoucher) {
-    discountLabels += ` <i>(Diskon Voucher ${escapeHtml(appliedVoucher.code)}: -Rp ${voucherDiscount.toLocaleString('id-ID')}! 🎟️)</i>`;
+  if (pricing.voucherDiscount > 0 && pricing.voucher) {
+    discountLabels += ` <i>(Diskon Voucher ${escapeHtml(pricing.voucher.code)}: -Rp ${pricing.voucherDiscount.toLocaleString('id-ID')}! 🎟️)</i>`;
   }
-  if (voucherCashback > 0 && appliedVoucher) {
-    discountLabels += ` <i>(Bonus Cashback ${escapeHtml(appliedVoucher.code)}: +Rp ${voucherCashback.toLocaleString('id-ID')}! 🎁)</i>`;
+  if (pricing.voucherCashback > 0 && pricing.voucher) {
+    discountLabels += ` <i>(Bonus Cashback ${escapeHtml(pricing.voucher.code)}: +Rp ${pricing.voucherCashback.toLocaleString('id-ID')}! 🎁)</i>`;
   }
 
   const invoiceCaption =
@@ -517,6 +803,11 @@ export function registerBuyHandler(botInstance: ExtendedBot): void {
     const parts = text.trim().split(/\s+/);
     const productId = parts[1] || '';
     const voucherCode = parts[2] || undefined;
-    await handleBuy(ctx, productId, botInstance, voucherCode);
+    if (voucherCode) {
+      await handleBuy(ctx, productId, botInstance, voucherCode);
+      return;
+    }
+    const { sendCheckoutMethodMenu } = await import('../menu');
+    await sendCheckoutMethodMenu(ctx, botInstance, productId);
   });
 }

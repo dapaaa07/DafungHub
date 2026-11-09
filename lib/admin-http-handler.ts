@@ -1,11 +1,48 @@
 import http from 'http';
 import { verifyAdminKey, ADMIN_SECRET_KEY } from './admin-auth';
 import { query, Product } from './db';
-import { getAllEnrichedProducts, getSupplierBalance, FALLBACK_PRODUCTS } from './supplier';
+import { getAllEnrichedProducts, getSupplierBalance } from './supplier';
 import { adminManualFulfill } from './fulfillment';
 import { getBotStatus, setBotStatus } from './settings';
-import { getShopeePayAccount } from './shopeepay';
-import { bot } from '../bot/handler';
+import {
+  getShopeePayTokenStatus,
+  updateShopeePayToken,
+  fetchShopeePayTransactions,
+  extractShopeePayTxId,
+  parseShopeePayTimeMs,
+  getWibTodayString,
+} from './shopeepay';
+import { bot, markMessageAsPreserved } from '../bot/handler';
+import { broadcastOrderSuccess } from './broadcast';
+
+interface AdminHttpRequestBody {
+  key?: string;
+  pin?: string;
+  credentials?: string;
+  media?: { name?: string; content?: string; isPhoto?: boolean };
+  file?: { name?: string; content?: string; isPhoto?: boolean };
+  name?: string;
+  price?: number | string;
+  stock?: number | string;
+  description?: string;
+  requiresEmail?: boolean;
+  isActive?: boolean;
+  token?: string;
+  shopeeToken?: string;
+  shopeepayToken?: string;
+  text?: string;
+  isMaintenance?: boolean;
+}
+
+function escapeHtml(str: string): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -56,10 +93,10 @@ export async function handleAdminHttpRequest(
     return true;
   }
 
-  let body: Record<string, any> = {};
+  let body: AdminHttpRequestBody = {};
   try {
     if (bodyStr && bodyStr.trim()) {
-      body = JSON.parse(bodyStr);
+      body = JSON.parse(bodyStr) as AdminHttpRequestBody;
     }
   } catch {
     body = {};
@@ -67,7 +104,9 @@ export async function handleAdminHttpRequest(
 
   // 1. POST /api/admin/auth
   if (pathname === '/api/admin/auth' && req.method === 'POST') {
-    const key = body.key || body.pin || req.headers['x-admin-key'];
+    const rawHeaderKey = req.headers['x-admin-key'];
+    const headerKey = Array.isArray(rawHeaderKey) ? rawHeaderKey[0] : rawHeaderKey;
+    const key = body.key || body.pin || headerKey;
     if (!verifyAdminKey(key)) {
       sendJson(res, 401, {
         success: false,
@@ -129,7 +168,7 @@ export async function handleAdminHttpRequest(
          FROM users`
       );
 
-      const recentOrdersRes = await query<any>(
+      const recentOrdersRes = await query<Record<string, unknown>>(
         `SELECT o.order_code, p.name as product_name, p.price, o.fulfillment_status, o.payment_status,
                 u.telegram_id, u.username, o.created_at
          FROM orders o
@@ -144,7 +183,12 @@ export async function handleAdminHttpRequest(
         username: 'prastyaaneki',
       }));
 
-      const shopeeAccount = await getShopeePayAccount().catch(() => null);
+      const shopeeTokenStatus = await getShopeePayTokenStatus().catch(() => ({
+        success: false,
+        valid: false,
+        tokenStatus: 'unreachable',
+        message: 'Gagal memeriksa status gateway ShopeePay',
+      }));
       const botStatus = await getBotStatus().catch(() => 'online');
 
       sendJson(res, 200, {
@@ -160,10 +204,12 @@ export async function handleAdminHttpRequest(
         supplier: {
           balance: supplierBalance.balance,
           currency: supplierBalance.currency || 'IDR',
-          username: (supplierBalance as any).username || 'Supplier API',
+          username: (supplierBalance as { username?: string }).username || 'Supplier API',
         },
         shopeepay: {
-          isOnline: Boolean(shopeeAccount && (shopeeAccount as any).account_name),
+          isOnline: shopeeTokenStatus.valid,
+          tokenStatus: shopeeTokenStatus.tokenStatus,
+          message: shopeeTokenStatus.message,
           gatewayUrl: process.env.SHOPEEPAY_API_URL || 'https://shopee.prastyaaneki.biz.id',
         },
         bot: {
@@ -188,7 +234,7 @@ export async function handleAdminHttpRequest(
       const offset = (page - 1) * limit;
 
       const conditions: string[] = [];
-      const values: any[] = [];
+      const values: unknown[] = [];
       let valIdx = 1;
 
       if (status) {
@@ -227,7 +273,24 @@ export async function handleAdminHttpRequest(
         ORDER BY o.created_at DESC
         LIMIT $${valIdx++} OFFSET $${valIdx++}
       `;
-      const ordersRes = await query<any>(ordersSql, [...values, limit, offset]);
+      const ordersRes = await query<{
+        id: string;
+        order_code: string;
+        product_id: string;
+        product_name: string;
+        price: number | string;
+        payment_status: string;
+        fulfillment_status: string;
+        is_delivered: boolean;
+        delivered_at: string | null;
+        created_at: string;
+        encrypted_credential: string | null;
+        invoice_data: unknown;
+        telegram_id: string | null;
+        username: string | null;
+        first_name: string | null;
+        membership_tier: string | null;
+      }>(ordersSql, [...values, limit, offset]);
 
       const formatted = ordersRes.rows.map((row) => ({
         id: row.id,
@@ -271,10 +334,12 @@ export async function handleAdminHttpRequest(
   const fulfillMatch = pathname.match(/^\/api\/admin\/orders\/([^/]+)\/fulfill$/);
   if (fulfillMatch && req.method === 'POST') {
     const orderCode = decodeURIComponent(fulfillMatch[1]);
-    const credentials = body.credentials;
-    const file = body.file;
+    const credentials = String(body.credentials || '').trim();
+    const mediaObj = (body.media || body.file) as
+      | { name?: string; content?: string; isPhoto?: boolean }
+      | undefined;
 
-    if (!credentials && !file?.content) {
+    if (!credentials && (!mediaObj || !mediaObj.content)) {
       sendJson(res, 400, {
         success: false,
         error: 'Teks kredensial atau file dokumen wajib diisi.',
@@ -283,8 +348,116 @@ export async function handleAdminHttpRequest(
     }
 
     try {
-      const success = await adminManualFulfill(orderCode, credentials || file?.name || 'Kredensial Dokumen', bot, file);
-      if (success) {
+      const orderRes = await query<{
+        id: string;
+        order_code: string;
+        telegram_id: string;
+        product_name: string;
+      }>(
+        `SELECT o.*, COALESCE(u.telegram_id, '') as telegram_id, COALESCE(p.name, 'Produk Khusus') as product_name
+         FROM orders o
+         LEFT JOIN users u ON o.user_id = u.id
+         LEFT JOIN products p ON o.product_id = p.id
+         WHERE o.order_code = $1 LIMIT 1`,
+        [orderCode]
+      );
+
+      if (orderRes.rows.length === 0) {
+        sendJson(res, 404, {
+          success: false,
+          error: `Pesanan "${orderCode}" tidak ditemukan.`,
+        });
+        return true;
+      }
+
+      const ord = orderRes.rows[0];
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      if (mediaObj?.content && token && ord.telegram_id && ord.telegram_id !== 'Guest') {
+        const fileName = mediaObj.name || (mediaObj.isPhoto ? `${orderCode}_voucher.jpg` : `${orderCode}_kredensial.txt`);
+        const fileBuffer =
+          mediaObj.content.startsWith('data:') && mediaObj.content.includes('base64,')
+            ? Buffer.from(mediaObj.content.split('base64,')[1], 'base64')
+            : Buffer.from(mediaObj.content, 'base64');
+        const isPhoto = Boolean(mediaObj.isPhoto || /\.(jpe?g|png|webp|gif)$/i.test(fileName));
+        const endpoint = isPhoto ? 'sendPhoto' : 'sendDocument';
+        const mimeType = isPhoto ? 'image/jpeg' : 'application/octet-stream';
+        const formData = new FormData();
+        formData.append('chat_id', String(ord.telegram_id));
+        formData.append('parse_mode', 'HTML');
+        formData.append(
+          'caption',
+          `🎉 <b>PESANAN ANDA TELAH SELESAI!</b>\n━━━━━━━━━━━━━━━━━━━\n📦 <b>Produk:</b> ${escapeHtml(ord.product_name)}\n🆔 <b>Kode Order:</b> <code>${escapeHtml(ord.order_code)}</code>\n━━━━━━━━━━━━━━━━━━━` +
+            (credentials ? `\n\n🔑 <b>Kredensial / Petunjuk:</b>\n<code>${escapeHtml(credentials)}</code>` : '') +
+            `\n\n📎 <i>Lampiran akun digital terlampir di atas. Simpan baik-baik!</i>`
+        );
+        formData.append(
+          'reply_markup',
+          JSON.stringify({
+            inline_keyboard: [
+              [
+                { text: '📩 Riwayat Pesanan', callback_data: 'menu_orders' },
+                { text: '🛍️ Beli Produk Baru', callback_data: 'menu_products' },
+              ],
+              [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+            ],
+          })
+        );
+        formData.append(isPhoto ? 'photo' : 'document', new Blob([new Uint8Array(fileBuffer)], { type: mimeType }), fileName);
+
+        const tgRes = await fetch(`https://api.telegram.org/bot${token}/${endpoint}`, {
+          method: 'POST',
+          body: formData,
+        });
+        const tgJson = await tgRes.json().catch(() => null);
+
+        if (tgJson?.ok && tgJson?.result) {
+          const r = tgJson.result;
+          if (r.message_id) {
+            markMessageAsPreserved(String(ord.telegram_id), r.message_id);
+          }
+          const uploadedFileId = isPhoto
+            ? r.photo?.[r.photo.length - 1]?.file_id
+            : r.document?.file_id || r.video?.file_id || r.audio?.file_id || r.animation?.file_id;
+          const uploadedType = isPhoto
+            ? 'photo'
+            : r.animation?.file_id
+              ? 'animation'
+              : r.video?.file_id
+                ? 'video'
+                : r.audio?.file_id
+                  ? 'audio'
+                  : 'document';
+          if (uploadedFileId) {
+            const { encrypt } = await import('./encrypt');
+            const storedCred = `[MEDIA: ${fileName}] ${credentials || 'Dikirim via lampiran media'}`;
+            await query(
+              `UPDATE orders
+               SET payment_status = 'paid',
+                   fulfillment_status = 'delivered',
+                   credential_encrypted = $1,
+                   delivered_at = CURRENT_TIMESTAMP,
+                   invoice_data = jsonb_set(COALESCE(invoice_data::jsonb, '{}'::jsonb), '{delivered_media}', $3::jsonb)
+               WHERE id = $2`,
+              [
+                encrypt(storedCred),
+                ord.id,
+                JSON.stringify({ type: uploadedType, fileId: uploadedFileId, fileName, mimeType }),
+              ]
+            );
+            broadcastOrderSuccess(orderCode, bot).catch((bErr) => {
+              console.warn('[Broadcast Warning] Failed to broadcast admin HTTP media fulfill:', bErr);
+            });
+            sendJson(res, 200, {
+              success: true,
+              message: `Pesanan ${orderCode} beserta lampiran berhasil dipenuhi dan dikirim ke pembeli.`,
+            });
+            return true;
+          }
+        }
+      }
+
+      const fulfillRes = await adminManualFulfill(orderCode, credentials, bot);
+      if (fulfillRes.success) {
         sendJson(res, 200, {
           success: true,
           message: `Pesanan ${orderCode} berhasil dipenuhi dan kredensial telah dikirimkan ke Telegram pembeli.`,
@@ -292,7 +465,7 @@ export async function handleAdminHttpRequest(
       } else {
         sendJson(res, 400, {
           success: false,
-          error: `Gagal memenuhi pesanan ${orderCode}. Pastikan status pesanan sudah dibayar.`,
+          error: fulfillRes.message || `Gagal memenuhi pesanan ${orderCode}.`,
         });
       }
       return true;
@@ -359,7 +532,7 @@ export async function handleAdminHttpRequest(
       try {
         const { price, stock, isActive, description, name } = body;
         const updates: string[] = [];
-        const values: any[] = [];
+        const values: unknown[] = [];
         let vIdx = 1;
 
         if (price !== undefined) {
@@ -430,7 +603,7 @@ export async function handleAdminHttpRequest(
       const offset = (page - 1) * limit;
 
       const conditions: string[] = [];
-      const values: any[] = [];
+      const values: unknown[] = [];
       let valIdx = 1;
 
       if (search) {
@@ -460,7 +633,19 @@ export async function handleAdminHttpRequest(
         ORDER BY u.created_at DESC
         LIMIT $${valIdx++} OFFSET $${valIdx++}
       `;
-      const usersRes = await query<any>(usersSql, [...values, limit, offset]);
+      const usersRes = await query<{
+        id: string;
+        telegram_id: string;
+        role: string;
+        balance: number | string | null;
+        username: string | null;
+        first_name: string | null;
+        membership_tier: string | null;
+        membership_expires_at: string | Date | null;
+        created_at: string | Date;
+        total_orders: string | number;
+        total_spent: string | number;
+      }>(usersSql, [...values, limit, offset]);
 
       const formatted = usersRes.rows.map((row) => ({
         id: row.id,
@@ -501,7 +686,14 @@ export async function handleAdminHttpRequest(
   if (userDetailMatch && req.method === 'GET') {
     const id = decodeURIComponent(userDetailMatch[1]);
     try {
-      const userRes = await query<any>(
+      const userRes = await query<
+        Record<string, unknown> & {
+          id: string;
+          balance?: number | string | null;
+          membership_tier?: string | null;
+          membership_expires_at?: string | Date | null;
+        }
+      >(
         `SELECT * FROM users WHERE id = $1 OR telegram_id = $1 LIMIT 1`,
         [id]
       );
@@ -511,7 +703,7 @@ export async function handleAdminHttpRequest(
       }
       const user = userRes.rows[0];
 
-      const ordersRes = await query<any>(
+      const ordersRes = await query<Record<string, unknown>>(
         `SELECT o.id, o.order_code, o.payment_status, o.fulfillment_status, o.created_at,
                 p.name as product_name, p.price
          FROM orders o
@@ -537,33 +729,28 @@ export async function handleAdminHttpRequest(
     }
   }
 
-  // 9. GET /api/admin/shopeepay
+  // 9. GET & POST /api/admin/shopeepay
   if (pathname === '/api/admin/shopeepay' && req.method === 'GET') {
     try {
       const limit = Math.min(100, Math.max(10, parseInt(parsedUrl.searchParams.get('limit') || '50', 10)));
-      const gatewayUrl = `${(process.env.SHOPEEPAY_API_URL || 'https://shopee.prastyaaneki.biz.id').replace(/\/+$/, '')}/transactions?page_size=${limit}`;
-      const gatewayRes = await fetch(gatewayUrl, {
-        method: 'GET',
-        headers: {
-          'x-api-key': process.env.SHOPEEPAY_API_KEY || '',
-          'Content-Type': 'application/json',
-        },
-      }).catch(() => null);
-      const gatewayJson = gatewayRes && gatewayRes.ok ? await gatewayRes.json().catch(() => ({})) : {};
-      const rawTransactions: any[] = gatewayJson?.data?.transactions || gatewayJson?.transactions || [];
+      const txFetch = await fetchShopeePayTransactions(limit);
+      const rawTransactions = txFetch.transactions;
 
       const reconciliationRes = await query<{
         order_code: string;
         payment_status: string;
         created_at: string;
-        payable_amount: string;
+        payable_amount: string | null;
+        price: number;
+        shopeepay_tx_id: string | null;
         product_name: string;
         telegram_id: string;
         username: string | null;
       }>(
         `SELECT o.order_code, o.payment_status, o.created_at,
                 (o.invoice_data->>'payable_amount') as payable_amount,
-                p.name as product_name, u.telegram_id, u.username
+                (o.invoice_data->>'shopeepay_tx_id') as shopeepay_tx_id,
+                p.price, p.name as product_name, u.telegram_id, u.username
          FROM orders o
          JOIN products p ON o.product_id = p.id
          LEFT JOIN users u ON o.user_id = u.id
@@ -572,26 +759,48 @@ export async function handleAdminHttpRequest(
       );
 
       const recentOrders = reconciliationRes.rows;
+      const orderByTxId = new Map<string, (typeof recentOrders)[number]>();
+      for (const ord of recentOrders) {
+        if (ord.shopeepay_tx_id) {
+          orderByTxId.set(String(ord.shopeepay_tx_id).trim(), ord);
+        }
+      }
 
-      const reconciledTransactions = rawTransactions.map((tx: any, idx: number) => {
-        const txAmount = Number(tx.amount || 0);
-        const txTime = new Date(tx.time || tx.created_at || Date.now()).getTime();
+      const todayStr = getWibTodayString();
+      let totalToday = 0;
 
-        const matchedOrder = recentOrders.find((ord) => {
-          const ordAmount = Number(ord.payable_amount || 0);
-          if (ordAmount !== txAmount) return false;
-          const ordTime = new Date(ord.created_at).getTime();
-          const diffMinutes = Math.abs(txTime - ordTime) / (1000 * 60);
-          return diffMinutes <= 180;
-        });
+      const reconciledTransactions = rawTransactions.map((tx, idx: number) => {
+        const txId = extractShopeePayTxId(tx) || `TX-${Date.now()}-${idx}`;
+        const txAmount = Math.round(Number(tx.amount || tx.nominal || tx.total || 0));
+        const rawTime = String(tx.time || tx.created_at || tx.timestamp || tx.date || '').trim();
+        const txTimeMs = parseShopeePayTimeMs(rawTime);
+        const effectiveTimeMs = isNaN(txTimeMs) ? Date.now() : txTimeMs;
+
+        const txWibDate = !isNaN(txTimeMs)
+          ? new Date(txTimeMs + 7 * 60 * 60 * 1000).toISOString().slice(0, 10)
+          : rawTime.slice(0, 10);
+        if (txWibDate === todayStr) {
+          totalToday += txAmount;
+        }
+
+        let matchedOrder = txId ? orderByTxId.get(txId) : undefined;
+        if (!matchedOrder && txAmount > 0) {
+          matchedOrder = recentOrders.find((ord) => {
+            const ordAmount = Math.round(Number(ord.payable_amount || ord.price || 0));
+            if (ordAmount !== txAmount) return false;
+            const ordTime = new Date(ord.created_at).getTime();
+            const diffMinutes = Math.abs(effectiveTimeMs - ordTime) / (1000 * 60);
+            return diffMinutes <= 180;
+          });
+        }
 
         return {
-          transactionId: tx.transaction_id || tx.id || `TX-${Date.now()}-${idx}`,
+          transactionId: txId,
           amount: txAmount,
           formattedAmount: `Rp ${txAmount.toLocaleString('id-ID')}`,
-          status: tx.status || 'Berhasil',
-          time: tx.time || tx.created_at || new Date().toISOString(),
-          issuer: tx.issuer || tx.payment_method || 'ShopeePay',
+          status: String(tx.status || 'Berhasil'),
+          time: rawTime || new Date().toISOString(),
+          issuer: String(tx.issuer || tx.payment_method || 'ShopeePay'),
           isMatched: Boolean(matchedOrder),
           order: matchedOrder
             ? {
@@ -604,15 +813,12 @@ export async function handleAdminHttpRequest(
         };
       });
 
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const totalToday = reconciledTransactions
-        .filter((tx: any) => String(tx.time).startsWith(todayStr))
-        .reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
-
-      const totalAll = reconciledTransactions.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
-      const matchedCount = reconciledTransactions.filter((tx: any) => tx.isMatched).length;
+      const totalAll = reconciledTransactions.reduce((sum: number, tx) => sum + (tx.amount || 0), 0);
+      const matchedCount = reconciledTransactions.filter((tx) => tx.isMatched).length;
 
       sendJson(res, 200, {
+        tokenValid: txFetch.ok && !txFetch.sessionExpired,
+        gatewayError: txFetch.ok ? null : (txFetch.error || null),
         summary: {
           totalTransactions: reconciledTransactions.length,
           matchedOrdersCount: matchedCount,
@@ -631,12 +837,43 @@ export async function handleAdminHttpRequest(
     }
   }
 
+  if (pathname === '/api/admin/shopeepay' && req.method === 'POST') {
+    const rawToken = String(body.token || body.shopeeToken || body.shopeepayToken || '').trim();
+    if (!rawToken) {
+      sendJson(res, 400, {
+        success: false,
+        error: 'Token ShopeePay wajib diisi.',
+      });
+      return true;
+    }
+
+    try {
+      const result = await updateShopeePayToken(rawToken);
+      sendJson(res, result.success ? 200 : 502, result);
+      return true;
+    } catch (err) {
+      sendJson(res, 500, { success: false, error: (err as Error).message });
+      return true;
+    }
+  }
+
   // 10. GET /api/admin/notifications
   if (pathname === '/api/admin/notifications' && req.method === 'GET') {
     try {
       const since = parsedUrl.searchParams.get('since') || new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
-      const newPaidOrdersRes = await query<any>(
+      const newPaidOrdersRes = await query<{
+        id: string;
+        order_code: string;
+        product_name: string;
+        price: number | string;
+        fulfillment_status: string;
+        created_at: string | Date;
+        telegram_id: string | null;
+        username: string | null;
+        first_name: string | null;
+        membership_tier: string | null;
+      }>(
         `SELECT o.id, o.order_code, p.name as product_name, p.price, o.fulfillment_status,
                 o.created_at, u.telegram_id, u.username, u.first_name, u.membership_tier
          FROM orders o

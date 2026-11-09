@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { verifyAdminRequest, unauthorizedResponse } from '@/lib/admin-auth';
 import { getSupplierBalance, getSupplierProfile } from '@/lib/supplier';
-import { SHOPEEPAY_BASE_URL, SHOPEEPAY_API_KEY } from '@/lib/shopeepay';
+import { SHOPEEPAY_BASE_URL, getShopeePayTokenStatus } from '@/lib/shopeepay';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -68,17 +68,13 @@ export async function GET(req: Request) {
       // Keep defaults if supplier offline
     }
 
-    // 4. ShopeePay gateway check
-    let shopeeOnline = false;
-    try {
-      const shopeeRes = await fetch(`${SHOPEEPAY_BASE_URL.replace(/\/+$/, '')}/transactions?page_size=1`, {
-        method: 'GET',
-        headers: { 'x-api-key': SHOPEEPAY_API_KEY },
-      });
-      shopeeOnline = shopeeRes.ok;
-    } catch {
-      shopeeOnline = false;
-    }
+    // 4. ShopeePay gateway real-time token check
+    const shopeeTokenStatus = await getShopeePayTokenStatus().catch(() => ({
+      success: false,
+      valid: false,
+      tokenStatus: 'unreachable',
+      message: 'Gagal memeriksa status gateway ShopeePay',
+    }));
 
     // 5. Bot maintenance status
     let isMaintenance = false;
@@ -130,7 +126,9 @@ export async function GET(req: Request) {
           username: supplierUsername,
         },
         shopeepay: {
-          isOnline: shopeeOnline,
+          isOnline: shopeeTokenStatus.valid,
+          tokenStatus: shopeeTokenStatus.tokenStatus,
+          message: shopeeTokenStatus.message,
           gatewayUrl: SHOPEEPAY_BASE_URL,
         },
         bot: {

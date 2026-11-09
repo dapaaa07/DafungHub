@@ -2,11 +2,25 @@ import fs from 'fs';
 import path from 'path';
 import { Context } from 'node-telegram-bot-api';
 import { fromPath } from 'node-telegram-bot-api/node';
-import { ExtendedBot, sendSafeMessage, sendSafePhoto } from './handler';
+import {
+  ExtendedBot,
+  sendSafeMessage,
+  sendSafePhoto,
+  markMessageAsPreserved,
+  cleanupChatMessages,
+  recordBotMessage,
+} from './handler';
 import { getSupplierProducts, getSupplierProfile, getSupplierBalance, SupplierProduct, isTestProduct } from '../lib/supplier';
 import { query, Order, Product } from '../lib/db';
-import { handleBuy } from './commands/buy';
-import { isAdmin, calculateSellingPrice, ADMIN_TELEGRAM_ID, getEffectiveSellingPrice } from '../lib/pricing';
+import { decrypt } from '../lib/encrypt';
+import { formatWibDateTime, sendTelegramApi } from '../lib/broadcast';
+import {
+  handleBuy,
+  resolveProductForCheckout,
+  ensureUser,
+  calculateOrderPricing,
+} from './commands/buy';
+import { isAdmin, ADMIN_TELEGRAM_ID, getEffectiveSellingPrice } from '../lib/pricing';
 import { getCustomPrices } from '../lib/custom-prices';
 import {
   adminRetrySupplierFulfill,
@@ -687,20 +701,30 @@ export async function sendProductDetail(
     const priceStr = `Rp ${sellingPrice.toLocaleString('id-ID')}`;
     const statusStr = prod.availability === 'in_stock' ? '🟢 Stok Tersedia' : '🔴 Stok Habis';
 
-    const { getUserMembership } = await import('../lib/membership');
+    const { getUserMembership, isDepositProduct, BALANCE_PAYMENT_DISCOUNT } = await import('../lib/membership');
     const memberInfo = await getUserMembership(String(ctx.from?.id)).catch(() => null);
     let priceSection = `• Harga: <b>${escapeHtml(priceStr)}</b>\n`;
     let buttonBuyText = `💳 Beli Sekarang (${priceStr})`;
+    let effectiveDisplayPrice = sellingPrice;
 
     if (memberInfo?.isVip && memberInfo.remainingWeeklyQuota >= 1000 && sellingPrice > 1000) {
       const vipPrice = sellingPrice - 1000;
       const vipPriceStr = `Rp ${vipPrice.toLocaleString('id-ID')}`;
+      effectiveDisplayPrice = vipPrice;
       priceSection =
         `• Harga Normal: <s>${escapeHtml(priceStr)}</s>\n` +
         `• Harga VIP Member: <b>${escapeHtml(vipPriceStr)}</b> <i>(Hemat Rp 1.000! 🌟)</i>\n`;
       buttonBuyText = `💳 Beli Sekarang (${vipPriceStr})`;
     } else if (!memberInfo?.isVip && sellingPrice > 1000) {
       priceSection += `💡 <i>Tips: Gabung VIP Member untuk dapat harga Rp ${(sellingPrice - 1000).toLocaleString('id-ID')}!</i>\n`;
+    }
+
+    const saldoPreviewDiscount = !isDepositProduct(prod.name)
+      ? Math.min(BALANCE_PAYMENT_DISCOUNT, effectiveDisplayPrice)
+      : 0;
+    if (saldoPreviewDiscount > 0) {
+      const saldoPreviewPrice = Math.max(0, effectiveDisplayPrice - saldoPreviewDiscount);
+      priceSection += `• Bayar via Saldo: <b>Rp ${saldoPreviewPrice.toLocaleString('id-ID')}</b> <i>(Lebih murah Rp ${saldoPreviewDiscount.toLocaleString('id-ID')}! 💰)</i>\n`;
     }
 
     const detailText =
@@ -713,7 +737,7 @@ export async function sendProductDetail(
         ? `\n📝 <b>Deskripsi / Ketentuan:</b>\n${escapeHtml(prod.description.substring(0, 300))}\n`
         : '') +
       `━━━━━━━━━━━━━━━━━━━\n` +
-      `Sentuh tombol di bawah untuk langsung membuat invoice pembayaran QRIS:`;
+      `Sentuh tombol di bawah untuk memilih metode pembayaran (QRIS / Saldo):`;
 
     const buttons = [];
     if (prod.availability === 'in_stock') {
@@ -760,6 +784,139 @@ export async function sendProductDetail(
 }
 
 /**
+ * Display dual payment method choice (QRIS vs Saldo) before checkout execution.
+ * Balance payments automatically receive a Rp 200 discount across all products.
+ */
+export async function sendCheckoutMethodMenu(
+  ctx: Context,
+  botInstance: ExtendedBot,
+  productId: string
+): Promise<void> {
+  try {
+    const product = await resolveProductForCheckout(ctx, productId, botInstance);
+    if (!product) {
+      return;
+    }
+
+    const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
+    const telegramId = ctx.from?.id ? String(ctx.from.id) : String(chatId);
+    const user = await ensureUser(telegramId, {
+      username: ctx.from?.username,
+      firstName: ctx.from?.first_name,
+    });
+
+    const [qrisPricing, balancePricing] = await Promise.all([
+      calculateOrderPricing({
+        userId: user.id,
+        telegramId,
+        product,
+        paymentMethod: 'qris',
+      }),
+      calculateOrderPricing({
+        userId: user.id,
+        telegramId,
+        product,
+        paymentMethod: 'balance',
+      }),
+    ]);
+
+    // Deposit / balance top-up orders can only be paid via QRIS
+    if (qrisPricing.isDeposit) {
+      await handleBuy(ctx, product.id, botInstance, undefined, 'qris');
+      return;
+    }
+
+    const userBalance = Math.max(0, Number(user.balance ?? 0));
+    const qrisPayableDisplay = qrisPricing.priceAfterDiscounts;
+    const balancePayable = balancePricing.balancePayableAmount;
+    const isBalanceSufficient = userBalance >= balancePayable;
+
+    let discountSummary = '';
+    if (qrisPricing.isVipDiscountApplied) {
+      discountSummary += `• Diskon VIP Member: <b>-Rp ${qrisPricing.vipDiscount.toLocaleString('id-ID')}</b> 🌟\n`;
+    }
+    if (qrisPricing.voucher && qrisPricing.voucherDiscount > 0) {
+      discountSummary += `• Voucher (<code>${escapeHtml(qrisPricing.voucher.code)}</code>): <b>-Rp ${qrisPricing.voucherDiscount.toLocaleString('id-ID')}</b> 🎟️\n`;
+    }
+
+    const balanceNoteLine = isBalanceSufficient
+      ? `✅ <i>Saldo mencukupi! Pilih bayar pakai Saldo untuk langsung hemat Rp ${balancePricing.balanceDiscount.toLocaleString('id-ID')}.</i>`
+      : `⚠️ <i>Saldo kurang <b>Rp ${Math.max(0, balancePayable - userBalance).toLocaleString('id-ID')}</b> untuk metode Saldo. Silakan Top up sekarang atau bayar via QRIS.</i>`;
+
+    const checkoutText =
+      `🛒 <b>PILIH METODE PEMBAYARAN</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n` +
+      `📦 <b>Produk:</b> ${escapeHtml(product.name)}\n` +
+      `🏷️ <b>Harga Produk:</b> Rp ${qrisPricing.basePrice.toLocaleString('id-ID')}\n` +
+      discountSummary +
+      `💳 <b>Saldo Akun Anda:</b> <b>Rp ${userBalance.toLocaleString('id-ID')}</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n\n` +
+      `• 📱 <b>QRIS Instant:</b> <b>Rp ${qrisPayableDisplay.toLocaleString('id-ID')}</b> <i>(+ kode unik pembayaran)</i>\n` +
+      `• 💰 <b>Saldo Akun:</b> <b>Rp ${balancePayable.toLocaleString('id-ID')}</b> <i>(Lebih murah Rp ${balancePricing.balanceDiscount.toLocaleString('id-ID')}! ⚡)</i>\n\n` +
+      balanceNoteLine;
+
+    const buttons: Array<Array<{ text: string; callback_data: string }>> = [
+      [
+        {
+          text: `📱 Bayar dengan QRIS (Rp ${qrisPayableDisplay.toLocaleString('id-ID')})`,
+          callback_data: `pay_qris:${product.id}`,
+        },
+      ],
+      [
+        isBalanceSufficient
+          ? {
+              text: `💰 Bayar dengan Saldo (Rp ${balancePayable.toLocaleString('id-ID')} • Hemat Rp ${balancePricing.balanceDiscount.toLocaleString('id-ID')})`,
+              callback_data: `pay_bal:${product.id}`,
+            }
+          : {
+              text: '💰 Saldo (tidak mencukupi | Top up sekarang)',
+              callback_data: 'menu_deposit',
+            },
+      ],
+      [
+        {
+          text: '🎟️ Gunakan Kode Voucher',
+          callback_data: `input_voucher_${product.id}`,
+        },
+      ],
+    ];
+
+    if (qrisPricing.isMembership) {
+      buttons.push([
+        { text: '◀️ Kembali ke Membership', callback_data: 'menu_membership' },
+        { text: '🔙 Menu Utama', callback_data: 'menu_main' },
+      ]);
+    } else {
+      const backPlat = matchProductPlatform(product.name)?.id || 'all';
+      buttons.push([
+        { text: '◀️ Detail Produk', callback_data: `pdetail:${backPlat}:${product.id}` },
+        { text: '🔙 Menu Utama', callback_data: 'menu_main' },
+      ]);
+    }
+
+    await sendSafeMessage(ctx, botInstance, checkoutText, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: buttons },
+    });
+  } catch (err) {
+    console.error('[Checkout Method Menu] Failed:', err);
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      '⚠️ Gagal memuat pilihan metode pembayaran. Silakan coba kembali.',
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🛍️ Buka Katalog Produk', callback_data: 'menu_products' }],
+            [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+          ],
+        },
+      }
+    );
+  }
+}
+
+/**
  * Display user profile
  */
 export async function sendProfileMenu(ctx: Context, botInstance: ExtendedBot): Promise<void> {
@@ -772,22 +929,11 @@ export async function sendProfileMenu(ctx: Context, botInstance: ExtendedBot): P
 
   if (ctx.from?.id) {
     try {
-      const userRes = await query<{ balance: number }>(
-        `SELECT balance FROM users WHERE telegram_id = $1 LIMIT 1`,
-        [String(ctx.from.id)]
-      );
-      if (userRes.rows.length > 0 && typeof userRes.rows[0].balance === 'number') {
-        balance = userRes.rows[0].balance;
-      } else {
-        // Auto-register user in DB with initial balance 0 if not yet present
-        await query(
-          `INSERT INTO users (telegram_id, role, balance)
-           VALUES ($1, $2, 0)
-           ON CONFLICT (telegram_id) DO UPDATE SET telegram_id = EXCLUDED.telegram_id`,
-          [String(ctx.from.id), isOwner ? 'admin' : 'buyer']
-        );
-        balance = 0;
-      }
+      const syncedUser = await ensureUser(String(ctx.from.id), {
+        username: ctx.from?.username,
+        firstName: ctx.from?.first_name,
+      });
+      balance = typeof syncedUser?.balance === 'number' ? syncedUser.balance : 0;
     } catch (err) {
       console.error('[Profile] Error fetching user balance:', err);
       balance = 0;
@@ -920,37 +1066,265 @@ export async function sendMembershipMenu(ctx: Context, botInstance: ExtendedBot)
   });
 }
 
+interface OrderHistoryRow extends Order {
+  product_name?: string | null;
+  product_price?: number | null;
+  buyer_telegram_id?: string | null;
+}
+
+export interface DeliveredMediaMeta {
+  type: 'document' | 'photo' | 'video' | 'audio' | 'voice' | 'animation' | 'sticker';
+  fileId: string;
+  fileName?: string;
+  mimeType?: string | null;
+}
+
+export interface ParsedCredentialDisplay {
+  attachmentLabel: string | null;
+  credentialText: string | null;
+}
+
+function safeDecryptCredential(ciphertext?: string | null): string | null {
+  if (!ciphertext || typeof ciphertext !== 'string' || !ciphertext.trim()) {
+    return null;
+  }
+  try {
+    const plain = decrypt(ciphertext);
+    return plain && plain.trim() ? plain : null;
+  } catch {
+    return null;
+  }
+}
+
+export function parseStoredCredentialDisplay(
+  rawDecrypted: string | null
+): ParsedCredentialDisplay {
+  if (!rawDecrypted || !rawDecrypted.trim()) {
+    return { attachmentLabel: null, credentialText: null };
+  }
+  const trimmed = rawDecrypted.trim();
+  const prefixMatch = trimmed.match(/^\[(FILE|MEDIA):\s*([^\]]+)\]\s*([\s\S]*)$/i);
+  if (!prefixMatch) {
+    return { attachmentLabel: null, credentialText: trimmed };
+  }
+  const attachmentLabel = prefixMatch[2]?.trim() || null;
+  const remainder = (prefixMatch[3] || '').trim();
+  const isPlaceholder =
+    !remainder || remainder.toLowerCase() === 'dikirim via lampiran media';
+  return {
+    attachmentLabel,
+    credentialText: isPlaceholder ? null : remainder,
+  };
+}
+
+function extractDeliveredMedia(rawInvoiceData: unknown): DeliveredMediaMeta | null {
+  if (!rawInvoiceData) return null;
+  let data: Record<string, unknown> = {};
+  if (typeof rawInvoiceData === 'string') {
+    try {
+      data = JSON.parse(rawInvoiceData) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  } else if (typeof rawInvoiceData === 'object') {
+    data = rawInvoiceData as Record<string, unknown>;
+  }
+  const dm = data.delivered_media as Record<string, unknown> | undefined;
+  if (!dm || typeof dm.fileId !== 'string' || !dm.fileId.trim()) {
+    return null;
+  }
+  const allowedTypes = new Set([
+    'document',
+    'photo',
+    'video',
+    'audio',
+    'voice',
+    'animation',
+    'sticker',
+  ]);
+  const mediaType = typeof dm.type === 'string' && allowedTypes.has(dm.type)
+    ? (dm.type as DeliveredMediaMeta['type'])
+    : 'document';
+  return {
+    type: mediaType,
+    fileId: dm.fileId.trim(),
+    fileName: typeof dm.fileName === 'string' ? dm.fileName : undefined,
+    mimeType: typeof dm.mimeType === 'string' ? dm.mimeType : null,
+  };
+}
+
+async function dispatchOrderMedia(
+  botInstance: ExtendedBot,
+  chatId: string | number,
+  deliveredMedia: DeliveredMediaMeta,
+  caption: string,
+  replyMarkup?: Record<string, unknown>
+): Promise<{
+  ok: boolean;
+  attempted: boolean;
+  skippedDummy: boolean;
+  messageId?: number;
+  error?: string;
+}> {
+  const methodMap: Record<
+    DeliveredMediaMeta['type'],
+    { method: string; field: string; supportsCaption: boolean }
+  > = {
+    document: { method: 'sendDocument', field: 'document', supportsCaption: true },
+    photo: { method: 'sendPhoto', field: 'photo', supportsCaption: true },
+    video: { method: 'sendVideo', field: 'video', supportsCaption: true },
+    audio: { method: 'sendAudio', field: 'audio', supportsCaption: true },
+    voice: { method: 'sendVoice', field: 'voice', supportsCaption: true },
+    animation: { method: 'sendAnimation', field: 'animation', supportsCaption: true },
+    sticker: { method: 'sendSticker', field: 'sticker', supportsCaption: false },
+  };
+  const target = methodMap[deliveredMedia.type] || methodMap.document;
+  const safeCaption = caption.length > 980 ? `${caption.slice(0, 977)}...` : caption;
+  const payload: Record<string, unknown> = {
+    chat_id: chatId,
+    [target.field]: deliveredMedia.fileId,
+    ...(target.supportsCaption ? { caption: safeCaption, parse_mode: 'HTML' } : {}),
+    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+  };
+
+  // 1. Check own-property api mock (for unit tests overriding e.g. botInstance.api.sendDocument)
+  const apiObj = botInstance?.api as unknown as Record<string, unknown> | undefined;
+  if (
+    apiObj &&
+    Object.prototype.hasOwnProperty.call(apiObj, target.method) &&
+    typeof apiObj[target.method] === 'function'
+  ) {
+    try {
+      const mockRes = await (
+        apiObj[target.method] as (p: Record<string, unknown>) => Promise<unknown>
+      )(payload);
+      const messageId = (mockRes as { message_id?: number } | undefined)?.message_id;
+      return { ok: true, attempted: true, skippedDummy: false, messageId };
+    } catch (err) {
+      return {
+        ok: false,
+        attempted: true,
+        skippedDummy: false,
+        error: (err as Error)?.message || 'Media send mock error',
+      };
+    }
+  }
+
+  const transportToken = (
+    botInstance as unknown as { api?: { transport?: { token?: string } } }
+  )?.api?.transport?.token;
+  const isDummyTransport =
+    typeof transportToken === 'string' &&
+    (transportToken.startsWith('dummy_') || transportToken === 'dummy_token_for_build');
+
+  // 2. Check own-property botInstance.sendPhoto mock on dummy bots
+  if (
+    isDummyTransport &&
+    deliveredMedia.type === 'photo' &&
+    botInstance &&
+    Object.prototype.hasOwnProperty.call(botInstance, 'sendPhoto') &&
+    typeof botInstance.sendPhoto === 'function'
+  ) {
+    try {
+      const mockRes = await botInstance.sendPhoto(chatId, deliveredMedia.fileId, {
+        caption: safeCaption,
+        parse_mode: 'HTML',
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+      });
+      const messageId = (mockRes as { message_id?: number } | undefined)?.message_id;
+      return { ok: true, attempted: true, skippedDummy: false, messageId };
+    } catch (err) {
+      return {
+        ok: false,
+        attempted: true,
+        skippedDummy: false,
+        error: (err as Error)?.message || 'Photo send mock error',
+      };
+    }
+  }
+
+  // 3. Avoid real network calls for dummy test bot instances without explicit media mocks
+  if (isDummyTransport) {
+    return { ok: false, attempted: false, skippedDummy: true };
+  }
+
+  const effectiveToken = transportToken || process.env.TELEGRAM_BOT_TOKEN || '';
+  if (
+    !effectiveToken ||
+    effectiveToken.startsWith('dummy_') ||
+    effectiveToken === 'dummy_token_for_build'
+  ) {
+    return { ok: false, attempted: false, skippedDummy: true };
+  }
+
+  const apiRes = await sendTelegramApi(target.method, payload);
+  if (apiRes.ok) {
+    const messageId = (apiRes.result as { message_id?: number } | undefined)?.message_id;
+    return { ok: true, attempted: true, skippedDummy: false, messageId };
+  }
+  return {
+    ok: false,
+    attempted: true,
+    skippedDummy: false,
+    error: apiRes.description || 'Media tidak tersedia',
+  };
+}
+
 /**
- * Display user's orders
+ * Display user's order history along with delivered credentials
  */
-export async function sendOrdersMenu(ctx: Context, botInstance: ExtendedBot): Promise<void> {
+export async function sendOrdersMenu(
+  ctx: Context,
+  botInstance: ExtendedBot,
+  page: number = 0
+): Promise<void> {
   const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.from?.id;
   const telegramId = ctx.from?.id ? String(ctx.from.id) : String(chatId);
+  const pageSize = 5;
+  const requestedPage = Math.max(0, Number.isFinite(page) ? Math.floor(page) : 0);
 
-  let ordersList: Order[] = [];
+  let ordersList: OrderHistoryRow[] = [];
+  let totalOrders = 0;
+  let currentPage = requestedPage;
+  let totalPages = 1;
+
   try {
-    const res = await query<Order>(
-      `SELECT o.*, p.name as product_name
+    const countRes = await query<{ total: string }>(
+      `SELECT COUNT(*)::text as total
+       FROM orders o
+       JOIN users u ON o.user_id = u.id
+       WHERE u.telegram_id = $1`,
+      [telegramId]
+    );
+    totalOrders = parseInt(countRes.rows[0]?.total || '0', 10) || 0;
+    totalPages = Math.max(1, Math.ceil(totalOrders / pageSize));
+    currentPage = Math.min(requestedPage, totalPages - 1);
+    const offset = currentPage * pageSize;
+
+    const res = await query<OrderHistoryRow>(
+      `SELECT o.*, p.name as product_name, p.price as product_price
        FROM orders o
        JOIN users u ON o.user_id = u.id
        LEFT JOIN products p ON o.product_id = p.id
        WHERE u.telegram_id = $1
        ORDER BY o.created_at DESC
-       LIMIT 5`,
-      [telegramId]
+       LIMIT $2 OFFSET $3`,
+      [telegramId, pageSize, offset]
     );
     ordersList = res.rows;
   } catch (err) {
     console.error('Failed to query orders:', err);
   }
 
-  let text = `📩 <b>RIWAYAT PESANAN SAYA</b>\n━━━━━━━━━━━━━━━━━━━\n`;
-  const buttons = [];
+  const pageLabel = totalPages > 1 ? ` (Hal ${currentPage + 1}/${totalPages})` : '';
+  let text = `📩 <b>RIWAYAT PESANAN SAYA${pageLabel}</b>\n━━━━━━━━━━━━━━━━━━━\n`;
+  const buttons: Array<Array<{ text: string; callback_data: string }>> = [];
 
   if (ordersList.length === 0) {
     text += `Belum ada pesanan aktif.\nSilakan pilih menu <b>🟢 Produk</b> untuk mulai membeli akun digital!\n`;
   } else {
-    for (const ord of ordersList) {
+    for (let i = 0; i < ordersList.length; i++) {
+      let ord = ordersList[i];
       if (ord.payment_status === 'unpaid') {
         try {
           const invData =
@@ -960,21 +1334,37 @@ export async function sendOrdersMenu(ctx: Context, botInstance: ExtendedBot): Pr
           const actualAmount =
             Number(invData.payable_amount) ||
             Number(invData.amount) ||
+            Number(ord.product_price) ||
             0;
           const gateway = (invData.gateway || process.env.PAYMENT_GATEWAY || 'shopeepay').toLowerCase();
           if (gateway === 'shopeepay' && actualAmount > 0) {
             const { checkShopeePayPayment } = await import('../lib/shopeepay');
             const checkResult = await checkShopeePayPayment({
-              token: invData.token,
+              token: invData.token as string | undefined,
               orderCode: ord.order_code,
               amount: actualAmount,
               orderCreatedAt: ord.created_at,
             });
             if (checkResult.paid) {
               const { processOrderPayment } = await import('../lib/fulfillment');
-              await processOrderPayment(ord.order_code, botInstance, checkResult.transaction as any);
-              ord.payment_status = 'paid';
-              ord.fulfillment_status = 'delivered';
+              await processOrderPayment(
+                ord.order_code,
+                botInstance,
+                checkResult.transaction as Record<string, unknown> | undefined
+              );
+              const refreshed = await query<OrderHistoryRow>(
+                `SELECT o.*, p.name as product_name, p.price as product_price
+                 FROM orders o
+                 LEFT JOIN products p ON o.product_id = p.id
+                 WHERE o.order_code = $1 LIMIT 1`,
+                [ord.order_code]
+              );
+              if (refreshed.rows.length > 0) {
+                ord = refreshed.rows[0];
+              } else {
+                ord.payment_status = 'paid';
+                ord.fulfillment_status = 'delivered';
+              }
             }
           }
         } catch (e) {
@@ -992,11 +1382,66 @@ export async function sendOrdersMenu(ctx: Context, botInstance: ExtendedBot): Pr
             : '⚪';
       const statusLabel = isUnpaid
         ? 'MENUNGGU PEMBAYARAN'
-        : ord.fulfillment_status.toUpperCase();
-      text += `• ${statusIcon} <code>${escapeHtml(ord.order_code)}</code> | Status: <b>${statusLabel}</b>\n`;
+        : ord.fulfillment_status === 'delivered'
+          ? 'SELESAI (DELIVERED)'
+          : ord.fulfillment_status === 'processing'
+            ? 'DIPROSES SISTEM'
+            : ord.fulfillment_status.toUpperCase();
+
+      const itemNum = currentPage * pageSize + i + 1;
+      const prodName = ord.product_name || 'Akun Digital';
+      const timeStr = formatWibDateTime(ord.delivered_at || ord.created_at);
+
+      let entryText =
+        `${itemNum}. ${statusIcon} <b>${escapeHtml(prodName)}</b>\n` +
+        `   🆔 <code>${escapeHtml(ord.order_code)}</code> • <i>${escapeHtml(timeStr)}</i>\n` +
+        `   📊 Status: <b>${statusLabel}</b>\n`;
+
+      if (ord.fulfillment_status === 'delivered') {
+        const decrypted = safeDecryptCredential(ord.credential_encrypted);
+        const parsedCred = parseStoredCredentialDisplay(decrypted);
+        const deliveredMedia = extractDeliveredMedia(ord.invoice_data);
+        const mediaDisplay =
+          deliveredMedia?.fileName || parsedCred.attachmentLabel || deliveredMedia?.type;
+
+        if (mediaDisplay) {
+          const mediaLine = `   📎 <b>Lampiran:</b> <code>${escapeHtml(mediaDisplay)}</code>\n`;
+          if (text.length + entryText.length + mediaLine.length <= 3600) {
+            entryText += mediaLine;
+          }
+        }
+
+        if (parsedCred.credentialText) {
+          const previewPlain =
+            parsedCred.credentialText.length > 220
+              ? `${parsedCred.credentialText.slice(0, 220)}…`
+              : parsedCred.credentialText;
+          const credBlock = `   🔑 <b>Kredensial:</b>\n   <code>${escapeHtml(previewPlain)}</code>\n`;
+          if (text.length + entryText.length + credBlock.length <= 3600) {
+            entryText += credBlock;
+            if (parsedCred.credentialText.length > 220) {
+              entryText += `   <i>(Buka Detail Pesanan untuk salin kredensial lengkap)</i>\n`;
+            }
+          } else {
+            entryText += `   🔑 <i>Klik tombol Detail di bawah untuk melihat kredensial</i>\n`;
+          }
+        } else if (!mediaDisplay) {
+          entryText += `   🔑 <i>Klik tombol Detail di bawah untuk melihat kredensial</i>\n`;
+        }
+      }
+
+      entryText += `\n`;
+      if (text.length + entryText.length <= 3850) {
+        text += entryText;
+      } else {
+        text += `${itemNum}. ${statusIcon} <code>${escapeHtml(ord.order_code)}</code> (${statusLabel})\n`;
+      }
+
       const btnText = isUnpaid
         ? `💳 Bayar / Buka QRIS: ${ord.order_code}`
-        : `🔍 Cek Status: ${ord.order_code}`;
+        : ord.fulfillment_status === 'delivered'
+          ? `🔑 Detail & Kredensial: ${ord.order_code}`
+          : `🔍 Cek Status: ${ord.order_code}`;
       buttons.push([
         {
           text: btnText,
@@ -1006,6 +1451,20 @@ export async function sendOrdersMenu(ctx: Context, botInstance: ExtendedBot): Pr
     }
   }
 
+  if (totalPages > 1) {
+    const navRow: Array<{ text: string; callback_data: string }> = [];
+    if (currentPage > 0) {
+      navRow.push({ text: '⬅️ Sebelumnya', callback_data: `orders_page_${currentPage - 1}` });
+    }
+    if (currentPage < totalPages - 1) {
+      navRow.push({ text: 'Berikutnya ➡️', callback_data: `orders_page_${currentPage + 1}` });
+    }
+    if (navRow.length > 0) {
+      buttons.push(navRow);
+    }
+  }
+
+  buttons.push([{ text: '🔄 Muat Ulang Riwayat', callback_data: `orders_page_${currentPage}` }]);
   buttons.push([
     { text: '🛍️ Beli Produk Baru', callback_data: 'menu_products' },
     { text: '🔙 Menu Utama', callback_data: 'menu_main' },
@@ -1070,7 +1529,7 @@ export function extractQrisFromInvoiceData(rawInvoiceData: unknown): {
 export async function sendOrderInvoice(
   ctx: Context,
   botInstance: ExtendedBot,
-  order: Order & { product_name?: string; product_price?: number }
+  order: Order & { product_name?: string | null; product_price?: number | null }
 ): Promise<void> {
   const { qrCodeUrl, qrString, checkoutUrl } = extractQrisFromInvoiceData(order.invoice_data);
   const prodName = order.product_name || 'Akun Digital';
@@ -1146,16 +1605,17 @@ export async function sendOrderInvoice(
 }
 
 /**
- * Display order status: re-sends QRIS invoice if UNPAID, or displays fulfillment info if PAID
+ * Display order status: re-sends QRIS invoice if UNPAID, or displays fulfillment info + credentials if PAID
  */
 export async function sendOrderStatus(
   ctx: Context,
   botInstance: ExtendedBot,
   orderCode: string
 ): Promise<void> {
-  const ordRes = await query<Order & { product_name: string; product_price: number }>(
-    `SELECT o.*, p.name as product_name, p.price as product_price
+  const ordRes = await query<OrderHistoryRow>(
+    `SELECT o.*, p.name as product_name, p.price as product_price, u.telegram_id as buyer_telegram_id
      FROM orders o
+     LEFT JOIN users u ON o.user_id = u.id
      LEFT JOIN products p ON o.product_id = p.id
      WHERE o.order_code = $1 LIMIT 1`,
     [orderCode]
@@ -1207,11 +1667,16 @@ export async function sendOrderStatus(
         if (checkResult.paid) {
           console.log(`[ShopeePay] Payment confirmed upon manual status refresh for order: ${o.order_code}`);
           const { processOrderPayment } = await import('../lib/fulfillment');
-          await processOrderPayment(o.order_code, botInstance, checkResult.transaction as any);
+          await processOrderPayment(
+            o.order_code,
+            botInstance,
+            checkResult.transaction as Record<string, unknown> | undefined
+          );
 
-          const updatedOrd = await query<Order & { product_name: string; product_price: number }>(
-            `SELECT o.*, p.name as product_name, p.price as product_price
+          const updatedOrd = await query<OrderHistoryRow>(
+            `SELECT o.*, p.name as product_name, p.price as product_price, u.telegram_id as buyer_telegram_id
              FROM orders o
+             LEFT JOIN users u ON o.user_id = u.id
              LEFT JOIN products p ON o.product_id = p.id
              WHERE o.order_code = $1 LIMIT 1`,
             [orderCode]
@@ -1248,6 +1713,15 @@ export async function sendOrderStatus(
     }
   }
 
+  // Authorize viewing delivered credentials (only owning buyer or admin)
+  const requesterId = ctx.from?.id ? String(ctx.from.id) : '';
+  const ownerTelegramId = o.buyer_telegram_id ? String(o.buyer_telegram_id) : '';
+  const isAuthorizedForDetails =
+    !requesterId ||
+    !ownerTelegramId ||
+    requesterId === ownerTelegramId ||
+    isAdmin(ctx.from?.id);
+
   // If order is PAID or EXPIRED
   const payStatusStr =
     o.payment_status === 'paid'
@@ -1263,33 +1737,299 @@ export async function sendOrderStatus(
         ? '🟡 DALAM PROSES (ANTREAN SISTEM)'
         : escapeHtml(String(o.fulfillment_status).toUpperCase());
 
+  const rawInvData =
+    typeof o.invoice_data === 'string'
+      ? (() => {
+          try {
+            return JSON.parse(o.invoice_data) as Record<string, unknown>;
+          } catch {
+            return {};
+          }
+        })()
+      : ((o.invoice_data as Record<string, unknown>) || {});
+  const isBalOrder =
+    rawInvData.payment_method === 'balance' || rawInvData.gateway === 'balance';
+  const paidBalVal =
+    typeof rawInvData.payable_amount === 'number'
+      ? rawInvData.payable_amount
+      : Number(o.product_price || 0);
+  const paymentMethodBadge = isBalOrder
+    ? `• Metode Bayar: <b>💰 Saldo Akun (Rp ${paidBalVal.toLocaleString('id-ID')})</b>\n`
+    : '';
+
   let statText =
-    `🔍 <b>STATUS PESANAN</b>\n` +
+    `🔍 <b>STATUS &amp; DETAIL PESANAN</b>\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
     `• Kode Order: <code>${escapeHtml(o.order_code)}</code>\n` +
     `• Produk: <b>${escapeHtml(o.product_name || 'Akun Digital')}</b>\n` +
+    paymentMethodBadge +
+    `• Dibuat: <i>${escapeHtml(formatWibDateTime(o.created_at))}</i>\n` +
+    (o.delivered_at ? `• Dikirim: <i>${escapeHtml(formatWibDateTime(o.delivered_at))}</i>\n` : '') +
     `• Pembayaran: <b>${payStatusStr}</b>\n` +
     `• Pengiriman: <b>${fulStatusStr}</b>\n` +
     `━━━━━━━━━━━━━━━━━━━\n`;
 
+  const chatId =
+    ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
+  const buttons: Array<Array<Record<string, unknown>>> = [];
+  const deliveredMedia = isAuthorizedForDetails ? extractDeliveredMedia(o.invoice_data) : null;
+  let decryptedCredential: string | null = null;
+  let parsedCred: ParsedCredentialDisplay = { attachmentLabel: null, credentialText: null };
+  const overflowCredentialChunks: string[] = [];
+
   if (o.fulfillment_status === 'delivered') {
-    statText += `✅ Akun digital kamu telah berhasil dikirimkan ke chat ini.\nSilakan periksa riwayat chat untuk detail akun.`;
+    if (!isAuthorizedForDetails) {
+      statText += `🔒 <i>Detail kredensial hanya dapat diakses oleh pemilik pesanan ini.</i>`;
+    } else {
+      decryptedCredential = safeDecryptCredential(o.credential_encrypted);
+      parsedCred = parseStoredCredentialDisplay(decryptedCredential);
+      const attachmentName =
+        deliveredMedia?.fileName || parsedCred.attachmentLabel || deliveredMedia?.type;
+
+      let mediaDispatchRes: {
+        ok: boolean;
+        attempted: boolean;
+        skippedDummy: boolean;
+        messageId?: number;
+        error?: string;
+      } | null = null;
+
+      if (deliveredMedia && chatId) {
+        const mediaCaption =
+          `📎 <b>LAMPIRAN KREDENSIAL PESANAN</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━\n` +
+          `📦 <b>Produk:</b> ${escapeHtml(o.product_name || 'Akun Digital')}\n` +
+          `🆔 <b>Kode Order:</b> <code>${escapeHtml(o.order_code)}</code>\n` +
+          (parsedCred.credentialText
+            ? `\n🔑 <b>Keterangan / Kredensial:</b>\n<code>${escapeHtml(parsedCred.credentialText.slice(0, 600))}</code>\n`
+            : '') +
+          `\n📌 <i>Lampiran ini ditampilkan ulang dari Riwayat Pesanan dan dilindungi dari penghapusan otomatis.</i>`;
+
+        mediaDispatchRes = await dispatchOrderMedia(
+          botInstance,
+          chatId,
+          deliveredMedia,
+          mediaCaption
+        );
+        if (mediaDispatchRes.ok && mediaDispatchRes.messageId) {
+          markMessageAsPreserved(chatId, mediaDispatchRes.messageId);
+        }
+      }
+
+      if (attachmentName) {
+        statText += `📎 <b>File / Media Lampiran:</b> <code>${escapeHtml(attachmentName)}</code>\n`;
+      }
+
+      if (parsedCred.credentialText) {
+        const fullCred = parsedCred.credentialText;
+        let displayCred = fullCred;
+        if (fullCred.length > 2900) {
+          displayCred = fullCred.slice(0, 2900);
+          const remaining = fullCred.slice(2900);
+          for (let offset = 0; offset < remaining.length; offset += 3500) {
+            overflowCredentialChunks.push(remaining.slice(offset, offset + 3500));
+          }
+        }
+
+        statText +=
+          `\n🔑 <b>Kredensial / Detail Akun Anda:</b>\n` +
+          `<code>${escapeHtml(displayCred)}</code>\n\n` +
+          (overflowCredentialChunks.length > 0
+            ? `📌 <i>Lanjutan kredensial dikirim pada pesan di bawah.</i>`
+            : `📌 <i>Sentuh teks di atas atau gunakan tombol Salin di bawah untuk menyalin kredensial.</i>`);
+
+        if (fullCred.length >= 1 && fullCred.length <= 256) {
+          buttons.push([
+            {
+              text: '📋 Salin Kredensial',
+              copy_text: { text: fullCred },
+            },
+          ]);
+        }
+      } else if (deliveredMedia) {
+        if (
+          mediaDispatchRes?.attempted &&
+          !mediaDispatchRes.ok &&
+          !mediaDispatchRes.skippedDummy
+        ) {
+          statText +=
+            `\n⚠️ <i>Lampiran media gagal dikirim otomatis (<code>${escapeHtml(mediaDispatchRes.error || 'Media tidak tersedia')}</code>). Silakan sentuh tombol Kirim Ulang File atau hubungi Admin.</i>`;
+        } else {
+          statText +=
+            `\n✅ <i>Lampiran media kredensial Anda telah dikirimkan kembali di atas.</i>`;
+        }
+      } else if (parsedCred.attachmentLabel) {
+        statText +=
+          `\nℹ️ <i>Pesanan ini dikirimkan sebagai file lampiran pada pesan pengiriman awal di chat Anda (arsip media otomatis belum tersedia untuk transaksi lama). Silakan periksa chat sebelumnya atau hubungi Admin untuk pengiriman ulang file.</i>`;
+        buttons.push([{ text: '💬 Minta Kirim Ulang ke Admin ↗', url: 'https://t.me/DappaSecc' }]);
+      } else {
+        statText += `✅ Akun digital kamu telah berhasil dikirimkan ke chat ini.\nSilakan periksa pesan pengiriman awal di chat untuk detail akun.`;
+      }
+
+      if (deliveredMedia) {
+        const fileLabel = deliveredMedia.fileName || deliveredMedia.type;
+        buttons.push([
+          {
+            text: `📎 Kirim Ulang File (${fileLabel})`,
+            callback_data: `resend_media_${o.order_code}`,
+          },
+        ]);
+      }
+    }
   } else if (o.fulfillment_status === 'processing') {
     statText += `⏳ Pesanan kamu sedang disiapkan antrean sistem (estimasi 1–10 menit).`;
   }
 
-  const buttons = [
-    [{ text: '🔄 Refresh Status', callback_data: `status_${o.order_code}` }],
-    [
-      { text: '🛍️ Beli Produk Baru', callback_data: 'menu_products' },
-      { text: '🔙 Menu Utama', callback_data: 'menu_main' },
-    ],
-  ];
+  buttons.push([{ text: '🔄 Refresh Status', callback_data: `status_${o.order_code}` }]);
+  buttons.push([
+    { text: '📩 Riwayat Pesanan', callback_data: 'menu_orders' },
+    { text: '🛍️ Beli Produk Baru', callback_data: 'menu_products' },
+  ]);
+  buttons.push([{ text: '🔙 Menu Utama', callback_data: 'menu_main' }]);
 
   await sendSafeMessage(ctx, botInstance, statText, {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: buttons },
   });
+
+  if (overflowCredentialChunks.length > 0 && chatId) {
+    for (let idx = 0; idx < overflowCredentialChunks.length; idx++) {
+      const partText =
+        `🔑 <b>Lanjutan Kredensial (${idx + 2}/${overflowCredentialChunks.length + 1}) • ${escapeHtml(o.order_code)}:</b>\n` +
+        `<code>${escapeHtml(overflowCredentialChunks[idx])}</code>`;
+      let partRes: unknown;
+      if (typeof botInstance?.sendMessage === 'function') {
+        partRes = await botInstance
+          .sendMessage(chatId, partText, { parse_mode: 'HTML' })
+          .catch(() => null);
+      }
+      const partMsgId = (partRes as { message_id?: number } | null | undefined)?.message_id;
+      if (partMsgId) {
+        recordBotMessage(chatId, partMsgId);
+      }
+    }
+  }
+}
+
+/**
+ * Re-send delivered file/photo attachment for a fulfilled order from Order History
+ */
+export async function resendOrderMedia(
+  ctx: Context,
+  botInstance: ExtendedBot,
+  orderCode: string
+): Promise<void> {
+  const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.from?.id;
+  if (!chatId) return;
+
+  const ordRes = await query<OrderHistoryRow>(
+    `SELECT o.*, p.name as product_name, u.telegram_id as buyer_telegram_id
+     FROM orders o
+     LEFT JOIN users u ON o.user_id = u.id
+     LEFT JOIN products p ON o.product_id = p.id
+     WHERE o.order_code = $1 LIMIT 1`,
+    [orderCode]
+  );
+
+  if (ordRes.rows.length === 0) {
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      `❌ Order <code>${escapeHtml(orderCode)}</code> tidak ditemukan.`,
+      {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [[{ text: '📩 Riwayat Pesanan', callback_data: 'menu_orders' }]],
+        },
+      }
+    );
+    return;
+  }
+
+  const o = ordRes.rows[0];
+  const requesterId = ctx.from?.id ? String(ctx.from.id) : '';
+  const ownerTelegramId = o.buyer_telegram_id ? String(o.buyer_telegram_id) : '';
+  const isAuthorized =
+    !requesterId ||
+    !ownerTelegramId ||
+    requesterId === ownerTelegramId ||
+    isAdmin(ctx.from?.id);
+
+  if (!isAuthorized || o.fulfillment_status !== 'delivered') {
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      '⛔ Lampiran file pesanan ini tidak tersedia untuk akun Anda.',
+      {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '📩 Riwayat Pesanan', callback_data: 'menu_orders' }],
+            [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+          ],
+        },
+      }
+    );
+    return;
+  }
+
+  const deliveredMedia = extractDeliveredMedia(o.invoice_data);
+  if (!deliveredMedia) {
+    await sendOrderStatus(ctx, botInstance, orderCode);
+    return;
+  }
+
+  const parsedCred = parseStoredCredentialDisplay(safeDecryptCredential(o.credential_encrypted));
+  const caption =
+    `📎 <b>LAMPIRAN FILE PESANAN</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
+    `📦 <b>Produk:</b> ${escapeHtml(o.product_name || 'Akun Digital')}\n` +
+    `🆔 <b>Kode Order:</b> <code>${escapeHtml(o.order_code)}</code>\n` +
+    (parsedCred.credentialText
+      ? `\n📝 <b>Keterangan:</b>\n<code>${escapeHtml(parsedCred.credentialText.slice(0, 600))}</code>\n`
+      : '') +
+    `\n📌 <i>Lampiran ini dilindungi agar tidak terhapus otomatis.</i>`;
+
+  const replyMarkup = {
+    inline_keyboard: [
+      [{ text: '🔍 Detail Pesanan', callback_data: `status_${o.order_code}` }],
+      [
+        { text: '📩 Riwayat Pesanan', callback_data: 'menu_orders' },
+        { text: '🔙 Menu Utama', callback_data: 'menu_main' },
+      ],
+    ],
+  };
+
+  const dispatchRes = await dispatchOrderMedia(
+    botInstance,
+    chatId,
+    deliveredMedia,
+    caption,
+    replyMarkup
+  );
+
+  if (dispatchRes.ok) {
+    if (dispatchRes.messageId) {
+      markMessageAsPreserved(chatId, dispatchRes.messageId);
+    }
+    await cleanupChatMessages(ctx, botInstance, dispatchRes.messageId);
+    return;
+  }
+
+  await sendSafeMessage(
+    ctx,
+    botInstance,
+    `⚠️ Gagal mengirim ulang file lampiran (<code>${escapeHtml(dispatchRes.error || 'Media tidak tersedia')}</code>).\nSilakan hubungi Admin dengan menyertakan kode order <code>${escapeHtml(o.order_code)}</code>.`,
+    {
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔍 Kembali ke Detail Pesanan', callback_data: `status_${o.order_code}` }],
+          [{ text: '💬 Hubungi Admin ↗', url: 'https://t.me/DappaSecc' }],
+        ],
+      },
+    }
+  );
 }
 
 /**
@@ -1355,11 +2095,19 @@ export async function sendAdminPanel(ctx: Context, botInstance: ExtendedBot): Pr
   const { isForceChannelJoinEnabled } = await import('../lib/channel-gate');
   const forceJoinEnabled = await isForceChannelJoinEnabled();
 
+  let shopeeValid = false;
+  try {
+    const { getShopeePayTokenStatus } = await import('../lib/shopeepay');
+    const spStatus = await getShopeePayTokenStatus();
+    shopeeValid = spStatus.valid;
+  } catch {}
+
   const adminText =
     `👑 <b>PANEL OWNER & ADMIN DAFUNG HUB</b>\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
     `• <b>Owner:</b> @DappaSecc (<code>${ADMIN_TELEGRAM_ID}</code>)\n` +
     `• <b>Status Sistem:</b> ${botStatus === 'online' ? '🟢 ONLINE (Melayani Pembeli)' : '🔴 MAINTENANCE (Sedang Perbaikan)'}\n` +
+    `• <b>Gateway QRIS:</b> ${shopeeValid ? '🟢 AKTIF (Auto-Detect Jalan)' : '🔴 SESI HABIS (Jalankan /settoken)'}\n` +
     `• <b>Wajib Join Channel:</b> ${forceJoinEnabled ? '🟢 AKTIF (@DafungHub)' : '⚪ NONAKTIF'}\n` +
     `• <b>Saldo Supplier Live:</b> <b>Rp ${balance.toLocaleString('id-ID')}</b>\n` +
     `• <b>Status Mode:</b> ${balance > 0 ? '🟢 H2H Auto-Fulfill' : '🟡 Mode Antrean (0 Modal)'}\n` +
@@ -1765,7 +2513,7 @@ export async function sendAdminFulfillChoice(
 
   const buyerInfo = order.username ? `@${order.username}` : (order.first_name || order.telegram_id);
 
-  let text =
+  const text =
     `📦 <b>PILIH METODE PENGIRIMAN KREDENSIAL</b>\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
     `• <b>Kode Order:</b> <code>${escapeHtml(orderCode)}</code>\n` +
@@ -2290,11 +3038,27 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
         return;
       } else if (data === 'check_maintenance_status') {
         const currentStatus = await getBotStatus();
-        if (currentStatus === 'maintenance') {
+        if (currentStatus === 'maintenance' && !isAdmin(ctx.from?.id)) {
           await sendMaintenanceMessage(ctx, botInstance);
-        } else {
-          await sendMainMenu(ctx, botInstance);
+          return;
         }
+        if (!isAdmin(ctx.from?.id)) {
+          const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
+          const isMember = await checkUserChannelMembership(userId, botInstance);
+          if (!isMember) {
+            await sendChannelJoinPrompt(ctx, botInstance);
+            return;
+          }
+        }
+        if (userId) {
+          await ensureUser(String(userId), {
+            username: ctx.from?.username,
+            firstName: ctx.from?.first_name,
+          }).catch((regErr) => {
+            console.error('[Maintenance Check] Failed to register user in DB:', regErr);
+          });
+        }
+        await sendMainMenu(ctx, botInstance);
         return;
       } else if (data === 'admin_queue') {
         await sendAdminQueueMenu(ctx, botInstance);
@@ -2709,6 +3473,14 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
         if (userId) clearMembershipCache(userId);
         const isMember = await checkUserChannelMembership(userId, botInstance);
         if (isMember) {
+          if (userId) {
+            await ensureUser(String(userId), {
+              username: ctx.from?.username,
+              firstName: ctx.from?.first_name,
+            }).catch((regErr) => {
+              console.error('[Channel Gate] Failed to register user on verify_channel_join:', regErr);
+            });
+          }
           try {
             await ctx.answerCallbackQuery?.({
               text: '✅ Keanggotaan terverifikasi! Selamat datang di DaFung Hub.',
@@ -2746,6 +3518,13 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
           await sendChannelJoinPrompt(ctx, botInstance);
           return;
         }
+      }
+
+      if (userId) {
+        await ensureUser(String(userId), {
+          username: ctx.from?.username,
+          firstName: ctx.from?.first_name,
+        }).catch(() => {});
       }
 
       // BUYER CALLBACKS
@@ -2793,8 +3572,20 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
         await sendProductDetail(ctx, botInstance, prodId, platId);
       } else if (data.startsWith('buy_') || data.startsWith('buy:')) {
         const prodId = data.startsWith('buy_') ? data.replace('buy_', '') : data.replace('buy:', '');
-        console.log(`[Buy Flow] Triggering purchase for product: ${prodId}`);
-        await handleBuy(ctx, prodId, botInstance);
+        console.log(`[Buy Flow] Opening payment method selection for product: ${prodId}`);
+        await sendCheckoutMethodMenu(ctx, botInstance, prodId);
+      } else if (data.startsWith('pay_qris:') || data.startsWith('pay_qris_')) {
+        const prodId = data.startsWith('pay_qris:')
+          ? data.slice('pay_qris:'.length)
+          : data.slice('pay_qris_'.length);
+        console.log(`[Buy Flow] Creating QRIS invoice for product: ${prodId}`);
+        await handleBuy(ctx, prodId, botInstance, undefined, 'qris');
+      } else if (data.startsWith('pay_bal:') || data.startsWith('pay_bal_')) {
+        const prodId = data.startsWith('pay_bal:')
+          ? data.slice('pay_bal:'.length)
+          : data.slice('pay_bal_'.length);
+        console.log(`[Buy Flow] Processing balance payment for product: ${prodId}`);
+        await handleBuy(ctx, prodId, botInstance, undefined, 'balance');
       } else if (data === 'menu_profile') {
         await sendProfileMenu(ctx, botInstance);
       } else if (data === 'menu_deposit') {
@@ -2814,14 +3605,22 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
           (await query<{ id: string }>('SELECT id FROM products WHERE name = $1 LIMIT 1', [prodName]))
             .rows[0]?.id;
         if (prodId) {
-          await handleBuy(ctx, prodId, botInstance);
+          await handleBuy(ctx, prodId, botInstance, undefined, 'qris');
         }
       } else if (data === 'menu_membership') {
         await sendMembershipMenu(ctx, botInstance);
       } else if (data === 'menu_orders') {
-        await sendOrdersMenu(ctx, botInstance);
-      } else if (data.startsWith('status_')) {
-        const orderCode = data.replace('status_', '');
+        await sendOrdersMenu(ctx, botInstance, 0);
+      } else if (data.startsWith('orders_page_')) {
+        const pageNum = parseInt(data.replace('orders_page_', ''), 10) || 0;
+        await sendOrdersMenu(ctx, botInstance, pageNum);
+      } else if (data.startsWith('resend_media_')) {
+        const orderCode = data.replace('resend_media_', '');
+        await resendOrderMedia(ctx, botInstance, orderCode);
+      } else if (data.startsWith('status_') || data.startsWith('check_order_')) {
+        const orderCode = data.startsWith('check_order_')
+          ? data.replace('check_order_', '')
+          : data.replace('status_', '');
         await sendOrderStatus(ctx, botInstance, orderCode);
       } else if (data.startsWith('qris_') || data.startsWith('show_qris_')) {
         const orderCode = data.startsWith('show_qris_')
@@ -2834,108 +3633,78 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
     }
   });
 
-  // Reply keyboard text listeners with precise regexes
-  botInstance.hears(/^(?:👑\s*)?(?:panel\s*)?owner$/i, async (ctx: Context) => {
-    if (isAdmin(ctx.from?.id)) {
-      await sendAdminPanel(ctx, botInstance);
-    } else {
+  const ensureVerifiedUser = async (ctx: Context): Promise<boolean> => {
+    if (!isAdmin(ctx.from?.id)) {
       const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
       const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
       if (!isMember) {
         await sendChannelJoinPrompt(ctx, botInstance);
-        return;
+        return false;
       }
+    }
+    if (ctx.from?.id) {
+      await ensureUser(String(ctx.from.id), {
+        username: ctx.from.username,
+        firstName: ctx.from.first_name,
+      }).catch(() => {});
+    }
+    return true;
+  };
+
+  // Reply keyboard text listeners with precise regexes
+  botInstance.hears(/^(?:👑\s*)?(?:panel\s*)?owner$/i, async (ctx: Context) => {
+    if (isAdmin(ctx.from?.id)) {
+      if (ctx.from?.id) {
+        await ensureUser(String(ctx.from.id), {
+          username: ctx.from.username,
+          firstName: ctx.from.first_name,
+        }).catch(() => {});
+      }
+      await sendAdminPanel(ctx, botInstance);
+    } else {
+      if (!(await ensureVerifiedUser(ctx))) return;
       await sendMainMenu(ctx, botInstance);
     }
   });
 
   botInstance.hears(/^(?:🟢\s*)?produk$/i, async (ctx: Context) => {
     console.log(`[Telegram Text] Heard "Produk" from user ${ctx.from?.id}`);
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
-      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt(ctx, botInstance);
-        return;
-      }
-    }
+    if (!(await ensureVerifiedUser(ctx))) return;
     await sendPlatformsMenu(ctx, botInstance);
   });
 
   botInstance.hears(/^(?:👤\s*|🥷\s*)?profil$/i, async (ctx: Context) => {
     console.log(`[Telegram Text] Heard "Profil" from user ${ctx.from?.id}`);
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
-      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt(ctx, botInstance);
-        return;
-      }
-    }
+    if (!(await ensureVerifiedUser(ctx))) return;
     await sendProfileMenu(ctx, botInstance);
   });
 
   botInstance.hears(/^(?:💰\s*)?deposit$/i, async (ctx: Context) => {
     console.log(`[Telegram Text] Heard "Deposit" from user ${ctx.from?.id}`);
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
-      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt(ctx, botInstance);
-        return;
-      }
-    }
+    if (!(await ensureVerifiedUser(ctx))) return;
     await sendDepositMenu(ctx, botInstance);
   });
 
   botInstance.hears(/^(?:💎\s*)?(?:membership|vip)$/i, async (ctx: Context) => {
     console.log(`[Telegram Text] Heard "Membership" from user ${ctx.from?.id}`);
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
-      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt(ctx, botInstance);
-        return;
-      }
-    }
+    if (!(await ensureVerifiedUser(ctx))) return;
     await sendMembershipMenu(ctx, botInstance);
   });
 
   botInstance.command(['membership', 'vip'], async (ctx: Context) => {
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
-      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt(ctx, botInstance);
-        return;
-      }
-    }
+    if (!(await ensureVerifiedUser(ctx))) return;
     await sendMembershipMenu(ctx, botInstance);
   });
 
   botInstance.hears(/^(?:📩\s*)?pesanan(?:\s*saya)?$/i, async (ctx: Context) => {
     console.log(`[Telegram Text] Heard "Pesanan" from user ${ctx.from?.id}`);
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
-      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt(ctx, botInstance);
-        return;
-      }
-    }
+    if (!(await ensureVerifiedUser(ctx))) return;
     await sendOrdersMenu(ctx, botInstance);
   });
 
   botInstance.hears(/^(?:❓\s*)?(?:bantuan|help)$/i, async (ctx: Context) => {
     console.log(`[Telegram Text] Heard "Bantuan" from user ${ctx.from?.id}`);
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
-      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt(ctx, botInstance);
-        return;
-      }
-    }
+    if (!(await ensureVerifiedUser(ctx))) return;
     const helpMessage =
       'ℹ️ <b>Panduan & Garansi DaFung Hub:</b>\n\n' +
       '1. Setelah pembayaran QRIS berhasil, kredensial akun akan dikirimkan otomatis.\n' +
@@ -2980,7 +3749,7 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
     const maxUses = parseInt(parts[4], 10);
     const target = parts[5] || null;
 
-    let type: any = 'all_products';
+    let type: 'all_products' | 'product' | 'membership' | 'deposit_cashback' = 'all_products';
     if (rawType === 'product') type = 'product';
     else if (rawType === 'membership') type = 'membership';
     else if (rawType === 'deposit' || rawType === 'cashback') type = 'deposit_cashback';
@@ -3010,14 +3779,7 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
 
   // User Command: /voucher <KODE> or /klaim <KODE>
   botInstance.command(['voucher', 'klaim'], async (ctx: Context) => {
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
-      const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt(ctx, botInstance);
-        return;
-      }
-    }
+    if (!(await ensureVerifiedUser(ctx))) return;
 
     const text = ctx.message?.text || '';
     const parts = text.trim().split(/\s+/);

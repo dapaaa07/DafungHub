@@ -1374,7 +1374,7 @@ var require_cert_signatures = __commonJS({
 var require_sasl = __commonJS({
   "node_modules/pg/lib/crypto/sasl.js"(exports2, module2) {
     "use strict";
-    var crypto2 = require_utils2();
+    var crypto3 = require_utils2();
     var { signatureAlgorithmHashFromCertificate } = require_cert_signatures();
     function saslprep(password) {
       const nonAsciiSpace = /[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g;
@@ -1392,7 +1392,7 @@ var require_sasl = __commonJS({
       if (mechanism === "SCRAM-SHA-256-PLUS" && typeof stream.getPeerCertificate !== "function") {
         throw new Error("SASL: Mechanism SCRAM-SHA-256-PLUS requires a certificate");
       }
-      const clientNonce = crypto2.randomBytes(18).toString("base64");
+      const clientNonce = crypto3.randomBytes(18).toString("base64");
       const gs2Header = mechanism === "SCRAM-SHA-256-PLUS" ? "p=tls-server-end-point" : stream ? "y" : "n";
       return {
         mechanism,
@@ -1434,20 +1434,20 @@ var require_sasl = __commonJS({
         const peerCert = stream.getPeerCertificate().raw;
         let hashName = signatureAlgorithmHashFromCertificate(peerCert);
         if (hashName === "MD5" || hashName === "SHA-1") hashName = "SHA-256";
-        const certHash = await crypto2.hashByName(hashName, peerCert);
+        const certHash = await crypto3.hashByName(hashName, peerCert);
         const bindingData = Buffer.concat([Buffer.from("p=tls-server-end-point,,"), Buffer.from(certHash)]);
         channelBinding = bindingData.toString("base64");
       }
       const clientFinalMessageWithoutProof = "c=" + channelBinding + ",r=" + sv.nonce;
       const authMessage = clientFirstMessageBare + "," + serverFirstMessage + "," + clientFinalMessageWithoutProof;
       const saltBytes = Buffer.from(sv.salt, "base64");
-      const saltedPassword = await crypto2.deriveKey(saslprep(password), saltBytes, sv.iteration);
-      const clientKey2 = await crypto2.hmacSha256(saltedPassword, "Client Key");
-      const storedKey = await crypto2.sha256(clientKey2);
-      const clientSignature = await crypto2.hmacSha256(storedKey, authMessage);
+      const saltedPassword = await crypto3.deriveKey(saslprep(password), saltBytes, sv.iteration);
+      const clientKey2 = await crypto3.hmacSha256(saltedPassword, "Client Key");
+      const storedKey = await crypto3.sha256(clientKey2);
+      const clientSignature = await crypto3.hmacSha256(storedKey, authMessage);
       const clientProof = xorBuffers(Buffer.from(clientKey2), Buffer.from(clientSignature)).toString("base64");
-      const serverKey2 = await crypto2.hmacSha256(saltedPassword, "Server Key");
-      const serverSignatureBytes = await crypto2.hmacSha256(serverKey2, authMessage);
+      const serverKey2 = await crypto3.hmacSha256(saltedPassword, "Server Key");
+      const serverSignatureBytes = await crypto3.hmacSha256(serverKey2, authMessage);
       session.message = "SASLResponse";
       session.serverSignature = Buffer.from(serverSignatureBytes).toString("base64");
       session.response = clientFinalMessageWithoutProof + ",p=" + clientProof;
@@ -3686,7 +3686,7 @@ var require_client = __commonJS({
     var Query2 = require_query();
     var defaults2 = require_defaults();
     var Connection2 = require_connection();
-    var crypto2 = require_utils2();
+    var crypto3 = require_utils2();
     var activeQueryDeprecationNotice = nodeUtils.deprecate(
       () => {
       },
@@ -3941,7 +3941,7 @@ var require_client = __commonJS({
       _handleAuthMD5Password(msg) {
         this._getPassword(async () => {
           try {
-            const hashedPassword = await crypto2.postgresMd5PasswordHash(this.user, this.password, msg.salt);
+            const hashedPassword = await crypto3.postgresMd5PasswordHash(this.user, this.password, msg.salt);
             this.connection.password(hashedPassword);
           } catch (e) {
             this.emit("error", e);
@@ -5435,69 +5435,6 @@ var init_db = __esm({
   }
 });
 
-// lib/settings.ts
-var settings_exports = {};
-__export2(settings_exports, {
-  clearSettingsCache: () => clearSettingsCache,
-  getBotStatus: () => getBotStatus,
-  setBotStatus: () => setBotStatus
-});
-async function getBotStatus() {
-  const now = Date.now();
-  if (cachedStatus !== null && now < cacheExpiry) {
-    return cachedStatus;
-  }
-  try {
-    const res = await query(
-      "SELECT value FROM bot_settings WHERE key = $1 LIMIT 1",
-      ["bot_status"]
-    );
-    if (res.rows.length > 0) {
-      const val = res.rows[0].value;
-      cachedStatus = val === "maintenance" ? "maintenance" : "online";
-    } else {
-      cachedStatus = "online";
-    }
-    cacheExpiry = now + CACHE_TTL_MS;
-    return cachedStatus;
-  } catch (error) {
-    console.error("[Settings] Error fetching bot status, falling back:", error);
-    return cachedStatus ?? "online";
-  }
-}
-async function setBotStatus(status) {
-  try {
-    await query(
-      `INSERT INTO bot_settings (key, value, updated_at)
-       VALUES ('bot_status', $1, CURRENT_TIMESTAMP)
-       ON CONFLICT (key) DO UPDATE
-       SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
-      [status]
-    );
-    cachedStatus = status;
-    cacheExpiry = Date.now() + CACHE_TTL_MS;
-    console.log(`[Settings] Bot operational status changed to: ${status.toUpperCase()}`);
-  } catch (error) {
-    console.error("[Settings] Failed to set bot status in DB, fallback to memory cache:", error);
-    cachedStatus = status;
-    cacheExpiry = Date.now() + CACHE_TTL_MS;
-  }
-}
-function clearSettingsCache() {
-  cachedStatus = null;
-  cacheExpiry = 0;
-}
-var cachedStatus, cacheExpiry, CACHE_TTL_MS;
-var init_settings = __esm({
-  "lib/settings.ts"() {
-    "use strict";
-    init_db();
-    cachedStatus = null;
-    cacheExpiry = 0;
-    CACHE_TTL_MS = 5e3;
-  }
-});
-
 // lib/pricing.ts
 var pricing_exports = {};
 __export2(pricing_exports, {
@@ -5618,6 +5555,69 @@ var init_pricing = __esm({
     CS_WHATSAPP_NUMBER = "081294950241";
     CS_WHATSAPP_INTL = "6281294950241";
     TELEGRAM_BOT_USERNAME = "dafung_hub_bot";
+  }
+});
+
+// lib/settings.ts
+var settings_exports = {};
+__export2(settings_exports, {
+  clearSettingsCache: () => clearSettingsCache,
+  getBotStatus: () => getBotStatus,
+  setBotStatus: () => setBotStatus
+});
+async function getBotStatus() {
+  const now = Date.now();
+  if (cachedStatus !== null && now < cacheExpiry) {
+    return cachedStatus;
+  }
+  try {
+    const res = await query(
+      "SELECT value FROM bot_settings WHERE key = $1 LIMIT 1",
+      ["bot_status"]
+    );
+    if (res.rows.length > 0) {
+      const val = res.rows[0].value;
+      cachedStatus = val === "maintenance" ? "maintenance" : "online";
+    } else {
+      cachedStatus = "online";
+    }
+    cacheExpiry = now + CACHE_TTL_MS;
+    return cachedStatus;
+  } catch (error) {
+    console.error("[Settings] Error fetching bot status, falling back:", error);
+    return cachedStatus ?? "online";
+  }
+}
+async function setBotStatus(status) {
+  try {
+    await query(
+      `INSERT INTO bot_settings (key, value, updated_at)
+       VALUES ('bot_status', $1, CURRENT_TIMESTAMP)
+       ON CONFLICT (key) DO UPDATE
+       SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+      [status]
+    );
+    cachedStatus = status;
+    cacheExpiry = Date.now() + CACHE_TTL_MS;
+    console.log(`[Settings] Bot operational status changed to: ${status.toUpperCase()}`);
+  } catch (error) {
+    console.error("[Settings] Failed to set bot status in DB, fallback to memory cache:", error);
+    cachedStatus = status;
+    cacheExpiry = Date.now() + CACHE_TTL_MS;
+  }
+}
+function clearSettingsCache() {
+  cachedStatus = null;
+  cacheExpiry = 0;
+}
+var cachedStatus, cacheExpiry, CACHE_TTL_MS;
+var init_settings = __esm({
+  "lib/settings.ts"() {
+    "use strict";
+    init_db();
+    cachedStatus = null;
+    cacheExpiry = 0;
+    CACHE_TTL_MS = 5e3;
   }
 });
 
@@ -5763,11 +5763,35 @@ function isTestProduct(product) {
   const desc = (product.description || "").toLowerCase();
   return id.startsWith("loc_test") || id.startsWith("test_") || id === "test" || /\btest(?:ing)?\b/i.test(id) || /\btest\b/i.test(name) || /\btesting\b/i.test(name) || /\bsandbox\b/i.test(name) || /\btesting developer\b/i.test(desc);
 }
-async function getSupplierProducts(includeTest = false) {
-  const data = await supplierRequest("/v1/products");
-  const products = data.products || [];
-  if (includeTest) return products;
-  return products.filter((p) => !isTestProduct(p));
+async function getSupplierProducts(includeTest = false, includeManual = true) {
+  let supplierProducts = [];
+  try {
+    const data = await supplierRequest("/v1/products");
+    supplierProducts = data.products || [];
+  } catch (err) {
+    supplierProducts = FALLBACK_PRODUCTS;
+  }
+  const filteredSupplier = includeTest ? supplierProducts : supplierProducts.filter((p) => !isTestProduct(p));
+  if (!includeManual) {
+    return filteredSupplier;
+  }
+  try {
+    const dbRes = await query(
+      "SELECT * FROM products WHERE is_manual = true AND is_active = true ORDER BY created_at DESC"
+    );
+    const manualProducts = (dbRes?.rows || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      availability: (p.stock ?? 0) > 0 ? "in_stock" : "out_of_stock",
+      price_idr: p.price,
+      description: p.description || "",
+      requires_email: Boolean(p.requires_email),
+      is_manual: true
+    }));
+    return [...manualProducts, ...filteredSupplier];
+  } catch {
+    return filteredSupplier;
+  }
 }
 async function getSupplierBalance() {
   return await supplierRequest("/v1/balance");
@@ -5919,7 +5943,7 @@ function enrichManualProduct(product) {
 async function getAllEnrichedProducts(includeTest = false) {
   try {
     const [rawProducts, customPrices, manualDbResult] = await Promise.all([
-      getSupplierProducts(includeTest).catch(() => FALLBACK_PRODUCTS),
+      getSupplierProducts(includeTest, false).catch(() => FALLBACK_PRODUCTS),
       getCustomPrices().catch(() => /* @__PURE__ */ new Map()),
       query(
         "SELECT * FROM products WHERE is_manual = true AND is_active = true ORDER BY created_at DESC"
@@ -6330,39 +6354,39 @@ var require_core = __commonJS({
       }
     })(exports2, function() {
       var CryptoJS2 = CryptoJS2 || (function(Math2, undefined2) {
-        var crypto2;
+        var crypto3;
         if (typeof window !== "undefined" && window.crypto) {
-          crypto2 = window.crypto;
+          crypto3 = window.crypto;
         }
         if (typeof self !== "undefined" && self.crypto) {
-          crypto2 = self.crypto;
+          crypto3 = self.crypto;
         }
         if (typeof globalThis !== "undefined" && globalThis.crypto) {
-          crypto2 = globalThis.crypto;
+          crypto3 = globalThis.crypto;
         }
-        if (!crypto2 && typeof window !== "undefined" && window.msCrypto) {
-          crypto2 = window.msCrypto;
+        if (!crypto3 && typeof window !== "undefined" && window.msCrypto) {
+          crypto3 = window.msCrypto;
         }
-        if (!crypto2 && typeof global !== "undefined" && global.crypto) {
-          crypto2 = global.crypto;
+        if (!crypto3 && typeof global !== "undefined" && global.crypto) {
+          crypto3 = global.crypto;
         }
-        if (!crypto2 && typeof require === "function") {
+        if (!crypto3 && typeof require === "function") {
           try {
-            crypto2 = require("crypto");
+            crypto3 = require("crypto");
           } catch (err) {
           }
         }
         var cryptoSecureRandomInt = function() {
-          if (crypto2) {
-            if (typeof crypto2.getRandomValues === "function") {
+          if (crypto3) {
+            if (typeof crypto3.getRandomValues === "function") {
               try {
-                return crypto2.getRandomValues(new Uint32Array(1))[0];
+                return crypto3.getRandomValues(new Uint32Array(1))[0];
               } catch (err) {
               }
             }
-            if (typeof crypto2.randomBytes === "function") {
+            if (typeof crypto3.randomBytes === "function") {
               try {
-                return crypto2.randomBytes(4).readInt32LE();
+                return crypto3.randomBytes(4).readInt32LE();
               } catch (err) {
               }
             }
@@ -12869,6 +12893,11 @@ var require_crypto_js = __commonJS({
 });
 
 // lib/encrypt.ts
+var encrypt_exports = {};
+__export2(encrypt_exports, {
+  decrypt: () => decrypt,
+  encrypt: () => encrypt
+});
 function getSecretKey() {
   const secretKey = process.env.AES_SECRET_KEY;
   if (!secretKey) {
@@ -12879,6 +12908,16 @@ function getSecretKey() {
 function encrypt(plaintext) {
   const secretKey = getSecretKey();
   return import_crypto_js.default.AES.encrypt(plaintext, secretKey).toString();
+}
+function decrypt(ciphertext) {
+  const secretKey = getSecretKey();
+  try {
+    const bytes = import_crypto_js.default.AES.decrypt(ciphertext, secretKey);
+    const decrypted = bytes.toString(import_crypto_js.default.enc.Utf8);
+    return decrypted;
+  } catch (error) {
+    throw new Error(`Decryption failed: ${error.message}`);
+  }
 }
 var import_crypto_js;
 var init_encrypt = __esm({
@@ -13630,6 +13669,7 @@ var init_voucher = __esm({
 // lib/membership.ts
 var membership_exports = {};
 __export2(membership_exports, {
+  BALANCE_PAYMENT_DISCOUNT: () => BALANCE_PAYMENT_DISCOUNT,
   MEMBERSHIP_PACKAGES: () => MEMBERSHIP_PACKAGES,
   MEMBERSHIP_PRODUCT_DISCOUNT: () => MEMBERSHIP_PRODUCT_DISCOUNT,
   MEMBERSHIP_WEEKLY_QUOTA_LIMIT: () => MEMBERSHIP_WEEKLY_QUOTA_LIMIT,
@@ -13743,26 +13783,33 @@ async function getUserMembership(telegramIdOrUserId) {
     resetAt
   };
 }
-async function calculateCheckoutPrice(telegramIdOrUserId, product) {
+async function calculateCheckoutPrice(telegramIdOrUserId, product, options) {
   const membershipStatus = await getUserMembership(telegramIdOrUserId);
-  const basePrice = Number(product.price || 0);
-  const isSpecialProduct = isMembershipProduct(product.name) || isDepositProduct(product.name);
+  const paymentMethod = options?.paymentMethod === "balance" ? "balance" : "qris";
+  const basePrice = Math.max(0, Number(product.price || 0));
+  const isDeposit = isDepositProduct(product.name);
+  const isSpecialProduct = isMembershipProduct(product.name) || isDeposit;
   let discount = 0;
   let isVipDiscountApplied = false;
   if (membershipStatus.isVip && !isSpecialProduct && membershipStatus.remainingWeeklyQuota >= MEMBERSHIP_PRODUCT_DISCOUNT && basePrice > MEMBERSHIP_PRODUCT_DISCOUNT) {
     discount = MEMBERSHIP_PRODUCT_DISCOUNT;
     isVipDiscountApplied = true;
   }
-  const fee = TRANSACTION_FEE;
   const priceAfterDiscount = Math.max(0, basePrice - discount);
-  const finalPayableAmount = priceAfterDiscount + fee;
+  const isBalancePayment = paymentMethod === "balance" && !isDeposit;
+  const balanceDiscount = isBalancePayment ? Math.min(BALANCE_PAYMENT_DISCOUNT, priceAfterDiscount) : 0;
+  const isBalanceDiscountApplied = balanceDiscount > 0;
+  const fee = isBalancePayment ? 0 : TRANSACTION_FEE;
+  const finalPayableAmount = Math.max(0, priceAfterDiscount - balanceDiscount) + fee;
   const remainingQuotaAfter = Math.max(0, membershipStatus.remainingWeeklyQuota - discount);
   return {
     basePrice,
     discount,
+    balanceDiscount,
     fee,
     finalPayableAmount,
     isVipDiscountApplied,
+    isBalanceDiscountApplied,
     remainingQuotaAfter,
     membershipStatus
   };
@@ -13820,12 +13867,13 @@ async function activateOrExtendMembership(userId, durationDays) {
     throw err;
   }
 }
-var TRANSACTION_FEE, MEMBERSHIP_PRODUCT_DISCOUNT, MEMBERSHIP_WEEKLY_QUOTA_LIMIT, MEMBERSHIP_PACKAGES;
+var TRANSACTION_FEE, BALANCE_PAYMENT_DISCOUNT, MEMBERSHIP_PRODUCT_DISCOUNT, MEMBERSHIP_WEEKLY_QUOTA_LIMIT, MEMBERSHIP_PACKAGES;
 var init_membership = __esm({
   "lib/membership.ts"() {
     "use strict";
     init_db();
     TRANSACTION_FEE = 100;
+    BALANCE_PAYMENT_DISCOUNT = 200;
     MEMBERSHIP_PRODUCT_DISCOUNT = 1e3;
     MEMBERSHIP_WEEKLY_QUOTA_LIMIT = 2e4;
     MEMBERSHIP_PACKAGES = [
@@ -18411,10 +18459,19 @@ __export2(shopeepay_exports, {
   checkShopeePayPayment: () => checkShopeePayPayment,
   crc16Ccitt: () => crc16Ccitt,
   createShopeePayInvoice: () => createShopeePayInvoice,
+  extractShopeePayTxId: () => extractShopeePayTxId,
+  fetchShopeePayTransactions: () => fetchShopeePayTransactions,
   generateDynamicQrisFromStatic: () => generateDynamicQrisFromStatic,
   generateQrPngBuffer: () => generateQrPngBuffer,
   getShopeePayAccount: () => getShopeePayAccount,
-  parseEmvco: () => parseEmvco
+  getShopeePayTokenStatus: () => getShopeePayTokenStatus,
+  getWibTodayString: () => getWibTodayString,
+  parseEmvco: () => parseEmvco,
+  parseShopeePayTimeMs: () => parseShopeePayTimeMs,
+  processShopeePayWebhookPayload: () => processShopeePayWebhookPayload,
+  setupShopeePayWebhook: () => setupShopeePayWebhook,
+  updateShopeePayToken: () => updateShopeePayToken,
+  verifyShopeePayWebhookSignature: () => verifyShopeePayWebhookSignature
 });
 function crc16Ccitt(data) {
   let crc = 65535;
@@ -18507,6 +18564,126 @@ async function getShopeePayAccount() {
     };
   }
 }
+async function getShopeePayTokenStatus() {
+  const baseUrl = SHOPEEPAY_BASE_URL.replace(/\/+$/, "");
+  try {
+    const res = await fetch(`${baseUrl}/v1/token/status`, {
+      method: "GET",
+      headers: {
+        "x-api-key": SHOPEEPAY_API_KEY,
+        "Content-Type": "application/json"
+      }
+    });
+    const json = await res.json().catch(() => null);
+    const tokenStatus = String(json?.data?.token_status || (res.ok && json?.success ? "valid" : "invalid"));
+    const message = String(json?.data?.message || json?.error || json?.message || (res.ok ? "OK" : `HTTP ${res.status}`));
+    const valid = Boolean(res.ok && json?.success && tokenStatus.toLowerCase() === "valid");
+    return {
+      success: Boolean(json?.success ?? res.ok),
+      valid,
+      tokenStatus,
+      message
+    };
+  } catch (err) {
+    return {
+      success: false,
+      valid: false,
+      tokenStatus: "unreachable",
+      message: err.message
+    };
+  }
+}
+async function updateShopeePayToken(rawToken) {
+  const cleanToken = rawToken.trim().replace(/^["'`]+|["'`]+$/g, "");
+  if (!cleanToken) {
+    return {
+      success: false,
+      valid: false,
+      tokenStatus: "invalid",
+      message: "Token tidak boleh kosong.",
+      error: "Token kosong"
+    };
+  }
+  const baseUrl = SHOPEEPAY_BASE_URL.replace(/\/+$/, "");
+  try {
+    const putRes = await fetch(`${baseUrl}/v1/token`, {
+      method: "PUT",
+      headers: {
+        "x-api-key": SHOPEEPAY_API_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ token: cleanToken })
+    });
+    const putJson = await putRes.json().catch(() => null);
+    if (!putRes.ok || !putJson?.success) {
+      const errMsg = putJson?.error || putJson?.message || `HTTP ${putRes.status}`;
+      return {
+        success: false,
+        valid: false,
+        tokenStatus: "error",
+        message: errMsg,
+        error: errMsg
+      };
+    }
+    const statusCheck = await getShopeePayTokenStatus();
+    return {
+      success: true,
+      valid: statusCheck.valid,
+      tokenStatus: statusCheck.tokenStatus,
+      message: statusCheck.valid ? "Token berhasil diperbarui & terverifikasi aktif." : `Token tersimpan, namun gateway melapor: ${statusCheck.message}`
+    };
+  } catch (err) {
+    const errMsg = err.message;
+    return {
+      success: false,
+      valid: false,
+      tokenStatus: "unreachable",
+      message: errMsg,
+      error: errMsg
+    };
+  }
+}
+async function setupShopeePayWebhook(webhookUrl, webhookSecret) {
+  const baseUrl = SHOPEEPAY_BASE_URL.replace(/\/+$/, "");
+  try {
+    const payload = { webhook_url: webhookUrl };
+    if (webhookSecret) payload.webhook_secret = webhookSecret;
+    const res = await fetch(`${baseUrl}/v1/webhook/setup`, {
+      method: "POST",
+      headers: {
+        "x-api-key": SHOPEEPAY_API_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json().catch(() => null);
+    return {
+      success: Boolean(res.ok && json?.success),
+      message: json?.message || json?.error || `HTTP ${res.status}`,
+      data: json?.data
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: err.message
+    };
+  }
+}
+function extractShopeePayTxId(tx) {
+  if (!tx) return "";
+  return String(tx.transactionId || tx.transaction_id || tx.id || "").trim();
+}
+function parseShopeePayTimeMs(rawDate) {
+  if (!rawDate) return NaN;
+  const dateStr = String(rawDate).trim();
+  if (!dateStr) return NaN;
+  const hasTz = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(dateStr);
+  const normalized = hasTz ? dateStr : `${dateStr.replace(" ", "T")}+07:00`;
+  return new Date(normalized).getTime();
+}
+function getWibTodayString() {
+  return new Date(Date.now() + 7 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+}
 async function createShopeePayInvoice(orderCode, amount) {
   const roundedAmount = Math.round(amount);
   const dynamicQris = generateDynamicQrisFromStatic(SHOPEEPAY_STATIC_QRIS, roundedAmount);
@@ -18562,83 +18739,311 @@ async function checkShopeePayPayment(params) {
       console.warn("[ShopeePay] /v1/payment/check error:", checkErr);
     }
   }
-  try {
-    const txRes = await fetch(`${baseUrl}/transactions?page_size=20`, {
-      method: "GET",
-      headers: {
-        "x-api-key": SHOPEEPAY_API_KEY,
-        "Content-Type": "application/json"
-      }
-    });
-    if (txRes.ok) {
-      const txJson = await txRes.json();
-      const transactions = txJson?.data?.transactions || [];
-      if (params.amount && transactions.length > 0) {
-        const targetAmount = Math.round(params.amount);
-        const orderTime = params.orderCreatedAt ? new Date(params.orderCreatedAt).getTime() : 0;
-        let claimedTxIds = /* @__PURE__ */ new Set();
-        try {
-          const { query: query2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-          const claimedRes = await query2(
-            `SELECT invoice_data->>'shopeepay_tx_id' as tx_id
-             FROM orders
-             WHERE payment_status = 'paid'
-               AND invoice_data->>'shopeepay_tx_id' IS NOT NULL
-               AND created_at >= NOW() - INTERVAL '48 hours'`
-          );
-          claimedTxIds = new Set(
-            claimedRes.rows.map((r) => String(r.tx_id).trim()).filter(Boolean)
-          );
-        } catch (dbErr) {
-          console.warn("[ShopeePay] Error querying claimed tx IDs:", dbErr);
-        }
-        const match = transactions.find((t) => {
-          const txAmt = Math.round(Number(t.amount || t.nominal || t.total || 0));
-          if (txAmt !== targetAmount) return false;
-          const txId = String(t.transactionId || t.id || "").trim();
-          if (txId && claimedTxIds.has(txId)) {
-            return false;
-          }
-          const rawDate = t.time || t.created_at || t.timestamp || t.date;
-          if (orderTime > 0 && rawDate) {
-            const dateStr = String(rawDate).trim();
-            const normalizedDate = dateStr.includes("+") || dateStr.includes("Z") ? dateStr : dateStr.replace(" ", "T") + "+07:00";
-            const txTime = new Date(normalizedDate).getTime();
-            if (!isNaN(txTime)) {
-              if (txTime < orderTime - 6e5) return false;
-            }
-          }
-          return true;
-        });
-        if (match) {
-          return {
-            paid: true,
-            status: "paid",
-            transaction: match
-          };
-        }
-      }
-    } else {
-      const errJson = await txRes.json().catch(() => null);
-      const errMsg = errJson?.error || errJson?.message || "";
-      console.warn(`[ShopeePay Gateway] GET /transactions returned ${txRes.status}:`, errJson || errMsg);
-      if (errMsg.includes("login timeout") || errJson?.code === 200020) {
-        return {
-          paid: false,
-          status: "gateway_session_expired",
-          error: "Sesi ShopeePay di gateway kedaluwarsa (login timeout). Harap login ulang akun Shopee di gateway."
-        };
-      }
+  const txFetch = await fetchShopeePayTransactions(20);
+  if (!txFetch.ok) {
+    if (txFetch.sessionExpired) {
+      return {
+        paid: false,
+        status: "gateway_session_expired",
+        error: txFetch.error
+      };
     }
-  } catch (txErr) {
-    console.warn("[ShopeePay] /transactions error:", txErr);
+    return { paid: false, status: "unpaid" };
+  }
+  const transactions = txFetch.transactions;
+  if (params.amount && transactions.length > 0) {
+    const targetAmount = Math.round(params.amount);
+    const orderTime = params.orderCreatedAt ? new Date(params.orderCreatedAt).getTime() : 0;
+    let claimedTxIds = /* @__PURE__ */ new Set();
+    try {
+      const { query: query2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const claimedRes = await query2(
+        `SELECT invoice_data->>'shopeepay_tx_id' as tx_id
+         FROM orders
+         WHERE payment_status = 'paid'
+           AND invoice_data->>'shopeepay_tx_id' IS NOT NULL
+           AND created_at >= NOW() - INTERVAL '48 hours'`
+      );
+      claimedTxIds = new Set(
+        claimedRes.rows.map((r) => String(r.tx_id).trim()).filter(Boolean)
+      );
+    } catch (dbErr) {
+      console.warn("[ShopeePay] Error querying claimed tx IDs:", dbErr);
+    }
+    const match = transactions.find((t) => {
+      const txAmt = Math.round(Number(t.amount || t.nominal || t.total || 0));
+      if (txAmt !== targetAmount) return false;
+      const txStatus = String(t.status || "").toLowerCase();
+      if (txStatus && txStatus !== "paid" && txStatus !== "success" && txStatus !== "completed" && txStatus !== "settlement" && txStatus !== "berhasil") {
+        return false;
+      }
+      const txId = extractShopeePayTxId(t);
+      if (txId && claimedTxIds.has(txId)) {
+        return false;
+      }
+      const rawDate = t.time || t.created_at || t.timestamp || t.date;
+      if (orderTime > 0 && rawDate) {
+        const txTime = parseShopeePayTimeMs(rawDate);
+        if (!isNaN(txTime)) {
+          if (txTime < orderTime - 6e5) return false;
+        }
+      }
+      return true;
+    });
+    if (match) {
+      const normalizedTxId = extractShopeePayTxId(match);
+      return {
+        paid: true,
+        status: "paid",
+        transaction: normalizedTxId ? { ...match, transactionId: normalizedTxId } : match
+      };
+    }
   }
   return { paid: false, status: "unpaid" };
 }
-var SHOPEEPAY_BASE_URL, SHOPEEPAY_API_KEY, SHOPEEPAY_STATIC_QRIS;
+async function fetchShopeePayTransactions(pageSize = 20) {
+  const baseUrl = SHOPEEPAY_BASE_URL.replace(/\/+$/, "");
+  const size = Math.min(100, Math.max(1, Math.round(pageSize)));
+  const txEndpoints = [
+    `${baseUrl}/transactions?page_size=${size}`,
+    `${baseUrl}/v1/transactions?page_size=${size}`
+  ];
+  let lastStatus = 502;
+  let lastError = "";
+  for (const endpointUrl of txEndpoints) {
+    try {
+      const txRes = await fetch(endpointUrl, {
+        method: "GET",
+        headers: {
+          "x-api-key": SHOPEEPAY_API_KEY,
+          "Content-Type": "application/json"
+        }
+      });
+      if (txRes.ok) {
+        const txJson = await txRes.json().catch(() => ({}));
+        const transactions = txJson?.data?.transactions || txJson?.transactions || [];
+        return {
+          ok: true,
+          statusCode: txRes.status,
+          transactions,
+          sessionExpired: false
+        };
+      }
+      lastStatus = txRes.status;
+      const errJson = await txRes.json().catch(() => null);
+      const errMsg = String(errJson?.error || errJson?.message || "");
+      lastError = errMsg || `HTTP ${txRes.status}`;
+      console.warn(
+        `[ShopeePay Gateway] GET ${endpointUrl} returned ${txRes.status}:`,
+        errJson || lastError
+      );
+      if (errMsg.includes("login timeout") || errJson?.code === 200020) {
+        return {
+          ok: false,
+          statusCode: txRes.status,
+          transactions: [],
+          sessionExpired: true,
+          error: "Sesi ShopeePay di gateway kedaluwarsa (login timeout). Jalankan /settoken <token_baru> atau login ulang di gateway."
+        };
+      }
+    } catch (txErr) {
+      lastError = txErr.message;
+      console.warn("[ShopeePay] /transactions error:", txErr);
+    }
+  }
+  return {
+    ok: false,
+    statusCode: lastStatus,
+    transactions: [],
+    sessionExpired: false,
+    error: lastError || "Gagal mengambil mutasi dari gateway ShopeePay."
+  };
+}
+function verifyShopeePayWebhookSignature(rawBody, parsedData, signatureHeader, secret) {
+  const cleanSig = signatureHeader.trim();
+  if (!cleanSig || !secret) return false;
+  const sigBuf = Buffer.from(cleanSig, "utf8");
+  const payloadCandidates = [rawBody, JSON.stringify(parsedData)];
+  for (const payload of payloadCandidates) {
+    const hex = import_crypto.default.createHmac("sha256", secret).update(payload).digest("hex");
+    for (const expected of [`sha256=${hex}`, hex]) {
+      const expBuf = Buffer.from(expected, "utf8");
+      if (sigBuf.length === expBuf.length && import_crypto.default.timingSafeEqual(sigBuf, expBuf)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+async function processShopeePayWebhookPayload(rawBody, botInstance, signatureHeader) {
+  let data = {};
+  try {
+    const parsed = JSON.parse(rawBody || "{}");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      data = parsed;
+    }
+  } catch {
+    return {
+      httpStatus: 400,
+      body: { success: false, message: "Invalid JSON payload" }
+    };
+  }
+  const webhookSecret = process.env.SHOPEEPAY_WEBHOOK_SECRET;
+  if (webhookSecret) {
+    if (!signatureHeader || !verifyShopeePayWebhookSignature(rawBody, data, signatureHeader, webhookSecret)) {
+      return {
+        httpStatus: 401,
+        body: { success: false, message: "Invalid webhook signature" }
+      };
+    }
+  }
+  const eventName = String(data.event || "").trim().toLowerCase();
+  if (eventName === "test" || eventName === "webhook.test" || eventName === "ping" || data.test === true) {
+    return {
+      httpStatus: 200,
+      body: {
+        success: true,
+        paid: false,
+        message: `Webhook test ping acknowledged (${eventName || "test"})`,
+        event: eventName || "test"
+      }
+    };
+  }
+  let targetOrderCode = String(
+    data.order_id || data.order_code || data.merchant_ref || data.token || ""
+  ).trim();
+  const txId = extractShopeePayTxId(data);
+  const notificationFields = [
+    data.notification,
+    data.text,
+    data.message,
+    data.body,
+    data.not_body
+  ];
+  const hasExplicitNotificationText = notificationFields.some(
+    (v) => typeof v === "string" && v.trim().length > 0
+  );
+  let detectedAmount = Math.round(Number(data.amount || data.nominal || data.total || 0)) || 0;
+  if (!targetOrderCode && !detectedAmount && hasExplicitNotificationText) {
+    const notifText = notificationFields.filter((v) => typeof v === "string" && v.trim().length > 0).join(" ");
+    const rpMatch = notifText.match(/(?:rp\.?|idr)\s*([0-9][0-9.,]*)/i);
+    const numMatch = rpMatch || notifText.match(/\b([1-9][0-9]{2,6})\b/);
+    if (numMatch) {
+      const clean = numMatch[1].replace(/,\d{1,2}$/, "").replace(/[^0-9]/g, "");
+      detectedAmount = parseInt(clean, 10) || 0;
+    }
+  }
+  const rawStatus = String(
+    data.status || data.payment_status || (eventName === "payment.success" || eventName === "payment_success" ? "paid" : eventName ? eventName : hasExplicitNotificationText || txId && detectedAmount > 0 ? "paid" : "")
+  ).toLowerCase();
+  const isPaid = rawStatus === "success" || rawStatus === "paid" || rawStatus === "settlement" || rawStatus === "completed" || rawStatus === "berhasil";
+  if (!isPaid) {
+    return {
+      httpStatus: 200,
+      body: {
+        success: true,
+        paid: false,
+        message: targetOrderCode ? `Status received: ${rawStatus || "unknown"}` : detectedAmount > 0 ? `Non-paid status received (${rawStatus || "unknown"})` : "Notification received, not a confirmed payment",
+        order_id: targetOrderCode || null,
+        transaction_id: txId || null,
+        detected_amount: detectedAmount || null
+      }
+    };
+  }
+  const { query: query2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+  if (txId) {
+    const claimedRes = await query2(
+      `SELECT order_code FROM orders
+       WHERE payment_status = 'paid'
+         AND invoice_data->>'shopeepay_tx_id' = $1
+       LIMIT 1`,
+      [txId]
+    ).catch(() => ({ rows: [] }));
+    if (claimedRes.rows.length > 0) {
+      const existingCode = claimedRes.rows[0].order_code;
+      return {
+        httpStatus: 200,
+        body: {
+          success: true,
+          paid: true,
+          duplicate: true,
+          message: `Transaction ${txId} already claimed by order ${existingCode}`,
+          order_code: existingCode,
+          order_id: existingCode,
+          transaction_id: txId,
+          detected_amount: detectedAmount || null
+        }
+      };
+    }
+  }
+  if (!targetOrderCode && detectedAmount > 0) {
+    const rawTxTime = data.time || data.created_at || data.timestamp || data.date;
+    const txTimeMs = parseShopeePayTimeMs(rawTxTime);
+    const matchOrd = await query2(
+      `SELECT o.order_code, o.created_at
+       FROM orders o
+       LEFT JOIN products p ON o.product_id = p.id
+       WHERE o.payment_status = 'unpaid'
+         AND COALESCE(LOWER(o.invoice_data->>'gateway'), 'shopeepay') = 'shopeepay'
+         AND (
+           (o.invoice_data->>'payable_amount' ~ '^[0-9]+(\\.[0-9]+)?$' AND (o.invoice_data->>'payable_amount')::numeric = $1)
+           OR (o.invoice_data->>'amount' ~ '^[0-9]+(\\.[0-9]+)?$' AND (o.invoice_data->>'amount')::numeric = $1)
+           OR (
+             o.invoice_data->>'payable_amount' IS NULL
+             AND o.invoice_data->>'amount' IS NULL
+             AND p.price = $1
+           )
+         )
+         AND o.created_at >= NOW() - INTERVAL '24 hours'
+       ORDER BY o.created_at DESC
+       LIMIT 5`,
+      [detectedAmount]
+    );
+    const timeMatched = matchOrd.rows.find((ord) => {
+      if (isNaN(txTimeMs)) return true;
+      const ordTimeMs = new Date(ord.created_at).getTime();
+      return isNaN(ordTimeMs) || txTimeMs >= ordTimeMs - 6e5;
+    });
+    if (timeMatched) {
+      targetOrderCode = timeMatched.order_code;
+    }
+  }
+  if (targetOrderCode) {
+    console.log(`[ShopeePay Webhook] Payment confirmed for order: ${targetOrderCode}`);
+    const { processOrderPayment: processOrderPayment2 } = await Promise.resolve().then(() => (init_fulfillment(), fulfillment_exports));
+    const txMeta = txId ? { ...data, transactionId: txId } : data;
+    const result = await processOrderPayment2(targetOrderCode, botInstance, txMeta);
+    return {
+      httpStatus: 200,
+      body: {
+        success: true,
+        paid: result.mode !== "error",
+        message: result.mode === "error" ? result.message : "ShopeePay payment successfully confirmed",
+        order_code: targetOrderCode,
+        order_id: targetOrderCode,
+        transaction_id: txId || null,
+        detected_amount: detectedAmount || null,
+        mode: result.mode
+      }
+    };
+  }
+  return {
+    httpStatus: 200,
+    body: {
+      success: true,
+      paid: false,
+      message: detectedAmount > 0 ? `Amount detected (Rp ${detectedAmount.toLocaleString("id-ID")}) but no unpaid order found within last 24h` : "Notification received, no amount or order found",
+      order_id: null,
+      transaction_id: txId || null,
+      detected_amount: detectedAmount || null
+    }
+  };
+}
+var import_crypto, SHOPEEPAY_BASE_URL, SHOPEEPAY_API_KEY, SHOPEEPAY_STATIC_QRIS;
 var init_shopeepay = __esm({
   "lib/shopeepay.ts"() {
     "use strict";
+    import_crypto = __toESM(require("crypto"));
     if (!process.env.SHOPEEPAY_API_KEY) {
       try {
         process.loadEnvFile?.();
@@ -18664,7 +19069,7 @@ function escapeHtml2(str) {
   if (!str) return "";
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
-async function processOrderPayment(orderCode, botInstance, transactionMeta) {
+async function processOrderPayment(orderCode, botInstance, transactionMeta, options) {
   const orderRes = await query(
     `SELECT o.*, u.telegram_id, p.name as product_name, p.price as product_price
      FROM orders o
@@ -18681,6 +19086,7 @@ async function processOrderPayment(orderCode, botInstance, transactionMeta) {
     };
   }
   const order = orderRes.rows[0];
+  const wasPreviouslyPaid = order.payment_status === "paid";
   if (order.fulfillment_status === "delivered") {
     return {
       success: true,
@@ -18689,41 +19095,54 @@ async function processOrderPayment(orderCode, botInstance, transactionMeta) {
       orderCode
     };
   }
-  if (transactionMeta?.transactionId) {
-    const txId = String(transactionMeta.transactionId).trim();
+  if (wasPreviouslyPaid && !options?.allowRetryQueued) {
+    return {
+      success: true,
+      mode: "already_processed",
+      message: `Order "${orderCode}" payment has already been confirmed.`,
+      orderCode
+    };
+  }
+  const invData = order.invoice_data || {};
+  const isBalancePayment = invData.payment_method === "balance" || invData.gateway === "balance";
+  const rawTxId = transactionMeta?.transactionId ?? transactionMeta?.transaction_id ?? transactionMeta?.id;
+  const txId = rawTxId !== void 0 && rawTxId !== null ? String(rawTxId).trim() : "";
+  if (txId) {
+    const txFieldPath = isBalancePayment ? "{balance_tx_id}" : "{shopeepay_tx_id}";
     await query(
       `UPDATE orders
        SET payment_status = 'paid',
            invoice_data = jsonb_set(
              COALESCE(invoice_data::jsonb, '{}'::jsonb),
-             '{shopeepay_tx_id}',
-             to_jsonb($1::text)
+             $1::text[],
+             to_jsonb($2::text)
            )
-       WHERE id = $2`,
-      [txId, order.id]
+       WHERE id = $3`,
+      [txFieldPath, txId, order.id]
     ).catch(() => {
       return query(`UPDATE orders SET payment_status = 'paid' WHERE id = $1`, [order.id]);
     });
-  } else {
+  } else if (!wasPreviouslyPaid) {
     await query(
       `UPDATE orders SET payment_status = 'paid' WHERE id = $1`,
       [order.id]
     );
   }
-  const invData = order.invoice_data || {};
-  if (invData.voucher_id) {
-    const { applyVoucherUsage: applyVoucherUsage2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
-    const discountAmount = Number(invData.voucher_discount || invData.voucher_cashback || 0);
-    await applyVoucherUsage2({
-      voucherId: String(invData.voucher_id),
-      userId: order.user_id,
-      orderId: order.id,
-      discountAmount
+  if (!wasPreviouslyPaid) {
+    if (invData.voucher_id) {
+      const { applyVoucherUsage: applyVoucherUsage2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+      const discountAmount = Number(invData.voucher_discount || invData.voucher_cashback || 0);
+      await applyVoucherUsage2({
+        voucherId: String(invData.voucher_id),
+        userId: order.user_id,
+        orderId: order.id,
+        discountAmount
+      });
+    }
+    broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
+      console.warn("[Broadcast Warning] Failed to broadcast order payment success:", bErr);
     });
   }
-  broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
-    console.warn("[Broadcast Warning] Failed to broadcast order payment success:", bErr);
-  });
   const {
     isMembershipProduct: isMembershipProduct2,
     findMembershipPackage: findMembershipPackage2,
@@ -18746,11 +19165,14 @@ async function processOrderPayment(orderCode, botInstance, transactionMeta) {
        WHERE id = $2`,
       [encryptedNote, order.id]
     );
+    const balancePaidStr = typeof invData.payable_amount === "number" ? `Rp ${invData.payable_amount.toLocaleString("id-ID")}` : `Rp ${Number(order.product_price || 0).toLocaleString("id-ID")}`;
+    const balanceLineBuyer = isBalancePayment ? `\u{1F4B3} <b>Dibayar via Saldo:</b> ${balancePaidStr}` + (typeof invData.balance_after === "number" ? ` \u2022 Sisa Saldo: <b>Rp ${invData.balance_after.toLocaleString("id-ID")}</b>
+` : "\n") : "";
     const buyerMembershipMessage = `\u{1F389} <b>SELAMAT! MEMBERSHIP VIP ANDA TELAH AKTIF! \u2B50</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u{1F48E} <b>Paket:</b> ${escapeHtml2(order.product_name)}
 \u{1F4C5} <b>Masa Aktif:</b> Hingga <b>${formatWibDate2(act.newExpiresAt)}</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+` + balanceLineBuyer + `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
 \u{1F31F} <b>Keuntungan Eksklusif VIP Anda:</b>
 \u2022 \u{1F3F7}\uFE0F <b>Potongan Rp 1.000</b> untuk setiap pembelian akun digital.
@@ -18760,7 +19182,7 @@ async function processOrderPayment(orderCode, botInstance, transactionMeta) {
 \u2022 \u{1F381} <b>Promo & Restock Spesial:</b> Akses lebih awal ke akun langka.
 
 \u{1F6D2} <i>Mulai belanja akun premium dengan harga lebih murah sekarang lewat katalog bot!</i>`;
-    await sendSafeMessage(
+    await sendPreservedMessage(
       { chatId: order.telegram_id },
       botInstance,
       buyerMembershipMessage,
@@ -18780,6 +19202,7 @@ async function processOrderPayment(orderCode, botInstance, transactionMeta) {
 \u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
 \u2022 <b>Pembeli:</b> <code>${escapeHtml2(order.telegram_id)}</code>
 \u2022 <b>Paket:</b> ${escapeHtml2(order.product_name)}
+\u2022 <b>Metode Bayar:</b> ${isBalancePayment ? `\u{1F4B0} Saldo Akun (${balancePaidStr})` : "\u{1F4F1} QRIS"}
 \u2022 <b>Masa Aktif:</b> s/d ${formatWibDate2(act.newExpiresAt)}
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`;
     await sendSafeMessage(
@@ -18824,7 +19247,7 @@ async function processOrderPayment(orderCode, botInstance, transactionMeta) {
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
 Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464} Profil</b> untuk melihat total saldo Anda.`;
-    await sendSafeMessage(
+    await sendPreservedMessage(
       { chatId: order.telegram_id },
       botInstance,
       buyerDepositMessage,
@@ -18860,7 +19283,7 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
       deliveredKey: confirmationMsg
     };
   }
-  if (order.invoice_data?.is_vip_discount) {
+  if (!wasPreviouslyPaid && order.invoice_data?.is_vip_discount) {
     await recordDiscountUsage2(order.user_id, 1e3);
   }
   let supplierProductId = order.product_id;
@@ -18876,8 +19299,14 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
     }
   } catch {
   }
-  const sellingPrice = order.product_price;
+  const paidBalanceAmount = isBalancePayment && typeof invData.payable_amount === "number" ? invData.payable_amount : null;
+  const balanceAfterPayment = isBalancePayment && typeof invData.balance_after === "number" ? invData.balance_after : null;
+  const sellingPrice = isBalancePayment && paidBalanceAmount !== null ? paidBalanceAmount : order.product_price;
   const netProfit = Math.max(0, sellingPrice - modalPrice);
+  const paymentMethodLineBuyer = isBalancePayment ? `\u{1F4B3} <b>Metode Bayar:</b> Saldo Akun (Rp ${sellingPrice.toLocaleString("id-ID")})` + (balanceAfterPayment !== null ? ` \u2022 Sisa Saldo: <b>Rp ${balanceAfterPayment.toLocaleString("id-ID")}</b>` : "") + `
+` : "";
+  const paymentMethodLineOwner = `\u2022 <b>Metode Bayar:</b> ${isBalancePayment ? "\u{1F4B0} Saldo Akun (Hemat Rp 200)" : "\u{1F4F1} QRIS"}
+`;
   let currentBalance = 0;
   try {
     const balRes = await getSupplierBalance();
@@ -18909,13 +19338,13 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u{1F4E6} <b>Produk:</b> ${escapeHtml2(order.product_name)}
 \u{1F194} <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+` + paymentMethodLineBuyer + `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
 \u{1F511} <b>Kredensial / Lisensi Akun Anda:</b>
 <code>${escapeHtml2(deliveredKey)}</code>
 
 \u{1F4CC} <i>Simpan kredensial ini baik-baik. Garansi berlaku sesuai ketentuan produk. Terima kasih telah berbelanja di DaFung Hub!</i>`;
-        await sendSafeMessage(
+        await sendPreservedMessage(
           { chatId: buyerChatId },
           botInstance,
           buyerSuccessMessage,
@@ -18923,7 +19352,7 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
             parse_mode: "HTML",
             reply_markup: {
               inline_keyboard: [
-                [{ text: "\u{1F6CD}\uFE0F Beli Produk Lain", callback_data: "menu_products" }],
+                [{ text: "\u{1F4E9} Riwayat Pesanan", callback_data: "menu_orders" }, { text: "\u{1F6CD}\uFE0F Beli Produk Lain", callback_data: "menu_products" }],
                 [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
               ]
             }
@@ -18934,7 +19363,7 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
 \u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
 \u2022 <b>Produk:</b> ${escapeHtml2(order.product_name)}
 \u2022 <b>Pembeli:</b> <code>${escapeHtml2(buyerChatId)}</code>
-\u2022 <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
+` + paymentMethodLineOwner + `\u2022 <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
 \u2022 <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString("id-ID")}
 \u2022 <b>Untung Bersih:</b> <b>+Rp ${netProfit.toLocaleString("id-ID")}</b>
 \u2022 <b>Sisa Saldo Supplier:</b> Rp ${(currentBalance - modalPrice).toLocaleString("id-ID")}
@@ -18967,8 +19396,9 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
   const buyerQueueMessage = `\u{1F9FE} <b>PEMBAYARAN DITERIMA!</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u{1F4E6} <b>Produk:</b> ${escapeHtml2(order.product_name)}
-\u{1F4B0} <b>Total:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
-\u{1F194} <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
+\u{1F4B0} <b>Total:</b> Rp ${sellingPrice.toLocaleString("id-ID")}${isBalancePayment ? " <i>(Bayar via Saldo \u2022 Hemat Rp 200)</i>" : ""}
+` + (isBalancePayment && balanceAfterPayment !== null ? `\u{1F4B3} <b>Sisa Saldo:</b> <b>Rp ${balanceAfterPayment.toLocaleString("id-ID")}</b>
+` : "") + `\u{1F194} <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
 \u23F3 <i>Pesanan Anda sedang disiapkan oleh antrean sistem kami (estimasi 1\u201310 menit).</i>
@@ -18994,7 +19424,7 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
 \u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code> <i>(Sentuh untuk salin)</i>
 \u2022 <b>Produk:</b> ${escapeHtml2(order.product_name)}
 \u2022 <b>Pembeli:</b> <code>${escapeHtml2(buyerChatId)}</code>${vipPriorityBadge}
-\u2022 <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
+` + paymentMethodLineOwner + `\u2022 <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
 \u2022 <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString("id-ID")}
 \u2022 <b>Estimasi Untung:</b> <b>+Rp ${netProfit.toLocaleString("id-ID")}</b>
 \u2022 <b>Saldo Supplier:</b> Rp ${currentBalance.toLocaleString("id-ID")} (Kurang)
@@ -19087,7 +19517,10 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance, media
   const buyerChatId = order.telegram_id;
   const replyMarkup = {
     inline_keyboard: [
-      [{ text: "\u{1F6CD}\uFE0F Beli Produk Baru", callback_data: "menu_products" }],
+      [
+        { text: "\u{1F4E9} Riwayat Pesanan", callback_data: "menu_orders" },
+        { text: "\u{1F6CD}\uFE0F Beli Produk Baru", callback_data: "menu_products" }
+      ],
       [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
     ]
   };
@@ -19107,6 +19540,8 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance, media
 ` : "") + `
 \u{1F4CC} <i>Simpan file ini baik-baik. Garansi berlaku sesuai ketentuan produk. Terima kasih telah berbelanja di DaFung Hub!</i>`;
     let deliveredMedia = false;
+    let deliveredMediaMsgId;
+    let deliveredFileId = mediaData.fileId;
     if (mediaData.messageId && mediaData.fromChatId) {
       const copyRes = await sendTelegramApi2("copyMessage", {
         chat_id: buyerChatId,
@@ -19118,6 +19553,7 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance, media
       });
       if (copyRes.ok) {
         deliveredMedia = true;
+        deliveredMediaMsgId = copyRes.result?.message_id;
       }
     }
     if (!deliveredMedia && mediaData.fileId) {
@@ -19129,7 +19565,12 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance, media
           parse_mode: "HTML",
           reply_markup: replyMarkup
         });
-        if (docRes.ok) deliveredMedia = true;
+        if (docRes.ok) {
+          deliveredMedia = true;
+          const resData = docRes.result;
+          deliveredMediaMsgId = resData?.message_id;
+          deliveredFileId = resData?.document?.file_id || deliveredFileId;
+        }
       } else if (mediaData.type === "photo") {
         const photoRes = await sendTelegramApi2("sendPhoto", {
           chat_id: buyerChatId,
@@ -19138,7 +19579,14 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance, media
           parse_mode: "HTML",
           reply_markup: replyMarkup
         });
-        if (photoRes.ok) deliveredMedia = true;
+        if (photoRes.ok) {
+          deliveredMedia = true;
+          const resData = photoRes.result;
+          deliveredMediaMsgId = resData?.message_id;
+          if (Array.isArray(resData?.photo) && resData.photo.length > 0) {
+            deliveredFileId = resData.photo[resData.photo.length - 1]?.file_id || deliveredFileId;
+          }
+        }
       } else if (mediaData.type === "video") {
         const vidRes = await sendTelegramApi2("sendVideo", {
           chat_id: buyerChatId,
@@ -19147,7 +19595,12 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance, media
           parse_mode: "HTML",
           reply_markup: replyMarkup
         });
-        if (vidRes.ok) deliveredMedia = true;
+        if (vidRes.ok) {
+          deliveredMedia = true;
+          const resData = vidRes.result;
+          deliveredMediaMsgId = resData?.message_id;
+          deliveredFileId = resData?.video?.file_id || deliveredFileId;
+        }
       } else if (mediaData.type === "audio") {
         const audRes = await sendTelegramApi2("sendAudio", {
           chat_id: buyerChatId,
@@ -19156,11 +19609,82 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance, media
           parse_mode: "HTML",
           reply_markup: replyMarkup
         });
-        if (audRes.ok) deliveredMedia = true;
+        if (audRes.ok) {
+          deliveredMedia = true;
+          const resData = audRes.result;
+          deliveredMediaMsgId = resData?.message_id;
+          deliveredFileId = resData?.audio?.file_id || deliveredFileId;
+        }
+      } else if (mediaData.type === "animation") {
+        const animRes = await sendTelegramApi2("sendAnimation", {
+          chat_id: buyerChatId,
+          animation: mediaData.fileId,
+          caption: buyerCaption,
+          parse_mode: "HTML",
+          reply_markup: replyMarkup
+        });
+        if (animRes.ok) {
+          deliveredMedia = true;
+          const resData = animRes.result;
+          deliveredMediaMsgId = resData?.message_id;
+          deliveredFileId = resData?.animation?.file_id || deliveredFileId;
+        }
+      } else if (mediaData.type === "voice") {
+        const voiceRes = await sendTelegramApi2("sendVoice", {
+          chat_id: buyerChatId,
+          voice: mediaData.fileId,
+          caption: buyerCaption,
+          parse_mode: "HTML",
+          reply_markup: replyMarkup
+        });
+        if (voiceRes.ok) {
+          deliveredMedia = true;
+          const resData = voiceRes.result;
+          deliveredMediaMsgId = resData?.message_id;
+          deliveredFileId = resData?.voice?.file_id || deliveredFileId;
+        }
+      } else if (mediaData.type === "sticker") {
+        const stickerRes = await sendTelegramApi2("sendSticker", {
+          chat_id: buyerChatId,
+          sticker: mediaData.fileId,
+          reply_markup: replyMarkup
+        });
+        if (stickerRes.ok) {
+          deliveredMedia = true;
+          const resData = stickerRes.result;
+          deliveredMediaMsgId = resData?.message_id;
+          deliveredFileId = resData?.sticker?.file_id || deliveredFileId;
+        }
       }
     }
+    if (deliveredMediaMsgId) {
+      markMessageAsPreserved(buyerChatId, deliveredMediaMsgId);
+      await clearPreviousBotMessages(buyerChatId, botInstance, deliveredMediaMsgId);
+    }
+    if (deliveredFileId) {
+      await query(
+        `UPDATE orders
+         SET invoice_data = jsonb_set(
+           COALESCE(invoice_data::jsonb, '{}'::jsonb),
+           '{delivered_media}',
+           $1::jsonb
+         )
+         WHERE id = $2`,
+        [
+          JSON.stringify({
+            type: mediaData.type,
+            fileId: deliveredFileId,
+            fileName: mediaData.fileName || (mediaData.type === "photo" ? "foto.jpg" : "lampiran"),
+            mimeType: mediaData.mimeType || null
+          }),
+          order.id
+        ]
+      ).catch((dmErr) => {
+        console.warn("[Fulfillment] Failed to persist delivered_media metadata:", dmErr);
+      });
+    }
     if (!deliveredMedia) {
-      await sendSafeMessage(
+      await sendPreservedMessage(
         { chatId: buyerChatId },
         botInstance,
         buyerCaption,
@@ -19181,7 +19705,7 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance, media
 <code>${escapeHtml2(cleanKey)}</code>
 
 \u{1F4CC} <i>Terima kasih telah berbelanja di DaFung Hub! Hubungi admin jika butuh bantuan atau klaim garansi.</i>`;
-    await sendSafeMessage(
+    await sendPreservedMessage(
       { chatId: buyerChatId },
       botInstance,
       buyerMessage,
@@ -19201,7 +19725,9 @@ async function adminManualFulfill(orderCode, credentialsText, botInstance, media
   };
 }
 async function adminRetrySupplierFulfill(orderCode, botInstance) {
-  const result = await processOrderPayment(orderCode, botInstance);
+  const result = await processOrderPayment(orderCode, botInstance, void 0, {
+    allowRetryQueued: true
+  });
   if (result.mode === "instant") {
     return {
       success: true,
@@ -19245,13 +19771,23 @@ async function checkAndProcessUnpaidShopeeOrders(botInstance) {
   let confirmedCount = 0;
   try {
     const unpaidOrders = await query(
-      `SELECT o.*
+      `SELECT o.*, p.price as product_price
        FROM orders o
+       LEFT JOIN products p ON o.product_id = p.id
        WHERE o.payment_status = 'unpaid'
          AND o.created_at >= NOW() - INTERVAL '24 hours'
        ORDER BY o.created_at DESC
        LIMIT 10`
     );
+    const expiredAlertMsg = `\u{1F6A8} <b>PERINGATAN GATEWAY: Sesi ShopeePay Kedaluwarsa!</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+Gateway melaporkan: <code>login timeout, please login again (code 200020)</code>.
+
+\u{1F527} <b>Solusi Cepat:</b>
+Kirim token Shopee terbaru langsung ke chat ini dengan perintah:
+<code>/settoken &lt;token_baru&gt;</code>
+
+\u26A0\uFE0F <i>Untuk sementara, gunakan menu <b>\u23F3 Konfirmasi Order Belum Bayar</b> atau perintah <code>/konfirmasi &lt;kode_order&gt;</code>.</i>`;
     if (unpaidOrders.rows.length === 0) {
       try {
         const { SHOPEEPAY_BASE_URL: SHOPEEPAY_BASE_URL2, SHOPEEPAY_API_KEY: SHOPEEPAY_API_KEY2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
@@ -19275,11 +19811,7 @@ async function checkAndProcessUnpaidShopeeOrders(botInstance) {
               await sendSafeMessage2(
                 { chatId: ADMIN_TELEGRAM_ID4 },
                 botInstance,
-                `\u{1F6A8} <b>PERINGATAN GATEWAY: Sesi ShopeePay Kedaluwarsa!</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-Gateway melaporkan: <code>login timeout, please login again (code 200020)</code>.
-
-\u26A0\uFE0F <i>Mutasi QRIS tidak dapat dibaca otomatis sampai Anda login ulang di bot penyedia gateway (prastyaaneki). Untuk sementara gunakan menu <b>\u23F3 Konfirmasi Order Belum Bayar</b> atau perintah <code>/konfirmasi &lt;kode_order&gt;</code>.</i>`,
+                expiredAlertMsg,
                 { parse_mode: "HTML" }
               ).catch(() => {
               });
@@ -19292,7 +19824,9 @@ Gateway melaporkan: <code>login timeout, please login again (code 200020)</code>
     }
     for (const ord of unpaidOrders.rows) {
       const invData = typeof ord.invoice_data === "string" ? JSON.parse(ord.invoice_data || "{}") : ord.invoice_data || {};
-      const actualAmount = Number(invData.payable_amount) || Number(invData.amount) || 0;
+      const orderGateway = String(invData.gateway || gateway).toLowerCase();
+      if (orderGateway !== "shopeepay") continue;
+      const actualAmount = Number(invData.payable_amount) || Number(invData.amount) || Number(ord.product_price) || 0;
       if (actualAmount > 0) {
         const { checkShopeePayPayment: checkShopeePayPayment2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
         const checkResult = await checkShopeePayPayment2({
@@ -19303,7 +19837,8 @@ Gateway melaporkan: <code>login timeout, please login again (code 200020)</code>
         });
         if (checkResult.paid) {
           console.log(`[Auto-Check] Payment confirmed for order: ${ord.order_code}`);
-          await processOrderPayment(ord.order_code, botInstance, checkResult.transaction);
+          const txMeta = checkResult.transaction && typeof checkResult.transaction === "object" ? checkResult.transaction : void 0;
+          await processOrderPayment(ord.order_code, botInstance, txMeta);
           confirmedCount++;
         } else if (checkResult.status === "gateway_session_expired") {
           const now = Date.now();
@@ -19314,11 +19849,7 @@ Gateway melaporkan: <code>login timeout, please login again (code 200020)</code>
             await sendSafeMessage2(
               { chatId: ADMIN_TELEGRAM_ID4 },
               botInstance,
-              `\u{1F6A8} <b>PERINGATAN GATEWAY: Sesi ShopeePay Kedaluwarsa!</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-Gateway melaporkan: <code>login timeout, please login again (code 200020)</code>.
-
-\u26A0\uFE0F <i>Mutasi QRIS tidak dapat dibaca otomatis sampai Anda login ulang di bot penyedia gateway (prastyaaneki). Untuk sementara gunakan menu <b>\u23F3 Konfirmasi Order Belum Bayar</b> atau perintah <code>/konfirmasi &lt;kode_order&gt;</code>.</i>`,
+              expiredAlertMsg,
               { parse_mode: "HTML" }
             ).catch(() => {
             });
@@ -19677,7 +20208,9 @@ __export2(menu_exports, {
   getPlatformLogoPath: () => getPlatformLogoPath,
   getPlatformsWithCounts: () => getPlatformsWithCounts,
   matchProductPlatform: () => matchProductPlatform2,
+  parseStoredCredentialDisplay: () => parseStoredCredentialDisplay,
   registerMenuHandlers: () => registerMenuHandlers,
+  resendOrderMedia: () => resendOrderMedia,
   sendAdminAddVoucherMenu: () => sendAdminAddVoucherMenu,
   sendAdminBalanceMenu: () => sendAdminBalanceMenu,
   sendAdminBroadcastChoice: () => sendAdminBroadcastChoice,
@@ -19693,6 +20226,7 @@ __export2(menu_exports, {
   sendAdminVoucherDetail: () => sendAdminVoucherDetail,
   sendAdminVouchersMenu: () => sendAdminVouchersMenu,
   sendApiMenu: () => sendApiMenu,
+  sendCheckoutMethodMenu: () => sendCheckoutMethodMenu,
   sendDepositMenu: () => sendDepositMenu,
   sendMainMenu: () => sendMainMenu,
   sendMaintenanceMessage: () => sendMaintenanceMessage,
@@ -20183,20 +20717,28 @@ async function sendProductDetail(ctx, botInstance, productId, platformId = "all"
     const sellingPrice = getEffectiveSellingPrice(prod, customPrices);
     const priceStr = `Rp ${sellingPrice.toLocaleString("id-ID")}`;
     const statusStr = prod.availability === "in_stock" ? "\u{1F7E2} Stok Tersedia" : "\u{1F534} Stok Habis";
-    const { getUserMembership: getUserMembership2 } = await Promise.resolve().then(() => (init_membership(), membership_exports));
+    const { getUserMembership: getUserMembership2, isDepositProduct: isDepositProduct2, BALANCE_PAYMENT_DISCOUNT: BALANCE_PAYMENT_DISCOUNT2 } = await Promise.resolve().then(() => (init_membership(), membership_exports));
     const memberInfo = await getUserMembership2(String(ctx.from?.id)).catch(() => null);
     let priceSection = `\u2022 Harga: <b>${escapeHtml4(priceStr)}</b>
 `;
     let buttonBuyText = `\u{1F4B3} Beli Sekarang (${priceStr})`;
+    let effectiveDisplayPrice = sellingPrice;
     if (memberInfo?.isVip && memberInfo.remainingWeeklyQuota >= 1e3 && sellingPrice > 1e3) {
       const vipPrice = sellingPrice - 1e3;
       const vipPriceStr = `Rp ${vipPrice.toLocaleString("id-ID")}`;
+      effectiveDisplayPrice = vipPrice;
       priceSection = `\u2022 Harga Normal: <s>${escapeHtml4(priceStr)}</s>
 \u2022 Harga VIP Member: <b>${escapeHtml4(vipPriceStr)}</b> <i>(Hemat Rp 1.000! \u{1F31F})</i>
 `;
       buttonBuyText = `\u{1F4B3} Beli Sekarang (${vipPriceStr})`;
     } else if (!memberInfo?.isVip && sellingPrice > 1e3) {
       priceSection += `\u{1F4A1} <i>Tips: Gabung VIP Member untuk dapat harga Rp ${(sellingPrice - 1e3).toLocaleString("id-ID")}!</i>
+`;
+    }
+    const saldoPreviewDiscount = !isDepositProduct2(prod.name) ? Math.min(BALANCE_PAYMENT_DISCOUNT2, effectiveDisplayPrice) : 0;
+    if (saldoPreviewDiscount > 0) {
+      const saldoPreviewPrice = Math.max(0, effectiveDisplayPrice - saldoPreviewDiscount);
+      priceSection += `\u2022 Bayar via Saldo: <b>Rp ${saldoPreviewPrice.toLocaleString("id-ID")}</b> <i>(Lebih murah Rp ${saldoPreviewDiscount.toLocaleString("id-ID")}! \u{1F4B0})</i>
 `;
     }
     const detailText = `\u{1F4E6} <b>DETAIL PRODUK</b>
@@ -20207,7 +20749,7 @@ async function sendProductDetail(ctx, botInstance, productId, platformId = "all"
 \u{1F4DD} <b>Deskripsi / Ketentuan:</b>
 ${escapeHtml4(prod.description.substring(0, 300))}
 ` : "") + `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-Sentuh tombol di bawah untuk langsung membuat invoice pembayaran QRIS:`;
+Sentuh tombol di bawah untuk memilih metode pembayaran (QRIS / Saldo):`;
     const buttons = [];
     if (prod.availability === "in_stock") {
       buttons.push([
@@ -20250,6 +20792,117 @@ Sentuh tombol di bawah untuk langsung membuat invoice pembayaran QRIS:`;
     );
   }
 }
+async function sendCheckoutMethodMenu(ctx, botInstance, productId) {
+  try {
+    const product = await resolveProductForCheckout(ctx, productId, botInstance);
+    if (!product) {
+      return;
+    }
+    const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
+    const telegramId = ctx.from?.id ? String(ctx.from.id) : String(chatId);
+    const user = await ensureUser(telegramId, {
+      username: ctx.from?.username,
+      firstName: ctx.from?.first_name
+    });
+    const [qrisPricing, balancePricing] = await Promise.all([
+      calculateOrderPricing({
+        userId: user.id,
+        telegramId,
+        product,
+        paymentMethod: "qris"
+      }),
+      calculateOrderPricing({
+        userId: user.id,
+        telegramId,
+        product,
+        paymentMethod: "balance"
+      })
+    ]);
+    if (qrisPricing.isDeposit) {
+      await handleBuy(ctx, product.id, botInstance, void 0, "qris");
+      return;
+    }
+    const userBalance = Math.max(0, Number(user.balance ?? 0));
+    const qrisPayableDisplay = qrisPricing.priceAfterDiscounts;
+    const balancePayable = balancePricing.balancePayableAmount;
+    const isBalanceSufficient = userBalance >= balancePayable;
+    let discountSummary = "";
+    if (qrisPricing.isVipDiscountApplied) {
+      discountSummary += `\u2022 Diskon VIP Member: <b>-Rp ${qrisPricing.vipDiscount.toLocaleString("id-ID")}</b> \u{1F31F}
+`;
+    }
+    if (qrisPricing.voucher && qrisPricing.voucherDiscount > 0) {
+      discountSummary += `\u2022 Voucher (<code>${escapeHtml4(qrisPricing.voucher.code)}</code>): <b>-Rp ${qrisPricing.voucherDiscount.toLocaleString("id-ID")}</b> \u{1F39F}\uFE0F
+`;
+    }
+    const balanceNoteLine = isBalanceSufficient ? `\u2705 <i>Saldo mencukupi! Pilih bayar pakai Saldo untuk langsung hemat Rp ${balancePricing.balanceDiscount.toLocaleString("id-ID")}.</i>` : `\u26A0\uFE0F <i>Saldo kurang <b>Rp ${Math.max(0, balancePayable - userBalance).toLocaleString("id-ID")}</b> untuk metode Saldo. Silakan Top up sekarang atau bayar via QRIS.</i>`;
+    const checkoutText = `\u{1F6D2} <b>PILIH METODE PEMBAYARAN</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F4E6} <b>Produk:</b> ${escapeHtml4(product.name)}
+\u{1F3F7}\uFE0F <b>Harga Produk:</b> Rp ${qrisPricing.basePrice.toLocaleString("id-ID")}
+` + discountSummary + `\u{1F4B3} <b>Saldo Akun Anda:</b> <b>Rp ${userBalance.toLocaleString("id-ID")}</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+
+\u2022 \u{1F4F1} <b>QRIS Instant:</b> <b>Rp ${qrisPayableDisplay.toLocaleString("id-ID")}</b> <i>(+ kode unik pembayaran)</i>
+\u2022 \u{1F4B0} <b>Saldo Akun:</b> <b>Rp ${balancePayable.toLocaleString("id-ID")}</b> <i>(Lebih murah Rp ${balancePricing.balanceDiscount.toLocaleString("id-ID")}! \u26A1)</i>
+
+` + balanceNoteLine;
+    const buttons = [
+      [
+        {
+          text: `\u{1F4F1} Bayar dengan QRIS (Rp ${qrisPayableDisplay.toLocaleString("id-ID")})`,
+          callback_data: `pay_qris:${product.id}`
+        }
+      ],
+      [
+        isBalanceSufficient ? {
+          text: `\u{1F4B0} Bayar dengan Saldo (Rp ${balancePayable.toLocaleString("id-ID")} \u2022 Hemat Rp ${balancePricing.balanceDiscount.toLocaleString("id-ID")})`,
+          callback_data: `pay_bal:${product.id}`
+        } : {
+          text: "\u{1F4B0} Saldo (tidak mencukupi | Top up sekarang)",
+          callback_data: "menu_deposit"
+        }
+      ],
+      [
+        {
+          text: "\u{1F39F}\uFE0F Gunakan Kode Voucher",
+          callback_data: `input_voucher_${product.id}`
+        }
+      ]
+    ];
+    if (qrisPricing.isMembership) {
+      buttons.push([
+        { text: "\u25C0\uFE0F Kembali ke Membership", callback_data: "menu_membership" },
+        { text: "\u{1F519} Menu Utama", callback_data: "menu_main" }
+      ]);
+    } else {
+      const backPlat = matchProductPlatform2(product.name)?.id || "all";
+      buttons.push([
+        { text: "\u25C0\uFE0F Detail Produk", callback_data: `pdetail:${backPlat}:${product.id}` },
+        { text: "\u{1F519} Menu Utama", callback_data: "menu_main" }
+      ]);
+    }
+    await sendSafeMessage(ctx, botInstance, checkoutText, {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: buttons }
+    });
+  } catch (err) {
+    console.error("[Checkout Method Menu] Failed:", err);
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      "\u26A0\uFE0F Gagal memuat pilihan metode pembayaran. Silakan coba kembali.",
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "\u{1F6CD}\uFE0F Buka Katalog Produk", callback_data: "menu_products" }],
+            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+          ]
+        }
+      }
+    );
+  }
+}
 async function sendProfileMenu(ctx, botInstance) {
   const telegramId = ctx.from?.id ? String(ctx.from.id) : "-";
   const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || "-";
@@ -20258,21 +20911,11 @@ async function sendProfileMenu(ctx, botInstance) {
   let balance = 0;
   if (ctx.from?.id) {
     try {
-      const userRes = await query(
-        `SELECT balance FROM users WHERE telegram_id = $1 LIMIT 1`,
-        [String(ctx.from.id)]
-      );
-      if (userRes.rows.length > 0 && typeof userRes.rows[0].balance === "number") {
-        balance = userRes.rows[0].balance;
-      } else {
-        await query(
-          `INSERT INTO users (telegram_id, role, balance)
-           VALUES ($1, $2, 0)
-           ON CONFLICT (telegram_id) DO UPDATE SET telegram_id = EXCLUDED.telegram_id`,
-          [String(ctx.from.id), isOwner ? "admin" : "buyer"]
-        );
-        balance = 0;
-      }
+      const syncedUser = await ensureUser(String(ctx.from.id), {
+        username: ctx.from?.username,
+        firstName: ctx.from?.first_name
+      });
+      balance = typeof syncedUser?.balance === "number" ? syncedUser.balance : 0;
     } catch (err) {
       console.error("[Profile] Error fetching user balance:", err);
       balance = 0;
@@ -20379,26 +21022,176 @@ Silakan pilih paket langganan yang Anda inginkan:`;
     reply_markup: { inline_keyboard: buttons }
   });
 }
-async function sendOrdersMenu(ctx, botInstance) {
+function safeDecryptCredential(ciphertext) {
+  if (!ciphertext || typeof ciphertext !== "string" || !ciphertext.trim()) {
+    return null;
+  }
+  try {
+    const plain = decrypt(ciphertext);
+    return plain && plain.trim() ? plain : null;
+  } catch {
+    return null;
+  }
+}
+function parseStoredCredentialDisplay(rawDecrypted) {
+  if (!rawDecrypted || !rawDecrypted.trim()) {
+    return { attachmentLabel: null, credentialText: null };
+  }
+  const trimmed = rawDecrypted.trim();
+  const prefixMatch = trimmed.match(/^\[(FILE|MEDIA):\s*([^\]]+)\]\s*([\s\S]*)$/i);
+  if (!prefixMatch) {
+    return { attachmentLabel: null, credentialText: trimmed };
+  }
+  const attachmentLabel = prefixMatch[2]?.trim() || null;
+  const remainder = (prefixMatch[3] || "").trim();
+  const isPlaceholder = !remainder || remainder.toLowerCase() === "dikirim via lampiran media";
+  return {
+    attachmentLabel,
+    credentialText: isPlaceholder ? null : remainder
+  };
+}
+function extractDeliveredMedia(rawInvoiceData) {
+  if (!rawInvoiceData) return null;
+  let data = {};
+  if (typeof rawInvoiceData === "string") {
+    try {
+      data = JSON.parse(rawInvoiceData);
+    } catch {
+      return null;
+    }
+  } else if (typeof rawInvoiceData === "object") {
+    data = rawInvoiceData;
+  }
+  const dm = data.delivered_media;
+  if (!dm || typeof dm.fileId !== "string" || !dm.fileId.trim()) {
+    return null;
+  }
+  const allowedTypes = /* @__PURE__ */ new Set([
+    "document",
+    "photo",
+    "video",
+    "audio",
+    "voice",
+    "animation",
+    "sticker"
+  ]);
+  const mediaType = typeof dm.type === "string" && allowedTypes.has(dm.type) ? dm.type : "document";
+  return {
+    type: mediaType,
+    fileId: dm.fileId.trim(),
+    fileName: typeof dm.fileName === "string" ? dm.fileName : void 0,
+    mimeType: typeof dm.mimeType === "string" ? dm.mimeType : null
+  };
+}
+async function dispatchOrderMedia(botInstance, chatId, deliveredMedia, caption, replyMarkup) {
+  const methodMap = {
+    document: { method: "sendDocument", field: "document", supportsCaption: true },
+    photo: { method: "sendPhoto", field: "photo", supportsCaption: true },
+    video: { method: "sendVideo", field: "video", supportsCaption: true },
+    audio: { method: "sendAudio", field: "audio", supportsCaption: true },
+    voice: { method: "sendVoice", field: "voice", supportsCaption: true },
+    animation: { method: "sendAnimation", field: "animation", supportsCaption: true },
+    sticker: { method: "sendSticker", field: "sticker", supportsCaption: false }
+  };
+  const target = methodMap[deliveredMedia.type] || methodMap.document;
+  const safeCaption = caption.length > 980 ? `${caption.slice(0, 977)}...` : caption;
+  const payload = {
+    chat_id: chatId,
+    [target.field]: deliveredMedia.fileId,
+    ...target.supportsCaption ? { caption: safeCaption, parse_mode: "HTML" } : {},
+    ...replyMarkup ? { reply_markup: replyMarkup } : {}
+  };
+  const apiObj = botInstance?.api;
+  if (apiObj && Object.prototype.hasOwnProperty.call(apiObj, target.method) && typeof apiObj[target.method] === "function") {
+    try {
+      const mockRes = await apiObj[target.method](payload);
+      const messageId = mockRes?.message_id;
+      return { ok: true, attempted: true, skippedDummy: false, messageId };
+    } catch (err) {
+      return {
+        ok: false,
+        attempted: true,
+        skippedDummy: false,
+        error: err?.message || "Media send mock error"
+      };
+    }
+  }
+  const transportToken = botInstance?.api?.transport?.token;
+  const isDummyTransport = typeof transportToken === "string" && (transportToken.startsWith("dummy_") || transportToken === "dummy_token_for_build");
+  if (isDummyTransport && deliveredMedia.type === "photo" && botInstance && Object.prototype.hasOwnProperty.call(botInstance, "sendPhoto") && typeof botInstance.sendPhoto === "function") {
+    try {
+      const mockRes = await botInstance.sendPhoto(chatId, deliveredMedia.fileId, {
+        caption: safeCaption,
+        parse_mode: "HTML",
+        ...replyMarkup ? { reply_markup: replyMarkup } : {}
+      });
+      const messageId = mockRes?.message_id;
+      return { ok: true, attempted: true, skippedDummy: false, messageId };
+    } catch (err) {
+      return {
+        ok: false,
+        attempted: true,
+        skippedDummy: false,
+        error: err?.message || "Photo send mock error"
+      };
+    }
+  }
+  if (isDummyTransport) {
+    return { ok: false, attempted: false, skippedDummy: true };
+  }
+  const effectiveToken = transportToken || process.env.TELEGRAM_BOT_TOKEN || "";
+  if (!effectiveToken || effectiveToken.startsWith("dummy_") || effectiveToken === "dummy_token_for_build") {
+    return { ok: false, attempted: false, skippedDummy: true };
+  }
+  const apiRes = await sendTelegramApi(target.method, payload);
+  if (apiRes.ok) {
+    const messageId = apiRes.result?.message_id;
+    return { ok: true, attempted: true, skippedDummy: false, messageId };
+  }
+  return {
+    ok: false,
+    attempted: true,
+    skippedDummy: false,
+    error: apiRes.description || "Media tidak tersedia"
+  };
+}
+async function sendOrdersMenu(ctx, botInstance, page = 0) {
   const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.from?.id;
   const telegramId = ctx.from?.id ? String(ctx.from.id) : String(chatId);
+  const pageSize = 5;
+  const requestedPage = Math.max(0, Number.isFinite(page) ? Math.floor(page) : 0);
   let ordersList = [];
+  let totalOrders = 0;
+  let currentPage = requestedPage;
+  let totalPages = 1;
   try {
+    const countRes = await query(
+      `SELECT COUNT(*)::text as total
+       FROM orders o
+       JOIN users u ON o.user_id = u.id
+       WHERE u.telegram_id = $1`,
+      [telegramId]
+    );
+    totalOrders = parseInt(countRes.rows[0]?.total || "0", 10) || 0;
+    totalPages = Math.max(1, Math.ceil(totalOrders / pageSize));
+    currentPage = Math.min(requestedPage, totalPages - 1);
+    const offset = currentPage * pageSize;
     const res = await query(
-      `SELECT o.*, p.name as product_name
+      `SELECT o.*, p.name as product_name, p.price as product_price
        FROM orders o
        JOIN users u ON o.user_id = u.id
        LEFT JOIN products p ON o.product_id = p.id
        WHERE u.telegram_id = $1
        ORDER BY o.created_at DESC
-       LIMIT 5`,
-      [telegramId]
+       LIMIT $2 OFFSET $3`,
+      [telegramId, pageSize, offset]
     );
     ordersList = res.rows;
   } catch (err) {
     console.error("Failed to query orders:", err);
   }
-  let text = `\u{1F4E9} <b>RIWAYAT PESANAN SAYA</b>
+  const pageLabel = totalPages > 1 ? ` (Hal ${currentPage + 1}/${totalPages})` : "";
+  let text = `\u{1F4E9} <b>RIWAYAT PESANAN SAYA${pageLabel}</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 `;
   const buttons = [];
@@ -20407,11 +21200,12 @@ async function sendOrdersMenu(ctx, botInstance) {
 Silakan pilih menu <b>\u{1F7E2} Produk</b> untuk mulai membeli akun digital!
 `;
   } else {
-    for (const ord of ordersList) {
+    for (let i = 0; i < ordersList.length; i++) {
+      let ord = ordersList[i];
       if (ord.payment_status === "unpaid") {
         try {
           const invData = typeof ord.invoice_data === "string" ? JSON.parse(ord.invoice_data || "{}") : ord.invoice_data || {};
-          const actualAmount = Number(invData.payable_amount) || Number(invData.amount) || 0;
+          const actualAmount = Number(invData.payable_amount) || Number(invData.amount) || Number(ord.product_price) || 0;
           const gateway = (invData.gateway || process.env.PAYMENT_GATEWAY || "shopeepay").toLowerCase();
           if (gateway === "shopeepay" && actualAmount > 0) {
             const { checkShopeePayPayment: checkShopeePayPayment2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
@@ -20423,9 +21217,24 @@ Silakan pilih menu <b>\u{1F7E2} Produk</b> untuk mulai membeli akun digital!
             });
             if (checkResult.paid) {
               const { processOrderPayment: processOrderPayment2 } = await Promise.resolve().then(() => (init_fulfillment(), fulfillment_exports));
-              await processOrderPayment2(ord.order_code, botInstance, checkResult.transaction);
-              ord.payment_status = "paid";
-              ord.fulfillment_status = "delivered";
+              await processOrderPayment2(
+                ord.order_code,
+                botInstance,
+                checkResult.transaction
+              );
+              const refreshed = await query(
+                `SELECT o.*, p.name as product_name, p.price as product_price
+                 FROM orders o
+                 LEFT JOIN products p ON o.product_id = p.id
+                 WHERE o.order_code = $1 LIMIT 1`,
+                [ord.order_code]
+              );
+              if (refreshed.rows.length > 0) {
+                ord = refreshed.rows[0];
+              } else {
+                ord.payment_status = "paid";
+                ord.fulfillment_status = "delivered";
+              }
             }
           }
         } catch (e) {
@@ -20434,10 +21243,55 @@ Silakan pilih menu <b>\u{1F7E2} Produk</b> untuk mulai membeli akun digital!
       }
       const isUnpaid = ord.payment_status === "unpaid";
       const statusIcon = isUnpaid ? "\u23F3" : ord.fulfillment_status === "delivered" ? "\u{1F7E2}" : ord.fulfillment_status === "processing" ? "\u{1F7E1}" : "\u26AA";
-      const statusLabel = isUnpaid ? "MENUNGGU PEMBAYARAN" : ord.fulfillment_status.toUpperCase();
-      text += `\u2022 ${statusIcon} <code>${escapeHtml4(ord.order_code)}</code> | Status: <b>${statusLabel}</b>
+      const statusLabel = isUnpaid ? "MENUNGGU PEMBAYARAN" : ord.fulfillment_status === "delivered" ? "SELESAI (DELIVERED)" : ord.fulfillment_status === "processing" ? "DIPROSES SISTEM" : ord.fulfillment_status.toUpperCase();
+      const itemNum = currentPage * pageSize + i + 1;
+      const prodName = ord.product_name || "Akun Digital";
+      const timeStr = formatWibDateTime(ord.delivered_at || ord.created_at);
+      let entryText = `${itemNum}. ${statusIcon} <b>${escapeHtml4(prodName)}</b>
+   \u{1F194} <code>${escapeHtml4(ord.order_code)}</code> \u2022 <i>${escapeHtml4(timeStr)}</i>
+   \u{1F4CA} Status: <b>${statusLabel}</b>
 `;
-      const btnText = isUnpaid ? `\u{1F4B3} Bayar / Buka QRIS: ${ord.order_code}` : `\u{1F50D} Cek Status: ${ord.order_code}`;
+      if (ord.fulfillment_status === "delivered") {
+        const decrypted = safeDecryptCredential(ord.credential_encrypted);
+        const parsedCred = parseStoredCredentialDisplay(decrypted);
+        const deliveredMedia = extractDeliveredMedia(ord.invoice_data);
+        const mediaDisplay = deliveredMedia?.fileName || parsedCred.attachmentLabel || deliveredMedia?.type;
+        if (mediaDisplay) {
+          const mediaLine = `   \u{1F4CE} <b>Lampiran:</b> <code>${escapeHtml4(mediaDisplay)}</code>
+`;
+          if (text.length + entryText.length + mediaLine.length <= 3600) {
+            entryText += mediaLine;
+          }
+        }
+        if (parsedCred.credentialText) {
+          const previewPlain = parsedCred.credentialText.length > 220 ? `${parsedCred.credentialText.slice(0, 220)}\u2026` : parsedCred.credentialText;
+          const credBlock = `   \u{1F511} <b>Kredensial:</b>
+   <code>${escapeHtml4(previewPlain)}</code>
+`;
+          if (text.length + entryText.length + credBlock.length <= 3600) {
+            entryText += credBlock;
+            if (parsedCred.credentialText.length > 220) {
+              entryText += `   <i>(Buka Detail Pesanan untuk salin kredensial lengkap)</i>
+`;
+            }
+          } else {
+            entryText += `   \u{1F511} <i>Klik tombol Detail di bawah untuk melihat kredensial</i>
+`;
+          }
+        } else if (!mediaDisplay) {
+          entryText += `   \u{1F511} <i>Klik tombol Detail di bawah untuk melihat kredensial</i>
+`;
+        }
+      }
+      entryText += `
+`;
+      if (text.length + entryText.length <= 3850) {
+        text += entryText;
+      } else {
+        text += `${itemNum}. ${statusIcon} <code>${escapeHtml4(ord.order_code)}</code> (${statusLabel})
+`;
+      }
+      const btnText = isUnpaid ? `\u{1F4B3} Bayar / Buka QRIS: ${ord.order_code}` : ord.fulfillment_status === "delivered" ? `\u{1F511} Detail & Kredensial: ${ord.order_code}` : `\u{1F50D} Cek Status: ${ord.order_code}`;
       buttons.push([
         {
           text: btnText,
@@ -20446,6 +21300,19 @@ Silakan pilih menu <b>\u{1F7E2} Produk</b> untuk mulai membeli akun digital!
       ]);
     }
   }
+  if (totalPages > 1) {
+    const navRow = [];
+    if (currentPage > 0) {
+      navRow.push({ text: "\u2B05\uFE0F Sebelumnya", callback_data: `orders_page_${currentPage - 1}` });
+    }
+    if (currentPage < totalPages - 1) {
+      navRow.push({ text: "Berikutnya \u27A1\uFE0F", callback_data: `orders_page_${currentPage + 1}` });
+    }
+    if (navRow.length > 0) {
+      buttons.push(navRow);
+    }
+  }
+  buttons.push([{ text: "\u{1F504} Muat Ulang Riwayat", callback_data: `orders_page_${currentPage}` }]);
   buttons.push([
     { text: "\u{1F6CD}\uFE0F Beli Produk Baru", callback_data: "menu_products" },
     { text: "\u{1F519} Menu Utama", callback_data: "menu_main" }
@@ -20545,8 +21412,9 @@ async function sendOrderInvoice(ctx, botInstance, order) {
 }
 async function sendOrderStatus(ctx, botInstance, orderCode) {
   const ordRes = await query(
-    `SELECT o.*, p.name as product_name, p.price as product_price
+    `SELECT o.*, p.name as product_name, p.price as product_price, u.telegram_id as buyer_telegram_id
      FROM orders o
+     LEFT JOIN users u ON o.user_id = u.id
      LEFT JOIN products p ON o.product_id = p.id
      WHERE o.order_code = $1 LIMIT 1`,
     [orderCode]
@@ -20585,10 +21453,15 @@ async function sendOrderStatus(ctx, botInstance, orderCode) {
         if (checkResult.paid) {
           console.log(`[ShopeePay] Payment confirmed upon manual status refresh for order: ${o.order_code}`);
           const { processOrderPayment: processOrderPayment2 } = await Promise.resolve().then(() => (init_fulfillment(), fulfillment_exports));
-          await processOrderPayment2(o.order_code, botInstance, checkResult.transaction);
+          await processOrderPayment2(
+            o.order_code,
+            botInstance,
+            checkResult.transaction
+          );
           const updatedOrd = await query(
-            `SELECT o.*, p.name as product_name, p.price as product_price
+            `SELECT o.*, p.name as product_name, p.price as product_price, u.telegram_id as buyer_telegram_id
              FROM orders o
+             LEFT JOIN users u ON o.user_id = u.id
              LEFT JOIN products p ON o.product_id = p.id
              WHERE o.order_code = $1 LIMIT 1`,
             [orderCode]
@@ -20628,33 +21501,246 @@ async function sendOrderStatus(ctx, botInstance, orderCode) {
       return;
     }
   }
+  const requesterId = ctx.from?.id ? String(ctx.from.id) : "";
+  const ownerTelegramId = o.buyer_telegram_id ? String(o.buyer_telegram_id) : "";
+  const isAuthorizedForDetails = !requesterId || !ownerTelegramId || requesterId === ownerTelegramId || isAdmin(ctx.from?.id);
   const payStatusStr = o.payment_status === "paid" ? "\u{1F7E2} LUNAS (PAID)" : o.payment_status === "expired" ? "\u{1F534} KADALUWARSA (EXPIRED)" : escapeHtml4(String(o.payment_status).toUpperCase());
   const fulStatusStr = o.fulfillment_status === "delivered" ? "\u{1F7E2} SELESAI (DELIVERED)" : o.fulfillment_status === "processing" ? "\u{1F7E1} DALAM PROSES (ANTREAN SISTEM)" : escapeHtml4(String(o.fulfillment_status).toUpperCase());
-  let statText = `\u{1F50D} <b>STATUS PESANAN</b>
+  const rawInvData = typeof o.invoice_data === "string" ? (() => {
+    try {
+      return JSON.parse(o.invoice_data);
+    } catch {
+      return {};
+    }
+  })() : o.invoice_data || {};
+  const isBalOrder = rawInvData.payment_method === "balance" || rawInvData.gateway === "balance";
+  const paidBalVal = typeof rawInvData.payable_amount === "number" ? rawInvData.payable_amount : Number(o.product_price || 0);
+  const paymentMethodBadge = isBalOrder ? `\u2022 Metode Bayar: <b>\u{1F4B0} Saldo Akun (Rp ${paidBalVal.toLocaleString("id-ID")})</b>
+` : "";
+  let statText = `\u{1F50D} <b>STATUS &amp; DETAIL PESANAN</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u2022 Kode Order: <code>${escapeHtml4(o.order_code)}</code>
 \u2022 Produk: <b>${escapeHtml4(o.product_name || "Akun Digital")}</b>
-\u2022 Pembayaran: <b>${payStatusStr}</b>
+` + paymentMethodBadge + `\u2022 Dibuat: <i>${escapeHtml4(formatWibDateTime(o.created_at))}</i>
+` + (o.delivered_at ? `\u2022 Dikirim: <i>${escapeHtml4(formatWibDateTime(o.delivered_at))}</i>
+` : "") + `\u2022 Pembayaran: <b>${payStatusStr}</b>
 \u2022 Pengiriman: <b>${fulStatusStr}</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 `;
+  const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
+  const buttons = [];
+  const deliveredMedia = isAuthorizedForDetails ? extractDeliveredMedia(o.invoice_data) : null;
+  let decryptedCredential = null;
+  let parsedCred = { attachmentLabel: null, credentialText: null };
+  const overflowCredentialChunks = [];
   if (o.fulfillment_status === "delivered") {
-    statText += `\u2705 Akun digital kamu telah berhasil dikirimkan ke chat ini.
-Silakan periksa riwayat chat untuk detail akun.`;
+    if (!isAuthorizedForDetails) {
+      statText += `\u{1F512} <i>Detail kredensial hanya dapat diakses oleh pemilik pesanan ini.</i>`;
+    } else {
+      decryptedCredential = safeDecryptCredential(o.credential_encrypted);
+      parsedCred = parseStoredCredentialDisplay(decryptedCredential);
+      const attachmentName = deliveredMedia?.fileName || parsedCred.attachmentLabel || deliveredMedia?.type;
+      let mediaDispatchRes = null;
+      if (deliveredMedia && chatId) {
+        const mediaCaption = `\u{1F4CE} <b>LAMPIRAN KREDENSIAL PESANAN</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F4E6} <b>Produk:</b> ${escapeHtml4(o.product_name || "Akun Digital")}
+\u{1F194} <b>Kode Order:</b> <code>${escapeHtml4(o.order_code)}</code>
+` + (parsedCred.credentialText ? `
+\u{1F511} <b>Keterangan / Kredensial:</b>
+<code>${escapeHtml4(parsedCred.credentialText.slice(0, 600))}</code>
+` : "") + `
+\u{1F4CC} <i>Lampiran ini ditampilkan ulang dari Riwayat Pesanan dan dilindungi dari penghapusan otomatis.</i>`;
+        mediaDispatchRes = await dispatchOrderMedia(
+          botInstance,
+          chatId,
+          deliveredMedia,
+          mediaCaption
+        );
+        if (mediaDispatchRes.ok && mediaDispatchRes.messageId) {
+          markMessageAsPreserved(chatId, mediaDispatchRes.messageId);
+        }
+      }
+      if (attachmentName) {
+        statText += `\u{1F4CE} <b>File / Media Lampiran:</b> <code>${escapeHtml4(attachmentName)}</code>
+`;
+      }
+      if (parsedCred.credentialText) {
+        const fullCred = parsedCred.credentialText;
+        let displayCred = fullCred;
+        if (fullCred.length > 2900) {
+          displayCred = fullCred.slice(0, 2900);
+          const remaining = fullCred.slice(2900);
+          for (let offset = 0; offset < remaining.length; offset += 3500) {
+            overflowCredentialChunks.push(remaining.slice(offset, offset + 3500));
+          }
+        }
+        statText += `
+\u{1F511} <b>Kredensial / Detail Akun Anda:</b>
+<code>${escapeHtml4(displayCred)}</code>
+
+` + (overflowCredentialChunks.length > 0 ? `\u{1F4CC} <i>Lanjutan kredensial dikirim pada pesan di bawah.</i>` : `\u{1F4CC} <i>Sentuh teks di atas atau gunakan tombol Salin di bawah untuk menyalin kredensial.</i>`);
+        if (fullCred.length >= 1 && fullCred.length <= 256) {
+          buttons.push([
+            {
+              text: "\u{1F4CB} Salin Kredensial",
+              copy_text: { text: fullCred }
+            }
+          ]);
+        }
+      } else if (deliveredMedia) {
+        if (mediaDispatchRes?.attempted && !mediaDispatchRes.ok && !mediaDispatchRes.skippedDummy) {
+          statText += `
+\u26A0\uFE0F <i>Lampiran media gagal dikirim otomatis (<code>${escapeHtml4(mediaDispatchRes.error || "Media tidak tersedia")}</code>). Silakan sentuh tombol Kirim Ulang File atau hubungi Admin.</i>`;
+        } else {
+          statText += `
+\u2705 <i>Lampiran media kredensial Anda telah dikirimkan kembali di atas.</i>`;
+        }
+      } else if (parsedCred.attachmentLabel) {
+        statText += `
+\u2139\uFE0F <i>Pesanan ini dikirimkan sebagai file lampiran pada pesan pengiriman awal di chat Anda (arsip media otomatis belum tersedia untuk transaksi lama). Silakan periksa chat sebelumnya atau hubungi Admin untuk pengiriman ulang file.</i>`;
+        buttons.push([{ text: "\u{1F4AC} Minta Kirim Ulang ke Admin \u2197", url: "https://t.me/DappaSecc" }]);
+      } else {
+        statText += `\u2705 Akun digital kamu telah berhasil dikirimkan ke chat ini.
+Silakan periksa pesan pengiriman awal di chat untuk detail akun.`;
+      }
+      if (deliveredMedia) {
+        const fileLabel = deliveredMedia.fileName || deliveredMedia.type;
+        buttons.push([
+          {
+            text: `\u{1F4CE} Kirim Ulang File (${fileLabel})`,
+            callback_data: `resend_media_${o.order_code}`
+          }
+        ]);
+      }
+    }
   } else if (o.fulfillment_status === "processing") {
     statText += `\u23F3 Pesanan kamu sedang disiapkan antrean sistem (estimasi 1\u201310 menit).`;
   }
-  const buttons = [
-    [{ text: "\u{1F504} Refresh Status", callback_data: `status_${o.order_code}` }],
-    [
-      { text: "\u{1F6CD}\uFE0F Beli Produk Baru", callback_data: "menu_products" },
-      { text: "\u{1F519} Menu Utama", callback_data: "menu_main" }
-    ]
-  ];
+  buttons.push([{ text: "\u{1F504} Refresh Status", callback_data: `status_${o.order_code}` }]);
+  buttons.push([
+    { text: "\u{1F4E9} Riwayat Pesanan", callback_data: "menu_orders" },
+    { text: "\u{1F6CD}\uFE0F Beli Produk Baru", callback_data: "menu_products" }
+  ]);
+  buttons.push([{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]);
   await sendSafeMessage(ctx, botInstance, statText, {
     parse_mode: "HTML",
     reply_markup: { inline_keyboard: buttons }
   });
+  if (overflowCredentialChunks.length > 0 && chatId) {
+    for (let idx = 0; idx < overflowCredentialChunks.length; idx++) {
+      const partText = `\u{1F511} <b>Lanjutan Kredensial (${idx + 2}/${overflowCredentialChunks.length + 1}) \u2022 ${escapeHtml4(o.order_code)}:</b>
+<code>${escapeHtml4(overflowCredentialChunks[idx])}</code>`;
+      let partRes;
+      if (typeof botInstance?.sendMessage === "function") {
+        partRes = await botInstance.sendMessage(chatId, partText, { parse_mode: "HTML" }).catch(() => null);
+      }
+      const partMsgId = partRes?.message_id;
+      if (partMsgId) {
+        recordBotMessage(chatId, partMsgId);
+      }
+    }
+  }
+}
+async function resendOrderMedia(ctx, botInstance, orderCode) {
+  const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.from?.id;
+  if (!chatId) return;
+  const ordRes = await query(
+    `SELECT o.*, p.name as product_name, u.telegram_id as buyer_telegram_id
+     FROM orders o
+     LEFT JOIN users u ON o.user_id = u.id
+     LEFT JOIN products p ON o.product_id = p.id
+     WHERE o.order_code = $1 LIMIT 1`,
+    [orderCode]
+  );
+  if (ordRes.rows.length === 0) {
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      `\u274C Order <code>${escapeHtml4(orderCode)}</code> tidak ditemukan.`,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [[{ text: "\u{1F4E9} Riwayat Pesanan", callback_data: "menu_orders" }]]
+        }
+      }
+    );
+    return;
+  }
+  const o = ordRes.rows[0];
+  const requesterId = ctx.from?.id ? String(ctx.from.id) : "";
+  const ownerTelegramId = o.buyer_telegram_id ? String(o.buyer_telegram_id) : "";
+  const isAuthorized = !requesterId || !ownerTelegramId || requesterId === ownerTelegramId || isAdmin(ctx.from?.id);
+  if (!isAuthorized || o.fulfillment_status !== "delivered") {
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      "\u26D4 Lampiran file pesanan ini tidak tersedia untuk akun Anda.",
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "\u{1F4E9} Riwayat Pesanan", callback_data: "menu_orders" }],
+            [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+          ]
+        }
+      }
+    );
+    return;
+  }
+  const deliveredMedia = extractDeliveredMedia(o.invoice_data);
+  if (!deliveredMedia) {
+    await sendOrderStatus(ctx, botInstance, orderCode);
+    return;
+  }
+  const parsedCred = parseStoredCredentialDisplay(safeDecryptCredential(o.credential_encrypted));
+  const caption = `\u{1F4CE} <b>LAMPIRAN FILE PESANAN</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F4E6} <b>Produk:</b> ${escapeHtml4(o.product_name || "Akun Digital")}
+\u{1F194} <b>Kode Order:</b> <code>${escapeHtml4(o.order_code)}</code>
+` + (parsedCred.credentialText ? `
+\u{1F4DD} <b>Keterangan:</b>
+<code>${escapeHtml4(parsedCred.credentialText.slice(0, 600))}</code>
+` : "") + `
+\u{1F4CC} <i>Lampiran ini dilindungi agar tidak terhapus otomatis.</i>`;
+  const replyMarkup = {
+    inline_keyboard: [
+      [{ text: "\u{1F50D} Detail Pesanan", callback_data: `status_${o.order_code}` }],
+      [
+        { text: "\u{1F4E9} Riwayat Pesanan", callback_data: "menu_orders" },
+        { text: "\u{1F519} Menu Utama", callback_data: "menu_main" }
+      ]
+    ]
+  };
+  const dispatchRes = await dispatchOrderMedia(
+    botInstance,
+    chatId,
+    deliveredMedia,
+    caption,
+    replyMarkup
+  );
+  if (dispatchRes.ok) {
+    if (dispatchRes.messageId) {
+      markMessageAsPreserved(chatId, dispatchRes.messageId);
+    }
+    await cleanupChatMessages(ctx, botInstance, dispatchRes.messageId);
+    return;
+  }
+  await sendSafeMessage(
+    ctx,
+    botInstance,
+    `\u26A0\uFE0F Gagal mengirim ulang file lampiran (<code>${escapeHtml4(dispatchRes.error || "Media tidak tersedia")}</code>).
+Silakan hubungi Admin dengan menyertakan kode order <code>${escapeHtml4(o.order_code)}</code>.`,
+    {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "\u{1F50D} Kembali ke Detail Pesanan", callback_data: `status_${o.order_code}` }],
+          [{ text: "\u{1F4AC} Hubungi Admin \u2197", url: "https://t.me/DappaSecc" }]
+        ]
+      }
+    }
+  );
 }
 async function sendApiMenu(ctx, botInstance) {
   const apiText = `\u{1F525} <b>DEVELOPER API INTEGRATION</b>
@@ -20705,10 +21791,18 @@ async function sendAdminPanel(ctx, botInstance) {
   const botStatus = await getBotStatus();
   const { isForceChannelJoinEnabled: isForceChannelJoinEnabled2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
   const forceJoinEnabled = await isForceChannelJoinEnabled2();
+  let shopeeValid = false;
+  try {
+    const { getShopeePayTokenStatus: getShopeePayTokenStatus2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
+    const spStatus = await getShopeePayTokenStatus2();
+    shopeeValid = spStatus.valid;
+  } catch {
+  }
   const adminText = `\u{1F451} <b>PANEL OWNER & ADMIN DAFUNG HUB</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u2022 <b>Owner:</b> @DappaSecc (<code>${ADMIN_TELEGRAM_ID}</code>)
 \u2022 <b>Status Sistem:</b> ${botStatus === "online" ? "\u{1F7E2} ONLINE (Melayani Pembeli)" : "\u{1F534} MAINTENANCE (Sedang Perbaikan)"}
+\u2022 <b>Gateway QRIS:</b> ${shopeeValid ? "\u{1F7E2} AKTIF (Auto-Detect Jalan)" : "\u{1F534} SESI HABIS (Jalankan /settoken)"}
 \u2022 <b>Wajib Join Channel:</b> ${forceJoinEnabled ? "\u{1F7E2} AKTIF (@DafungHub)" : "\u26AA NONAKTIF"}
 \u2022 <b>Saldo Supplier Live:</b> <b>Rp ${balance.toLocaleString("id-ID")}</b>
 \u2022 <b>Status Mode:</b> ${balance > 0 ? "\u{1F7E2} H2H Auto-Fulfill" : "\u{1F7E1} Mode Antrean (0 Modal)"}
@@ -21023,7 +22117,7 @@ async function sendAdminFulfillChoice(ctx, botInstance, orderCode, initialNotes)
     notes: initialNotes || ""
   });
   const buyerInfo = order.username ? `@${order.username}` : order.first_name || order.telegram_id;
-  let text = `\u{1F4E6} <b>PILIH METODE PENGIRIMAN KREDENSIAL</b>
+  const text = `\u{1F4E6} <b>PILIH METODE PENGIRIMAN KREDENSIAL</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u2022 <b>Kode Order:</b> <code>${escapeHtml4(orderCode)}</code>
 \u2022 <b>Produk:</b> ${escapeHtml4(order.product_name)}
@@ -21445,11 +22539,27 @@ function registerMenuHandlers(botInstance) {
         return;
       } else if (data === "check_maintenance_status") {
         const currentStatus = await getBotStatus();
-        if (currentStatus === "maintenance") {
+        if (currentStatus === "maintenance" && !isAdmin(ctx.from?.id)) {
           await sendMaintenanceMessage(ctx, botInstance);
-        } else {
-          await sendMainMenu(ctx, botInstance);
+          return;
         }
+        if (!isAdmin(ctx.from?.id)) {
+          const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+          const isMember = await checkUserChannelMembership2(userId, botInstance);
+          if (!isMember) {
+            await sendChannelJoinPrompt2(ctx, botInstance);
+            return;
+          }
+        }
+        if (userId) {
+          await ensureUser(String(userId), {
+            username: ctx.from?.username,
+            firstName: ctx.from?.first_name
+          }).catch((regErr) => {
+            console.error("[Maintenance Check] Failed to register user in DB:", regErr);
+          });
+        }
+        await sendMainMenu(ctx, botInstance);
         return;
       } else if (data === "admin_queue") {
         await sendAdminQueueMenu(ctx, botInstance);
@@ -21867,6 +22977,14 @@ Pesan telah diposting live di https://t.me/DafungHub.`,
         if (userId) clearMembershipCache2(userId);
         const isMember = await checkUserChannelMembership2(userId, botInstance);
         if (isMember) {
+          if (userId) {
+            await ensureUser(String(userId), {
+              username: ctx.from?.username,
+              firstName: ctx.from?.first_name
+            }).catch((regErr) => {
+              console.error("[Channel Gate] Failed to register user on verify_channel_join:", regErr);
+            });
+          }
           try {
             await ctx.answerCallbackQuery?.({
               text: "\u2705 Keanggotaan terverifikasi! Selamat datang di DaFung Hub."
@@ -21904,6 +23022,13 @@ Pesan telah diposting live di https://t.me/DafungHub.`,
           await sendChannelJoinPrompt2(ctx, botInstance);
           return;
         }
+      }
+      if (userId) {
+        await ensureUser(String(userId), {
+          username: ctx.from?.username,
+          firstName: ctx.from?.first_name
+        }).catch(() => {
+        });
       }
       if (data === "menu_main") {
         await sendMainMenu(ctx, botInstance);
@@ -21948,8 +23073,16 @@ Pesan telah diposting live di https://t.me/DafungHub.`,
         await sendProductDetail(ctx, botInstance, prodId, platId);
       } else if (data.startsWith("buy_") || data.startsWith("buy:")) {
         const prodId = data.startsWith("buy_") ? data.replace("buy_", "") : data.replace("buy:", "");
-        console.log(`[Buy Flow] Triggering purchase for product: ${prodId}`);
-        await handleBuy(ctx, prodId, botInstance);
+        console.log(`[Buy Flow] Opening payment method selection for product: ${prodId}`);
+        await sendCheckoutMethodMenu(ctx, botInstance, prodId);
+      } else if (data.startsWith("pay_qris:") || data.startsWith("pay_qris_")) {
+        const prodId = data.startsWith("pay_qris:") ? data.slice("pay_qris:".length) : data.slice("pay_qris_".length);
+        console.log(`[Buy Flow] Creating QRIS invoice for product: ${prodId}`);
+        await handleBuy(ctx, prodId, botInstance, void 0, "qris");
+      } else if (data.startsWith("pay_bal:") || data.startsWith("pay_bal_")) {
+        const prodId = data.startsWith("pay_bal:") ? data.slice("pay_bal:".length) : data.slice("pay_bal_".length);
+        console.log(`[Buy Flow] Processing balance payment for product: ${prodId}`);
+        await handleBuy(ctx, prodId, botInstance, void 0, "balance");
       } else if (data === "menu_profile") {
         await sendProfileMenu(ctx, botInstance);
       } else if (data === "menu_deposit") {
@@ -21966,14 +23099,20 @@ Pesan telah diposting live di https://t.me/DafungHub.`,
         );
         const prodId = fakeProdRes.rows[0]?.id || (await query("SELECT id FROM products WHERE name = $1 LIMIT 1", [prodName])).rows[0]?.id;
         if (prodId) {
-          await handleBuy(ctx, prodId, botInstance);
+          await handleBuy(ctx, prodId, botInstance, void 0, "qris");
         }
       } else if (data === "menu_membership") {
         await sendMembershipMenu(ctx, botInstance);
       } else if (data === "menu_orders") {
-        await sendOrdersMenu(ctx, botInstance);
-      } else if (data.startsWith("status_")) {
-        const orderCode = data.replace("status_", "");
+        await sendOrdersMenu(ctx, botInstance, 0);
+      } else if (data.startsWith("orders_page_")) {
+        const pageNum = parseInt(data.replace("orders_page_", ""), 10) || 0;
+        await sendOrdersMenu(ctx, botInstance, pageNum);
+      } else if (data.startsWith("resend_media_")) {
+        const orderCode = data.replace("resend_media_", "");
+        await resendOrderMedia(ctx, botInstance, orderCode);
+      } else if (data.startsWith("status_") || data.startsWith("check_order_")) {
+        const orderCode = data.startsWith("check_order_") ? data.replace("check_order_", "") : data.replace("status_", "");
         await sendOrderStatus(ctx, botInstance, orderCode);
       } else if (data.startsWith("qris_") || data.startsWith("show_qris_")) {
         const orderCode = data.startsWith("show_qris_") ? data.replace("show_qris_", "") : data.replace("qris_", "");
@@ -21983,100 +23122,71 @@ Pesan telah diposting live di https://t.me/DafungHub.`,
       console.error(`[Telegram Callback Error] failed handling "${data}":`, err);
     }
   });
-  botInstance.hears(/^(?:👑\s*)?(?:panel\s*)?owner$/i, async (ctx) => {
-    if (isAdmin(ctx.from?.id)) {
-      await sendAdminPanel(ctx, botInstance);
-    } else {
+  const ensureVerifiedUser = async (ctx) => {
+    if (!isAdmin(ctx.from?.id)) {
       const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
       const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
       if (!isMember) {
         await sendChannelJoinPrompt2(ctx, botInstance);
-        return;
+        return false;
       }
+    }
+    if (ctx.from?.id) {
+      await ensureUser(String(ctx.from.id), {
+        username: ctx.from.username,
+        firstName: ctx.from.first_name
+      }).catch(() => {
+      });
+    }
+    return true;
+  };
+  botInstance.hears(/^(?:👑\s*)?(?:panel\s*)?owner$/i, async (ctx) => {
+    if (isAdmin(ctx.from?.id)) {
+      if (ctx.from?.id) {
+        await ensureUser(String(ctx.from.id), {
+          username: ctx.from.username,
+          firstName: ctx.from.first_name
+        }).catch(() => {
+        });
+      }
+      await sendAdminPanel(ctx, botInstance);
+    } else {
+      if (!await ensureVerifiedUser(ctx)) return;
       await sendMainMenu(ctx, botInstance);
     }
   });
   botInstance.hears(/^(?:🟢\s*)?produk$/i, async (ctx) => {
     console.log(`[Telegram Text] Heard "Produk" from user ${ctx.from?.id}`);
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
-      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt2(ctx, botInstance);
-        return;
-      }
-    }
+    if (!await ensureVerifiedUser(ctx)) return;
     await sendPlatformsMenu(ctx, botInstance);
   });
   botInstance.hears(/^(?:👤\s*|🥷\s*)?profil$/i, async (ctx) => {
     console.log(`[Telegram Text] Heard "Profil" from user ${ctx.from?.id}`);
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
-      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt2(ctx, botInstance);
-        return;
-      }
-    }
+    if (!await ensureVerifiedUser(ctx)) return;
     await sendProfileMenu(ctx, botInstance);
   });
   botInstance.hears(/^(?:💰\s*)?deposit$/i, async (ctx) => {
     console.log(`[Telegram Text] Heard "Deposit" from user ${ctx.from?.id}`);
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
-      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt2(ctx, botInstance);
-        return;
-      }
-    }
+    if (!await ensureVerifiedUser(ctx)) return;
     await sendDepositMenu(ctx, botInstance);
   });
   botInstance.hears(/^(?:💎\s*)?(?:membership|vip)$/i, async (ctx) => {
     console.log(`[Telegram Text] Heard "Membership" from user ${ctx.from?.id}`);
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
-      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt2(ctx, botInstance);
-        return;
-      }
-    }
+    if (!await ensureVerifiedUser(ctx)) return;
     await sendMembershipMenu(ctx, botInstance);
   });
   botInstance.command(["membership", "vip"], async (ctx) => {
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
-      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt2(ctx, botInstance);
-        return;
-      }
-    }
+    if (!await ensureVerifiedUser(ctx)) return;
     await sendMembershipMenu(ctx, botInstance);
   });
   botInstance.hears(/^(?:📩\s*)?pesanan(?:\s*saya)?$/i, async (ctx) => {
     console.log(`[Telegram Text] Heard "Pesanan" from user ${ctx.from?.id}`);
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
-      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt2(ctx, botInstance);
-        return;
-      }
-    }
+    if (!await ensureVerifiedUser(ctx)) return;
     await sendOrdersMenu(ctx, botInstance);
   });
   botInstance.hears(/^(?:❓\s*)?(?:bantuan|help)$/i, async (ctx) => {
     console.log(`[Telegram Text] Heard "Bantuan" from user ${ctx.from?.id}`);
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
-      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt2(ctx, botInstance);
-        return;
-      }
-    }
+    if (!await ensureVerifiedUser(ctx)) return;
     const helpMessage = "\u2139\uFE0F <b>Panduan & Garansi DaFung Hub:</b>\n\n1. Setelah pembayaran QRIS berhasil, kredensial akun akan dikirimkan otomatis.\n2. Jika ada kendala pesanan, silakan sertakan kode order kamu.\n3. Admin akan meninjau komplain dan memproses penggantian atau refund.";
     await sendSafeMessage(ctx, botInstance, helpMessage, {
       parse_mode: "HTML",
@@ -22142,14 +23252,7 @@ Contoh:
     );
   });
   botInstance.command(["voucher", "klaim"], async (ctx) => {
-    if (!isAdmin(ctx.from?.id)) {
-      const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
-      const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
-      if (!isMember) {
-        await sendChannelJoinPrompt2(ctx, botInstance);
-        return;
-      }
-    }
+    if (!await ensureVerifiedUser(ctx)) return;
     const text = ctx.message?.text || "";
     const parts = text.trim().split(/\s+/);
     const code = parts[1];
@@ -22218,6 +23321,8 @@ var init_menu = __esm({
     init_handler();
     init_supplier();
     init_db();
+    init_encrypt();
+    init_broadcast();
     init_buy();
     init_pricing();
     init_custom_prices();
@@ -37844,7 +38949,7 @@ var require_form_data = __commonJS({
     var parseUrl = require("url").parse;
     var fs2 = require("fs");
     var Stream = require("stream").Stream;
-    var crypto2 = require("crypto");
+    var crypto3 = require("crypto");
     var mime = require_mime_types();
     var asynckit = require_asynckit();
     var setToStringTag = require_es_set_tostringtag();
@@ -38053,7 +39158,7 @@ var require_form_data = __commonJS({
       return Buffer.concat([dataBuffer, Buffer.from(this._lastBoundary())]);
     };
     FormData2.prototype._generateBoundary = function() {
-      this._boundary = "--------------------------" + crypto2.randomBytes(12).toString("hex");
+      this._boundary = "--------------------------" + crypto3.randomBytes(12).toString("hex");
     };
     FormData2.prototype.getLengthSync = function() {
       var knownLength = this._overheadLength + this._valueLength;
@@ -39909,7 +41014,7 @@ var require_axios = __commonJS({
   "node_modules/axios/dist/node/axios.cjs"(exports2, module2) {
     "use strict";
     var FormData$1 = require_form_data();
-    var crypto2 = require("crypto");
+    var crypto3 = require("crypto");
     var url = require("url");
     var HttpsProxyAgent = require_dist2();
     var http2 = require("http");
@@ -41388,7 +42493,7 @@ var require_axios = __commonJS({
         length
       } = alphabet;
       const randomValues = new Uint32Array(size);
-      crypto2.randomFillSync(randomValues);
+      crypto3.randomFillSync(randomValues);
       for (let i = 0; i < size; i++) {
         str += alphabet[randomValues[i] % length];
       }
@@ -45907,7 +47012,7 @@ var require_snapBi = __commonJS({
   "node_modules/midtrans-client/lib/snapBi/snapBi.js"(exports2, module2) {
     var SnapBiApiRequestor = require_snapBiApiRequestor();
     var SnapBiConfig = require_snapBiConfig();
-    var crypto2 = require("crypto");
+    var crypto3 = require("crypto");
     var SnapBi = class _SnapBi {
       static ACCESS_TOKEN = "/v1.0/access-token/b2b";
       static PAYMENT_HOST_TO_HOST = "/v1.0/debit/payment-host-to-host";
@@ -46034,9 +47139,9 @@ var require_snapBi = __commonJS({
         }
         var notificationHttpMethod = "POST";
         var minifiedNotificationBodyJsonString = JSON.stringify(this.notificationPayload);
-        var hashedNotificationBodyJsonString = crypto2.createHash("sha256").update(minifiedNotificationBodyJsonString).digest("hex").toLowerCase();
+        var hashedNotificationBodyJsonString = crypto3.createHash("sha256").update(minifiedNotificationBodyJsonString).digest("hex").toLowerCase();
         var rawStringDataToVerifyAgainstSignature = notificationHttpMethod + ":" + this.notificationUrlPath + ":" + hashedNotificationBodyJsonString + ":" + this.timeStamp;
-        var verifier = crypto2.createVerify("SHA256");
+        var verifier = crypto3.createVerify("SHA256");
         verifier.update(rawStringDataToVerifyAgainstSignature, "utf8");
         var isSignatureVerified = verifier.verify(
           SnapBiConfig.snapBiPublicKey,
@@ -46075,14 +47180,14 @@ var require_snapBi = __commonJS({
       }
       static getSymmetricSignatureHmacSh512(accessToken, requestBody, method, path2, clientSecret, timeStamp) {
         const minifiedBody = JSON.stringify(requestBody);
-        const hashedBody = crypto2.createHash("sha256").update(minifiedBody).digest("hex").toLowerCase();
+        const hashedBody = crypto3.createHash("sha256").update(minifiedBody).digest("hex").toLowerCase();
         const payload = `${method.toUpperCase()}:${path2}:${accessToken}:${hashedBody}:${timeStamp}`;
-        const hmac = crypto2.createHmac("sha512", clientSecret).update(payload).digest("base64");
+        const hmac = crypto3.createHmac("sha512", clientSecret).update(payload).digest("base64");
         return hmac;
       }
       static getAsymmetricSignatureSha256WithRsa(clientId, xTimeStamp, privateKey) {
         const stringToSign = clientId + "|" + xTimeStamp;
-        return crypto2.sign("RSA-SHA256", Buffer.from(stringToSign), privateKey).toString("base64");
+        return crypto3.sign("RSA-SHA256", Buffer.from(stringToSign), privateKey).toString("base64");
       }
       buildSnapBiTransactionHeader(externalId, timeStamp) {
         let snapBiTransactionHeader = {
@@ -46302,13 +47407,13 @@ function getSakurupiahBaseUrl() {
 }
 function generateSakurupiahSignature(apiId, method, merchantRef, amount, apiKey) {
   const payload = `${apiId}${method}${merchantRef}${amount}`;
-  return import_crypto.default.createHmac("sha256", apiKey).update(payload).digest("hex");
+  return import_crypto2.default.createHmac("sha256", apiKey).update(payload).digest("hex");
 }
 function verifySakurupiahCallbackSignature(rawJsonBody, incomingSignature, apiKey = SAKURUPIAH_API_KEY) {
   if (!incomingSignature || !rawJsonBody) return false;
   try {
-    const computed = import_crypto.default.createHmac("sha256", apiKey).update(rawJsonBody).digest("hex");
-    return import_crypto.default.timingSafeEqual(Buffer.from(computed), Buffer.from(incomingSignature));
+    const computed = import_crypto2.default.createHmac("sha256", apiKey).update(rawJsonBody).digest("hex");
+    return import_crypto2.default.timingSafeEqual(Buffer.from(computed), Buffer.from(incomingSignature));
   } catch {
     return false;
   }
@@ -46438,11 +47543,11 @@ async function checkSakurupiahStatus(trxId) {
   }
   return "unknown";
 }
-var import_crypto, SAKURUPIAH_API_ID, SAKURUPIAH_API_KEY;
+var import_crypto2, SAKURUPIAH_API_ID, SAKURUPIAH_API_KEY;
 var init_sakurupiah = __esm({
   "lib/sakurupiah.ts"() {
     "use strict";
-    import_crypto = __toESM(require("crypto"));
+    import_crypto2 = __toESM(require("crypto"));
     if (!process.env.SAKURUPIAH_API_KEY && !process.env.SAKURUPIAH_API_ID) {
       try {
         process.loadEnvFile?.();
@@ -46455,6 +47560,15 @@ var init_sakurupiah = __esm({
 });
 
 // bot/commands/buy.ts
+var buy_exports = {};
+__export2(buy_exports, {
+  calculateOrderPricing: () => calculateOrderPricing,
+  ensureUser: () => ensureUser,
+  generateOrderCode: () => generateOrderCode,
+  handleBuy: () => handleBuy,
+  registerBuyHandler: () => registerBuyHandler,
+  resolveProductForCheckout: () => resolveProductForCheckout
+});
 function escapeHtml5(str) {
   if (!str) return "";
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -46465,50 +47579,58 @@ function generateOrderCode() {
   return `ORD-${timestamp}-${randomSuffix}`;
 }
 async function ensureUser(telegramId, profile) {
+  const { isAdmin: isAdmin2 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
   const cleanUsername = profile?.username ? profile.username.replace(/^@/, "") : null;
   const cleanFirstName = profile?.firstName || null;
+  const targetRole = isAdmin2(telegramId) ? "admin" : "buyer";
   const existingUser = await query(
-    "SELECT * FROM users WHERE telegram_id = $1",
+    "SELECT * FROM users WHERE telegram_id = $1 LIMIT 1",
     [telegramId]
   );
   if (existingUser.rows.length > 0) {
-    if (cleanUsername || cleanFirstName) {
-      await query(
+    const current = existingUser.rows[0];
+    const shouldUpdateUsername = Boolean(cleanUsername && current.username !== cleanUsername);
+    const shouldUpdateFirstName = Boolean(cleanFirstName && current.first_name !== cleanFirstName);
+    if (shouldUpdateUsername || shouldUpdateFirstName) {
+      const updated = await query(
         `UPDATE users
          SET username = COALESCE($1, username),
              first_name = COALESCE($2, first_name)
-         WHERE telegram_id = $3`,
+         WHERE telegram_id = $3
+         RETURNING *`,
         [cleanUsername, cleanFirstName, telegramId]
-      ).catch(() => {
-      });
+      ).catch(() => null);
+      if (updated && updated.rows.length > 0) {
+        return updated.rows[0];
+      }
     }
-    return existingUser.rows[0];
+    return current;
   }
   const insertUser = await query(
     `INSERT INTO users (telegram_id, role, username, first_name)
-     VALUES ($1, 'buyer', $2, $3)
+     VALUES ($1, $2, $3, $4)
      ON CONFLICT (telegram_id) DO UPDATE SET
        username = COALESCE(EXCLUDED.username, users.username),
        first_name = COALESCE(EXCLUDED.first_name, users.first_name)
      RETURNING *`,
-    [telegramId, cleanUsername, cleanFirstName]
+    [telegramId, targetRole, cleanUsername, cleanFirstName]
   );
   return insertUser.rows[0];
 }
-async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
+async function resolveProductForCheckout(ctx, productId, botInstance) {
   const { getBotStatus: getBotStatus2 } = await Promise.resolve().then(() => (init_settings(), settings_exports));
   const { isAdmin: isAdmin2 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
   const status = await getBotStatus2();
   if (status === "maintenance" && !isAdmin2(ctx.from?.id)) {
     const { sendMaintenanceMessage: sendMaintenanceMessage2 } = await Promise.resolve().then(() => (init_menu(), menu_exports));
     await sendMaintenanceMessage2(ctx, botInstance);
-    return;
+    return null;
   }
   const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
   const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
   if (!isMember) {
     await sendChannelJoinPrompt2(ctx, botInstance);
-    return;
+    return null;
   }
   const trimmedId = productId?.trim();
   if (!trimmedId) {
@@ -46526,7 +47648,7 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
         }
       }
     );
-    return;
+    return null;
   }
   let product = null;
   const { getEffectiveSellingPrice: getEffectiveSellingPrice2 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
@@ -46598,7 +47720,7 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
               }
             }
           );
-          return;
+          return null;
         }
         const effectivePrice = getEffectiveSellingPrice2(supp, customPrices);
         const existingByName = await query(
@@ -46644,7 +47766,7 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
           }
         }
       );
-      return;
+      return null;
     }
     const hasOverride = customPrices.has(product.id) || product.name && customPrices.has(product.name);
     if (hasOverride) {
@@ -46674,7 +47796,7 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
         }
       }
     );
-    return;
+    return null;
   }
   if (product.stock <= 0) {
     await sendSafeMessage(
@@ -46691,6 +47813,75 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
         }
       }
     );
+    return null;
+  }
+  return product;
+}
+async function calculateOrderPricing(params) {
+  const {
+    BALANCE_PAYMENT_DISCOUNT: BALANCE_PAYMENT_DISCOUNT2,
+    calculateCheckoutPrice: calculateCheckoutPrice2,
+    isMembershipProduct: isMembershipProduct2,
+    isDepositProduct: isDepositProduct2
+  } = await Promise.resolve().then(() => (init_membership(), membership_exports));
+  const { getPendingUserVoucher: getPendingUserVoucher2, validateVoucherForTransaction: validateVoucherForTransaction2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+  const isMembership = isMembershipProduct2(params.product.name);
+  const isDeposit = isDepositProduct2(params.product.name);
+  const checkoutPricing = await calculateCheckoutPrice2(
+    params.telegramId,
+    {
+      name: params.product.name,
+      price: params.product.price
+    },
+    { paymentMethod: params.paymentMethod }
+  );
+  const voucherCode = params.explicitVoucherCode || getPendingUserVoucher2(params.telegramId);
+  let appliedVoucher = null;
+  let voucherDiscount = 0;
+  let voucherCashback = 0;
+  if (voucherCode) {
+    const txnType = isDeposit ? "deposit" : isMembership ? "membership" : "product";
+    const vResult = await validateVoucherForTransaction2({
+      code: voucherCode,
+      userId: params.userId,
+      telegramId: params.telegramId,
+      transactionType: txnType,
+      productName: params.product.name,
+      productId: params.product.id,
+      amount: checkoutPricing.basePrice
+    });
+    if (vResult.valid && vResult.voucher) {
+      appliedVoucher = vResult.voucher;
+      voucherDiscount = vResult.discountAmount;
+      voucherCashback = vResult.cashbackAmount;
+    }
+  }
+  const priceAfterDiscounts = Math.max(
+    0,
+    checkoutPricing.basePrice - checkoutPricing.discount - voucherDiscount
+  );
+  const balanceDiscount = params.paymentMethod === "balance" && !isDeposit ? Math.min(BALANCE_PAYMENT_DISCOUNT2, priceAfterDiscounts) : 0;
+  const balancePayableAmount = Math.max(0, priceAfterDiscounts - balanceDiscount);
+  return {
+    paymentMethod: params.paymentMethod,
+    basePrice: checkoutPricing.basePrice,
+    vipDiscount: checkoutPricing.discount,
+    isVipDiscountApplied: checkoutPricing.isVipDiscountApplied,
+    voucher: appliedVoucher,
+    voucherDiscount,
+    voucherCashback,
+    balanceDiscount,
+    isBalanceDiscountApplied: balanceDiscount > 0,
+    fee: checkoutPricing.fee,
+    priceAfterDiscounts,
+    balancePayableAmount,
+    isDeposit,
+    isMembership
+  };
+}
+async function handleBuy(ctx, productId, botInstance, explicitVoucherCode, paymentMethod = "qris") {
+  const product = await resolveProductForCheckout(ctx, productId, botInstance);
+  if (!product) {
     return;
   }
   const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
@@ -46699,38 +47890,183 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
     username: ctx.from?.username,
     firstName: ctx.from?.first_name
   });
-  const { calculateCheckoutPrice: calculateCheckoutPrice2, isMembershipProduct: isMembershipProduct2, isDepositProduct: isDepositProduct2 } = await Promise.resolve().then(() => (init_membership(), membership_exports));
-  const checkoutPricing = await calculateCheckoutPrice2(telegramId, {
-    name: product.name,
-    price: product.price
+  const pricing = await calculateOrderPricing({
+    userId: user.id,
+    telegramId,
+    product,
+    paymentMethod,
+    explicitVoucherCode
   });
-  const { getPendingUserVoucher: getPendingUserVoucher2, clearPendingUserVoucher: clearPendingUserVoucher2, validateVoucherForTransaction: validateVoucherForTransaction2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
-  const voucherCode = explicitVoucherCode || getPendingUserVoucher2(telegramId);
-  let appliedVoucher = null;
-  let voucherDiscount = 0;
-  let voucherCashback = 0;
-  if (voucherCode) {
-    const isMembership = isMembershipProduct2(product.name);
-    const isDeposit = isDepositProduct2(product.name);
-    const txnType = isDeposit ? "deposit" : isMembership ? "membership" : "product";
-    const vResult = await validateVoucherForTransaction2({
-      code: voucherCode,
-      userId: user.id,
-      telegramId,
-      transactionType: txnType,
-      productName: product.name,
-      productId: product.id,
-      amount: checkoutPricing.basePrice
-    });
-    if (vResult.valid && vResult.voucher) {
-      appliedVoucher = vResult.voucher;
-      voucherDiscount = vResult.discountAmount;
-      voucherCashback = vResult.cashbackAmount;
+  const { clearPendingUserVoucher: clearPendingUserVoucher2 } = await Promise.resolve().then(() => (init_voucher(), voucher_exports));
+  if (paymentMethod === "balance") {
+    if (pricing.isDeposit) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        "\u26A0\uFE0F <b>Metode Tidak Tersedia:</b> Top-up deposit saldo hanya dapat dibayar menggunakan QRIS.",
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "\u{1F4F1} Bayar Deposit pakai QRIS", callback_data: `pay_qris:${product.id}` }],
+              [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+            ]
+          }
+        }
+      );
+      return;
+    }
+    const payableWithBalance = pricing.balancePayableAmount;
+    const orderCode2 = generateOrderCode();
+    const client = await getClient();
+    let balanceBefore = Number(user.balance ?? 0);
+    let balanceAfter = balanceBefore;
+    try {
+      await client.query("BEGIN");
+      const deductRes = await client.query(
+        `UPDATE users
+         SET balance = balance - $1
+         WHERE id = $2 AND COALESCE(balance, 0) >= $1
+         RETURNING balance`,
+        [payableWithBalance, user.id]
+      );
+      if (deductRes.rows.length === 0) {
+        const latestBalRes = await client.query(
+          "SELECT COALESCE(balance, 0)::int as balance FROM users WHERE id = $1 LIMIT 1",
+          [user.id]
+        );
+        const latestBalance = Number(latestBalRes.rows[0]?.balance ?? user.balance ?? 0);
+        await client.query("ROLLBACK");
+        const shortfall = Math.max(0, payableWithBalance - latestBalance);
+        const qrisDisplayPrice = pricing.priceAfterDiscounts;
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `\u26A0\uFE0F <b>SALDO AKUN TIDAK MENCUKUPI</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F4E6} <b>Produk:</b> ${escapeHtml5(product.name)}
+\u{1F4B0} <b>Total Bayar (Saldo -Rp ${pricing.balanceDiscount.toLocaleString("id-ID")}):</b> <b>Rp ${payableWithBalance.toLocaleString("id-ID")}</b>
+\u{1F4B3} <b>Saldo Anda:</b> <b>Rp ${latestBalance.toLocaleString("id-ID")}</b>
+\u2757 <b>Kurang:</b> <b>Rp ${shortfall.toLocaleString("id-ID")}</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+
+Silakan Top Up saldo terlebih dahulu atau lanjutkan pembayaran via QRIS:`,
+          {
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "\u{1F4B0} Saldo (tidak mencukupi | Top up sekarang)", callback_data: "menu_deposit" }],
+                [{ text: `\u{1F4F1} Bayar dengan QRIS (Rp ${qrisDisplayPrice.toLocaleString("id-ID")})`, callback_data: `pay_qris:${product.id}` }],
+                [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+              ]
+            }
+          }
+        );
+        return;
+      }
+      balanceAfter = Number(deductRes.rows[0].balance ?? 0);
+      balanceBefore = balanceAfter + payableWithBalance;
+      await client.query(
+        `INSERT INTO orders (
+           user_id,
+           product_id,
+           order_code,
+           payment_status,
+           fulfillment_status,
+           invoice_data
+         ) VALUES ($1, $2, $3, 'unpaid', 'pending', $4)`,
+        [
+          user.id,
+          product.id,
+          orderCode2,
+          JSON.stringify({
+            payment_method: "balance",
+            gateway: "balance",
+            customer_username: ctx.from?.username || null,
+            customer_first_name: ctx.from?.first_name || null,
+            base_price: pricing.basePrice,
+            discount: pricing.vipDiscount,
+            balance_discount: pricing.balanceDiscount,
+            fee: 0,
+            unique_code: 0,
+            payable_amount: payableWithBalance,
+            paid_with_balance: payableWithBalance,
+            balance_before: balanceBefore,
+            balance_after: balanceAfter,
+            is_vip_discount: pricing.isVipDiscountApplied,
+            is_balance_discount: pricing.isBalanceDiscountApplied,
+            voucher_id: pricing.voucher ? pricing.voucher.id : null,
+            voucher_code: pricing.voucher ? pricing.voucher.code : null,
+            voucher_discount: pricing.voucherDiscount,
+            voucher_cashback: pricing.voucherCashback
+          })
+        ]
+      );
+      await client.query("COMMIT");
+    } catch (txErr) {
+      await client.query("ROLLBACK").catch(() => {
+      });
+      console.error("[Buy Command] Balance transaction error:", txErr);
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        "\u274C Gagal memproses pembayaran menggunakan saldo. Saldo Anda tetap aman. Silakan coba kembali.",
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "\u{1F504} Coba Lagi", callback_data: `buy_${product.id}` }],
+              [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+            ]
+          }
+        }
+      );
+      return;
+    } finally {
+      client.release();
+    }
+    if (pricing.voucher) {
       clearPendingUserVoucher2(telegramId);
     }
+    try {
+      const { processOrderPayment: processOrderPayment2 } = await Promise.resolve().then(() => (init_fulfillment(), fulfillment_exports));
+      await processOrderPayment2(orderCode2, botInstance, { transactionId: `BAL-${orderCode2}` });
+    } catch (fulfillErr) {
+      console.error("[Buy Command] Post-balance payment fulfillment error:", fulfillErr);
+      const statusCheck = await query(
+        "SELECT payment_status FROM orders WHERE order_code = $1 LIMIT 1",
+        [orderCode2]
+      ).catch(() => ({ rows: [] }));
+      if (statusCheck.rows[0]?.payment_status === "unpaid") {
+        await query(
+          "UPDATE users SET balance = balance + $1 WHERE id = $2",
+          [payableWithBalance, user.id]
+        ).catch(() => {
+        });
+        await query(
+          "UPDATE orders SET payment_status = 'expired' WHERE order_code = $1",
+          [orderCode2]
+        ).catch(() => {
+        });
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          "\u274C Terjadi kendala saat memproses pesanan. Saldo Anda telah dikembalikan otomatis.",
+          {
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "\u{1F504} Coba Lagi", callback_data: `buy_${product.id}` }],
+                [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+              ]
+            }
+          }
+        );
+      }
+    }
+    return;
   }
-  const priceAfterDiscounts = Math.max(0, checkoutPricing.basePrice - checkoutPricing.discount - voucherDiscount);
-  const baseWithFee = priceAfterDiscounts + checkoutPricing.fee;
+  const baseWithFee = pricing.priceAfterDiscounts + pricing.fee;
   const { generateUniqueCheckoutAmount: generateUniqueCheckoutAmount2 } = await Promise.resolve().then(() => (init_unique_code(), unique_code_exports));
   const { payableAmount, uniqueCode } = await generateUniqueCheckoutAmount2(baseWithFee);
   const orderCode = generateOrderCode();
@@ -46763,7 +48099,7 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
         parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [
-            [{ text: "\u{1F504} Coba Lagi", callback_data: `buy_${trimmedId}` }],
+            [{ text: "\u{1F504} Coba Lagi", callback_data: `pay_qris:${product.id}` }],
             [{ text: "\u{1F6CD}\uFE0F Buka Katalog Produk", callback_data: "menu_products" }],
             [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
           ]
@@ -46771,6 +48107,9 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
       }
     );
     return;
+  }
+  if (pricing.voucher) {
+    clearPendingUserVoucher2(telegramId);
   }
   await query(
     `INSERT INTO orders (
@@ -46787,34 +48126,37 @@ async function handleBuy(ctx, productId, botInstance, explicitVoucherCode) {
       orderCode,
       JSON.stringify({
         ...qrisResult.raw || {},
+        payment_method: "qris",
         customer_username: ctx.from?.username || null,
         customer_first_name: ctx.from?.first_name || null,
         qr_code_url: qrisResult.qrCodeUrl,
         qr_string: qrisResult.qrString,
         checkout_url: qrisResult.checkoutUrl,
-        base_price: checkoutPricing.basePrice,
-        discount: checkoutPricing.discount,
-        fee: checkoutPricing.fee,
+        base_price: pricing.basePrice,
+        discount: pricing.vipDiscount,
+        balance_discount: 0,
+        fee: pricing.fee,
         unique_code: uniqueCode,
         payable_amount: payableAmount,
-        is_vip_discount: checkoutPricing.isVipDiscountApplied,
-        voucher_id: appliedVoucher ? appliedVoucher.id : null,
-        voucher_code: appliedVoucher ? appliedVoucher.code : null,
-        voucher_discount: voucherDiscount,
-        voucher_cashback: voucherCashback
+        is_vip_discount: pricing.isVipDiscountApplied,
+        is_balance_discount: false,
+        voucher_id: pricing.voucher ? pricing.voucher.id : null,
+        voucher_code: pricing.voucher ? pricing.voucher.code : null,
+        voucher_discount: pricing.voucherDiscount,
+        voucher_cashback: pricing.voucherCashback
       })
     ]
   );
   const formattedPrice = `Rp ${payableAmount.toLocaleString("id-ID")}`;
   let discountLabels = "";
-  if (checkoutPricing.isVipDiscountApplied) {
+  if (pricing.isVipDiscountApplied) {
     discountLabels += ` <i>(Hemat Rp 1.000 via VIP Member! \u{1F31F})</i>`;
   }
-  if (voucherDiscount > 0 && appliedVoucher) {
-    discountLabels += ` <i>(Diskon Voucher ${escapeHtml5(appliedVoucher.code)}: -Rp ${voucherDiscount.toLocaleString("id-ID")}! \u{1F39F}\uFE0F)</i>`;
+  if (pricing.voucherDiscount > 0 && pricing.voucher) {
+    discountLabels += ` <i>(Diskon Voucher ${escapeHtml5(pricing.voucher.code)}: -Rp ${pricing.voucherDiscount.toLocaleString("id-ID")}! \u{1F39F}\uFE0F)</i>`;
   }
-  if (voucherCashback > 0 && appliedVoucher) {
-    discountLabels += ` <i>(Bonus Cashback ${escapeHtml5(appliedVoucher.code)}: +Rp ${voucherCashback.toLocaleString("id-ID")}! \u{1F381})</i>`;
+  if (pricing.voucherCashback > 0 && pricing.voucher) {
+    discountLabels += ` <i>(Bonus Cashback ${escapeHtml5(pricing.voucher.code)}: +Rp ${pricing.voucherCashback.toLocaleString("id-ID")}! \u{1F381})</i>`;
   }
   const invoiceCaption = `\u{1F9FE} <b>INVOICE PEMBAYARAN QRIS</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
@@ -46878,7 +48220,12 @@ function registerBuyHandler(botInstance) {
     const parts = text.trim().split(/\s+/);
     const productId = parts[1] || "";
     const voucherCode = parts[2] || void 0;
-    await handleBuy(ctx, productId, botInstance, voucherCode);
+    if (voucherCode) {
+      await handleBuy(ctx, productId, botInstance, voucherCode);
+      return;
+    }
+    const { sendCheckoutMethodMenu: sendCheckoutMethodMenu2 } = await Promise.resolve().then(() => (init_menu(), menu_exports));
+    await sendCheckoutMethodMenu2(ctx, botInstance, productId);
   });
 }
 var init_buy = __esm({
@@ -46899,8 +48246,11 @@ __export2(handler_exports, {
   extractMediaFromMessage: () => extractMediaFromMessage,
   handleWebhookUpdate: () => handleWebhookUpdate,
   initBot: () => initBot,
+  isProtectedDeliveryMessage: () => isProtectedDeliveryMessage,
+  markMessageAsPreserved: () => markMessageAsPreserved,
   recordBotMessage: () => recordBotMessage,
   registerHandlers: () => registerHandlers,
+  sendPreservedMessage: () => sendPreservedMessage,
   sendSafeMessage: () => sendSafeMessage,
   sendSafePhoto: () => sendSafePhoto
 });
@@ -46908,7 +48258,34 @@ function escapeHtml6(str) {
   if (!str) return "";
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
+function getPreservedMessageKey(chatId, messageId) {
+  return `${String(chatId)}:${messageId}`;
+}
+function markMessageAsPreserved(chatId, messageId) {
+  const preservedKey = getPreservedMessageKey(chatId, messageId);
+  preservedBotMessages.add(preservedKey);
+  const msgSet = activeBotMessages.get(String(chatId));
+  if (msgSet) {
+    msgSet.delete(messageId);
+  }
+}
+function isProtectedDeliveryMessage(message, explicitChatId) {
+  if (!message) return false;
+  const resolvedChatId = explicitChatId ?? message.chat?.id;
+  if (resolvedChatId !== void 0 && message.message_id !== void 0) {
+    if (preservedBotMessages.has(getPreservedMessageKey(resolvedChatId, message.message_id))) {
+      return true;
+    }
+  }
+  const content = `${message.text || ""}
+${message.caption || ""}`;
+  if (!content.trim()) return false;
+  return PROTECTED_DELIVERY_MARKERS.some((marker) => content.includes(marker));
+}
 function recordBotMessage(chatId, messageId) {
+  if (preservedBotMessages.has(getPreservedMessageKey(chatId, messageId))) {
+    return;
+  }
   const key = String(chatId);
   if (!activeBotMessages.has(key)) {
     activeBotMessages.set(key, /* @__PURE__ */ new Set());
@@ -46919,7 +48296,9 @@ async function clearPreviousBotMessages(chatId, botInstance, excludeMessageId) {
   const key = String(chatId);
   const msgSet = activeBotMessages.get(key);
   if (!msgSet || msgSet.size === 0) return;
-  const idsToDelete = Array.from(msgSet).filter((id) => id !== excludeMessageId);
+  const idsToDelete = Array.from(msgSet).filter(
+    (id) => id !== excludeMessageId && !preservedBotMessages.has(getPreservedMessageKey(chatId, id))
+  );
   for (const msgId of idsToDelete) {
     try {
       if (typeof botInstance?.api?.deleteMessage === "function") {
@@ -46945,11 +48324,15 @@ async function cleanupChatMessages(ctx, botInstance, keepNewMessageId) {
     }
   }
   if (ctx.callbackQuery?.message?.message_id) {
-    recordBotMessage(chatId, ctx.callbackQuery.message.message_id);
+    if (isProtectedDeliveryMessage(ctx.callbackQuery.message, chatId)) {
+      markMessageAsPreserved(chatId, ctx.callbackQuery.message.message_id);
+    } else {
+      recordBotMessage(chatId, ctx.callbackQuery.message.message_id);
+    }
   }
   await clearPreviousBotMessages(chatId, botInstance, keepNewMessageId);
 }
-async function sendSafeMessage(ctx, botInstance, text, options) {
+async function dispatchSafeMessage(ctx, botInstance, text, options, preserveNewMessage = false) {
   const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
   let sentResult;
   if (typeof botInstance?.sendMessage === "function" && chatId) {
@@ -46977,11 +48360,21 @@ async function sendSafeMessage(ctx, botInstance, text, options) {
   if (chatId) {
     const newMsgId = sentResult?.message_id;
     if (newMsgId) {
-      recordBotMessage(chatId, newMsgId);
+      if (preserveNewMessage) {
+        markMessageAsPreserved(chatId, newMsgId);
+      } else {
+        recordBotMessage(chatId, newMsgId);
+      }
     }
     await cleanupChatMessages(ctx, botInstance, newMsgId);
   }
   return sentResult;
+}
+async function sendSafeMessage(ctx, botInstance, text, options) {
+  return dispatchSafeMessage(ctx, botInstance, text, options, false);
+}
+async function sendPreservedMessage(ctx, botInstance, text, options) {
+  return dispatchSafeMessage(ctx, botInstance, text, options, true);
 }
 async function sendSafePhoto(ctx, botInstance, photo, options) {
   const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
@@ -46990,7 +48383,7 @@ async function sendSafePhoto(ctx, botInstance, photo, options) {
     try {
       const formData = new FormData();
       formData.append("chat_id", String(chatId));
-      formData.append("photo", new Blob([photo], { type: "image/png" }), "qris.png");
+      formData.append("photo", new Blob([new Uint8Array(photo)], { type: "image/png" }), "qris.png");
       if (options?.caption) formData.append("caption", String(options.caption));
       if (options?.parse_mode) formData.append("parse_mode", String(options.parse_mode));
       if (options?.reply_markup) {
@@ -47062,8 +48455,9 @@ async function sendSafePhoto(ctx, botInstance, photo, options) {
   }
   return sentResult;
 }
-function extractMediaFromMessage(message) {
-  if (!message) return { hasMedia: false, type: "none" };
+function extractMediaFromMessage(rawMessage) {
+  if (!rawMessage || typeof rawMessage !== "object") return { hasMedia: false, type: "none" };
+  const message = rawMessage;
   const fromChatId = message.chat?.id;
   const messageId = message.message_id;
   if (message.document) {
@@ -47154,6 +48548,25 @@ function registerHandlers(botInstance) {
       await sendChannelJoinPrompt2(ctx, botInstance);
       return;
     }
+    if (ctx.from?.id) {
+      const { ensureUser: ensureUser2 } = await Promise.resolve().then(() => (init_buy(), buy_exports));
+      await ensureUser2(String(ctx.from.id), {
+        username: ctx.from.username,
+        firstName: ctx.from.first_name
+      }).catch((regErr) => {
+        console.error("[Start] Failed to register user in DB:", regErr);
+      });
+    }
+    const text = ctx.message?.text || "";
+    const startPayload = text.trim().split(/\s+/)[1] || "";
+    if (startPayload.startsWith("buy_")) {
+      const prodId = startPayload.slice("buy_".length).trim();
+      if (prodId) {
+        const { sendCheckoutMethodMenu: sendCheckoutMethodMenu2 } = await Promise.resolve().then(() => (init_menu(), menu_exports));
+        await sendCheckoutMethodMenu2(ctx, botInstance, prodId);
+        return;
+      }
+    }
     await sendMainMenu(ctx, botInstance);
   });
   botInstance.command("help", async (ctx) => {
@@ -47185,6 +48598,14 @@ function registerHandlers(botInstance) {
       await sendChannelJoinPrompt2(ctx, botInstance);
       return;
     }
+    if (ctx.from?.id) {
+      const { ensureUser: ensureUser2 } = await Promise.resolve().then(() => (init_buy(), buy_exports));
+      await ensureUser2(String(ctx.from.id), {
+        username: ctx.from.username,
+        firstName: ctx.from.first_name
+      }).catch(() => {
+      });
+    }
     const text = ctx.message?.text || "";
     const parts = text.trim().split(/\s+/);
     const orderCode = parts[1];
@@ -47203,6 +48624,36 @@ function registerHandlers(botInstance) {
         ]
       }
     });
+  });
+  botInstance.command(["pesanan", "orders"], async (ctx) => {
+    const status = await getBotStatus();
+    if (status === "maintenance" && !isAdmin(ctx.from?.id)) {
+      await sendMaintenanceMessage(ctx, botInstance);
+      return;
+    }
+    const { checkUserChannelMembership: checkUserChannelMembership2, sendChannelJoinPrompt: sendChannelJoinPrompt2 } = await Promise.resolve().then(() => (init_channel_gate(), channel_gate_exports));
+    const isMember = await checkUserChannelMembership2(ctx.from?.id, botInstance);
+    if (!isMember) {
+      await sendChannelJoinPrompt2(ctx, botInstance);
+      return;
+    }
+    if (ctx.from?.id) {
+      const { ensureUser: ensureUser2 } = await Promise.resolve().then(() => (init_buy(), buy_exports));
+      await ensureUser2(String(ctx.from.id), {
+        username: ctx.from.username,
+        firstName: ctx.from.first_name
+      }).catch(() => {
+      });
+    }
+    const text = ctx.message?.text || "";
+    const parts = text.trim().split(/\s+/);
+    const orderCode = parts[1];
+    const { sendOrderStatus: sendOrderStatus2, sendOrdersMenu: sendOrdersMenu2 } = await Promise.resolve().then(() => (init_menu(), menu_exports));
+    if (orderCode) {
+      await sendOrderStatus2(ctx, botInstance, orderCode);
+    } else {
+      await sendOrdersMenu2(ctx, botInstance, 0);
+    }
   });
   registerBuyHandler(botInstance);
   registerMenuHandlers(botInstance);
@@ -47256,8 +48707,8 @@ function registerHandlers(botInstance) {
         fileId: mediaData.fileId,
         fileName: mediaData.fileName || (mediaData.type === "photo" ? "foto.jpg" : "file"),
         mimeType: mediaData.mimeType,
-        fromChatId: chatId,
-        messageId: ctx.message?.message_id,
+        fromChatId: mediaData.fromChatId || chatId,
+        messageId: mediaData.messageId || ctx.message?.message_id,
         savedAt: Date.now()
       });
     }
@@ -47354,6 +48805,150 @@ Pembeli telah menerima notifikasi dan broadcast channel telah dikirim.`,
         { parse_mode: "HTML" }
       );
     }
+  });
+  botInstance.command("settoken", async (ctx) => {
+    if (!isAdmin(ctx.from?.id)) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        "\u26D4 <b>Akses Ditolak:</b> Perintah ini khusus untuk Owner / Admin DaFung Hub.",
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [[{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]]
+          }
+        }
+      );
+      return;
+    }
+    const rawText = ctx.message?.text || "";
+    const tokenArg = rawText.trim().replace(/^\/settoken(?:@\w+)?\s*/i, "").trim();
+    if (!tokenArg) {
+      const { getShopeePayTokenStatus: getShopeePayTokenStatus2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
+      const status = await getShopeePayTokenStatus2();
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        `\u{1F511} <b>PENGATURAN TOKEN SHOPEEPAY GATEWAY</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u2022 <b>Status Sesi Saat Ini:</b> ${status.valid ? "\u{1F7E2} AKTIF (VALID)" : "\u{1F534} KEDALUWARSA / TIDAK VALID"}
+\u2022 <b>Keterangan Gateway:</b> <code>${escapeHtml6(status.message)}</code>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+
+\u{1F4CC} <b>Cara Memperbarui Token Sesi:</b>
+Kirim perintah:
+<code>/settoken B:...token_terbaru_anda...</code>
+
+<i>Pesan berisi token akan otomatis dihapus setelah tersimpan.</i>`,
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "\u23F3 Cek Order Belum Bayar", callback_data: "admin_unpaid_orders" }],
+              [{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]
+            ]
+          }
+        }
+      );
+      return;
+    }
+    try {
+      const { updateShopeePayToken: updateShopeePayToken2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
+      const result = await updateShopeePayToken2(tokenArg);
+      if (!result.success) {
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `\u274C <b>Gagal Memperbarui Token Gateway</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u2022 <b>Error:</b> <code>${escapeHtml6(result.error || result.message)}</code>`,
+          {
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [[{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]]
+            }
+          }
+        );
+        return;
+      }
+      let sweptCount = 0;
+      if (result.valid) {
+        try {
+          const { checkAndProcessUnpaidShopeeOrders: checkAndProcessUnpaidShopeeOrders2 } = await Promise.resolve().then(() => (init_fulfillment(), fulfillment_exports));
+          sweptCount = await checkAndProcessUnpaidShopeeOrders2(botInstance);
+        } catch {
+        }
+      }
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        `${result.valid ? "\u2705 <b>TOKEN SHOPEEPAY AKTIF & TERVERIFIKASI!</b>" : "\u26A0\uFE0F <b>TOKEN TERSIMPAN, NAMUN BELUM VALID</b>"}
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u2022 <b>Status Sesi:</b> <code>${escapeHtml6(result.tokenStatus.toUpperCase())}</code>
+\u2022 <b>Pesan Gateway:</b> ${escapeHtml6(result.message)}
+` + (sweptCount > 0 ? `\u2022 <b>Order Terdeteksi Lunas Otomatis:</b> <b>${sweptCount} Pesanan</b> \u{1F389}
+` : "") + `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u26A1 <i>Deteksi pembayaran QRIS otomatis siap berjalan kembali.</i>`,
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "\u23F3 Cek Order Belum Bayar", callback_data: "admin_unpaid_orders" }],
+              [{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]
+            ]
+          }
+        }
+      );
+    } catch (err) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        `\u274C Terjadi kesalahan saat memperbarui token: ${escapeHtml6(err.message)}`,
+        { parse_mode: "HTML" }
+      );
+    }
+  });
+  botInstance.command("cektoken", async (ctx) => {
+    if (!isAdmin(ctx.from?.id)) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        "\u26D4 <b>Akses Ditolak:</b> Perintah ini khusus untuk Owner / Admin DaFung Hub.",
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [[{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]]
+          }
+        }
+      );
+      return;
+    }
+    const { getShopeePayTokenStatus: getShopeePayTokenStatus2, getShopeePayAccount: getShopeePayAccount2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
+    const [status, account] = await Promise.all([
+      getShopeePayTokenStatus2(),
+      getShopeePayAccount2().catch(() => null)
+    ]);
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      `\u{1F6E1}\uFE0F <b>STATUS GATEWAY SHOPEEPAY</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u2022 <b>Sesi Token:</b> ${status.valid ? "\u{1F7E2} AKTIF (VALID)" : "\u{1F534} KEDALUWARSA / TIDAK VALID"}
+\u2022 <b>Detail:</b> ${escapeHtml6(status.message)}
+\u2022 <b>Username Akun:</b> ${escapeHtml6(account?.data?.username || "DappaSecc")}
+\u2022 <b>QRIS Statis:</b> ${account?.data?.has_qris_static ? "\u{1F7E2} Terpasang" : "\u26AA Belum ada"}
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+` + (status.valid ? `<i>Pembacaan mutasi QRIS otomatis dalam kondisi normal.</i>` : `<i>Perbarui token dengan perintah: <code>/settoken &lt;token_baru&gt;</code></i>`),
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "\u23F3 Cek Order Belum Bayar", callback_data: "admin_unpaid_orders" }],
+            [{ text: "\u{1F519} Panel Owner", callback_data: "admin_panel" }]
+          ]
+        }
+      }
+    );
   });
   botInstance.command("addstock", async (ctx) => {
     await sendSafeMessage(
@@ -47497,7 +49092,7 @@ Pembeli telah menerima notifikasi dan broadcast channel telah dikirim.`,
     try {
       const { getSupplierProducts: getSupplierProducts2 } = await Promise.resolve().then(() => (init_supplier(), supplier_exports));
       const { deleteCustomPrice: deleteCustomPrice2 } = await Promise.resolve().then(() => (init_custom_prices(), custom_prices_exports));
-      const { calculateSellingPrice: calculateSellingPrice4 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
+      const { calculateSellingPrice: calculateSellingPrice3 } = await Promise.resolve().then(() => (init_pricing(), pricing_exports));
       const products = await getSupplierProducts2().catch(() => []);
       const q = targetQuery.toLowerCase();
       let matched = products.find((p) => p.id.toLowerCase() === q);
@@ -47515,7 +49110,7 @@ Pembeli telah menerima notifikasi dan broadcast channel telah dikirim.`,
         return;
       }
       await deleteCustomPrice2(matched.id);
-      const defaultPrice = calculateSellingPrice4(matched.price_idr);
+      const defaultPrice = calculateSellingPrice3(matched.price_idr);
       await sendSafeMessage(
         ctx,
         botInstance,
@@ -47678,6 +49273,14 @@ Saat Anda menjalankan <code>/kirim &lt;order_code&gt;</code> atau membuat <b>Bro
         await sendChannelJoinPrompt2(ctx, botInstance);
         return;
       }
+      if (ctx.from?.id) {
+        const { ensureUser: ensureUser2 } = await Promise.resolve().then(() => (init_buy(), buy_exports));
+        await ensureUser2(String(ctx.from.id), {
+          username: ctx.from.username,
+          firstName: ctx.from.first_name
+        }).catch(() => {
+        });
+      }
       await sendSafeMessage(
         ctx,
         botInstance,
@@ -47749,7 +49352,7 @@ async function initBot(options) {
 async function handleWebhookUpdate(update) {
   await bot.handleUpdate(update);
 }
-var import_node_telegram_bot_api, activeBotMessages, bot, handler_default;
+var import_node_telegram_bot_api, activeBotMessages, preservedBotMessages, PROTECTED_DELIVERY_MARKERS, bot, handler_default;
 var init_handler = __esm({
   "bot/handler.ts"() {
     "use strict";
@@ -47765,6 +49368,20 @@ var init_handler = __esm({
       }
     }
     activeBotMessages = /* @__PURE__ */ new Map();
+    preservedBotMessages = /* @__PURE__ */ new Set();
+    PROTECTED_DELIVERY_MARKERS = [
+      "PEMBAYARAN SUKSES & PESANAN SELESAI",
+      "PESANAN ANDA TELAH SELESAI",
+      "Kredensial / Lisensi Akun",
+      "Kredensial / Detail Akun",
+      "Kredensial Akun Anda",
+      "File Kredensial Terlampir",
+      "Lampiran akun digital",
+      "MEMBERSHIP VIP ANDA TELAH AKTIF",
+      "DEPOSIT SALDO BERHASIL DITAMBAHKAN",
+      "LAMPIRAN FILE PESANAN",
+      "LAMPIRAN KREDENSIAL PESANAN"
+    ];
     bot = globalThis.telegramBotGlobal ?? createBotInstance();
     if (process.env.NODE_ENV !== "production") {
       globalThis.telegramBotGlobal = bot;
@@ -54906,7 +56523,7 @@ var require_server2 = __commonJS({
 var import_http = __toESM(require("http"));
 init_handler();
 init_fulfillment();
-init_db();
+init_shopeepay();
 
 // lib/admin-auth.ts
 var import_server = __toESM(require_server2());
@@ -54935,6 +56552,11 @@ init_fulfillment();
 init_settings();
 init_shopeepay();
 init_handler();
+init_broadcast();
+function escapeHtml7(str) {
+  if (!str) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
 var CORS_HEADERS = {
   "Content-Type": "application/json",
   "Access-Control-Allow-Origin": "*",
@@ -54978,7 +56600,9 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
     body = {};
   }
   if (pathname === "/api/admin/auth" && req.method === "POST") {
-    const key = body.key || body.pin || req.headers["x-admin-key"];
+    const rawHeaderKey = req.headers["x-admin-key"];
+    const headerKey = Array.isArray(rawHeaderKey) ? rawHeaderKey[0] : rawHeaderKey;
+    const key = body.key || body.pin || headerKey;
     if (!verifyAdminKey(key)) {
       sendJson(res, 401, {
         success: false,
@@ -55044,7 +56668,12 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
         currency: "IDR",
         username: "prastyaaneki"
       }));
-      const shopeeAccount = await getShopeePayAccount().catch(() => null);
+      const shopeeTokenStatus = await getShopeePayTokenStatus().catch(() => ({
+        success: false,
+        valid: false,
+        tokenStatus: "unreachable",
+        message: "Gagal memeriksa status gateway ShopeePay"
+      }));
       const botStatus = await getBotStatus().catch(() => "online");
       sendJson(res, 200, {
         stats: {
@@ -55062,7 +56691,9 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
           username: supplierBalance.username || "Supplier API"
         },
         shopeepay: {
-          isOnline: Boolean(shopeeAccount && shopeeAccount.account_name),
+          isOnline: shopeeTokenStatus.valid,
+          tokenStatus: shopeeTokenStatus.tokenStatus,
+          message: shopeeTokenStatus.message,
           gatewayUrl: process.env.SHOPEEPAY_API_URL || "https://shopee.prastyaaneki.biz.id"
         },
         bot: {
@@ -55158,9 +56789,9 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
   const fulfillMatch = pathname.match(/^\/api\/admin\/orders\/([^/]+)\/fulfill$/);
   if (fulfillMatch && req.method === "POST") {
     const orderCode = decodeURIComponent(fulfillMatch[1]);
-    const credentials = body.credentials;
-    const file = body.file;
-    if (!credentials && !file?.content) {
+    const credentials = String(body.credentials || "").trim();
+    const mediaObj = body.media || body.file;
+    if (!credentials && (!mediaObj || !mediaObj.content)) {
       sendJson(res, 400, {
         success: false,
         error: "Teks kredensial atau file dokumen wajib diisi."
@@ -55168,8 +56799,100 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
       return true;
     }
     try {
-      const success = await adminManualFulfill(orderCode, credentials || file?.name || "Kredensial Dokumen", bot, file);
-      if (success) {
+      const orderRes = await query(
+        `SELECT o.*, COALESCE(u.telegram_id, '') as telegram_id, COALESCE(p.name, 'Produk Khusus') as product_name
+         FROM orders o
+         LEFT JOIN users u ON o.user_id = u.id
+         LEFT JOIN products p ON o.product_id = p.id
+         WHERE o.order_code = $1 LIMIT 1`,
+        [orderCode]
+      );
+      if (orderRes.rows.length === 0) {
+        sendJson(res, 404, {
+          success: false,
+          error: `Pesanan "${orderCode}" tidak ditemukan.`
+        });
+        return true;
+      }
+      const ord = orderRes.rows[0];
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      if (mediaObj?.content && token && ord.telegram_id && ord.telegram_id !== "Guest") {
+        const fileName = mediaObj.name || (mediaObj.isPhoto ? `${orderCode}_voucher.jpg` : `${orderCode}_kredensial.txt`);
+        const fileBuffer = mediaObj.content.startsWith("data:") && mediaObj.content.includes("base64,") ? Buffer.from(mediaObj.content.split("base64,")[1], "base64") : Buffer.from(mediaObj.content, "base64");
+        const isPhoto = Boolean(mediaObj.isPhoto || /\.(jpe?g|png|webp|gif)$/i.test(fileName));
+        const endpoint = isPhoto ? "sendPhoto" : "sendDocument";
+        const mimeType = isPhoto ? "image/jpeg" : "application/octet-stream";
+        const formData = new FormData();
+        formData.append("chat_id", String(ord.telegram_id));
+        formData.append("parse_mode", "HTML");
+        formData.append(
+          "caption",
+          `\u{1F389} <b>PESANAN ANDA TELAH SELESAI!</b>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+\u{1F4E6} <b>Produk:</b> ${escapeHtml7(ord.product_name)}
+\u{1F194} <b>Kode Order:</b> <code>${escapeHtml7(ord.order_code)}</code>
+\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501` + (credentials ? `
+
+\u{1F511} <b>Kredensial / Petunjuk:</b>
+<code>${escapeHtml7(credentials)}</code>` : "") + `
+
+\u{1F4CE} <i>Lampiran akun digital terlampir di atas. Simpan baik-baik!</i>`
+        );
+        formData.append(
+          "reply_markup",
+          JSON.stringify({
+            inline_keyboard: [
+              [
+                { text: "\u{1F4E9} Riwayat Pesanan", callback_data: "menu_orders" },
+                { text: "\u{1F6CD}\uFE0F Beli Produk Baru", callback_data: "menu_products" }
+              ],
+              [{ text: "\u{1F519} Menu Utama", callback_data: "menu_main" }]
+            ]
+          })
+        );
+        formData.append(isPhoto ? "photo" : "document", new Blob([new Uint8Array(fileBuffer)], { type: mimeType }), fileName);
+        const tgRes = await fetch(`https://api.telegram.org/bot${token}/${endpoint}`, {
+          method: "POST",
+          body: formData
+        });
+        const tgJson = await tgRes.json().catch(() => null);
+        if (tgJson?.ok && tgJson?.result) {
+          const r = tgJson.result;
+          if (r.message_id) {
+            markMessageAsPreserved(String(ord.telegram_id), r.message_id);
+          }
+          const uploadedFileId = isPhoto ? r.photo?.[r.photo.length - 1]?.file_id : r.document?.file_id || r.video?.file_id || r.audio?.file_id || r.animation?.file_id;
+          const uploadedType = isPhoto ? "photo" : r.animation?.file_id ? "animation" : r.video?.file_id ? "video" : r.audio?.file_id ? "audio" : "document";
+          if (uploadedFileId) {
+            const { encrypt: encrypt2 } = await Promise.resolve().then(() => (init_encrypt(), encrypt_exports));
+            const storedCred = `[MEDIA: ${fileName}] ${credentials || "Dikirim via lampiran media"}`;
+            await query(
+              `UPDATE orders
+               SET payment_status = 'paid',
+                   fulfillment_status = 'delivered',
+                   credential_encrypted = $1,
+                   delivered_at = CURRENT_TIMESTAMP,
+                   invoice_data = jsonb_set(COALESCE(invoice_data::jsonb, '{}'::jsonb), '{delivered_media}', $3::jsonb)
+               WHERE id = $2`,
+              [
+                encrypt2(storedCred),
+                ord.id,
+                JSON.stringify({ type: uploadedType, fileId: uploadedFileId, fileName, mimeType })
+              ]
+            );
+            broadcastOrderSuccess(orderCode, bot).catch((bErr) => {
+              console.warn("[Broadcast Warning] Failed to broadcast admin HTTP media fulfill:", bErr);
+            });
+            sendJson(res, 200, {
+              success: true,
+              message: `Pesanan ${orderCode} beserta lampiran berhasil dipenuhi dan dikirim ke pembeli.`
+            });
+            return true;
+          }
+        }
+      }
+      const fulfillRes = await adminManualFulfill(orderCode, credentials, bot);
+      if (fulfillRes.success) {
         sendJson(res, 200, {
           success: true,
           message: `Pesanan ${orderCode} berhasil dipenuhi dan kredensial telah dikirimkan ke Telegram pembeli.`
@@ -55177,7 +56900,7 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
       } else {
         sendJson(res, 400, {
           success: false,
-          error: `Gagal memenuhi pesanan ${orderCode}. Pastikan status pesanan sudah dibayar.`
+          error: fulfillRes.message || `Gagal memenuhi pesanan ${orderCode}.`
         });
       }
       return true;
@@ -55399,20 +57122,13 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
   if (pathname === "/api/admin/shopeepay" && req.method === "GET") {
     try {
       const limit = Math.min(100, Math.max(10, parseInt(parsedUrl.searchParams.get("limit") || "50", 10)));
-      const gatewayUrl = `${(process.env.SHOPEEPAY_API_URL || "https://shopee.prastyaaneki.biz.id").replace(/\/+$/, "")}/transactions?page_size=${limit}`;
-      const gatewayRes = await fetch(gatewayUrl, {
-        method: "GET",
-        headers: {
-          "x-api-key": process.env.SHOPEEPAY_API_KEY || "",
-          "Content-Type": "application/json"
-        }
-      }).catch(() => null);
-      const gatewayJson = gatewayRes && gatewayRes.ok ? await gatewayRes.json().catch(() => ({})) : {};
-      const rawTransactions = gatewayJson?.data?.transactions || gatewayJson?.transactions || [];
+      const txFetch = await fetchShopeePayTransactions(limit);
+      const rawTransactions = txFetch.transactions;
       const reconciliationRes = await query(
         `SELECT o.order_code, o.payment_status, o.created_at,
                 (o.invoice_data->>'payable_amount') as payable_amount,
-                p.name as product_name, u.telegram_id, u.username
+                (o.invoice_data->>'shopeepay_tx_id') as shopeepay_tx_id,
+                p.price, p.name as product_name, u.telegram_id, u.username
          FROM orders o
          JOIN products p ON o.product_id = p.id
          LEFT JOIN users u ON o.user_id = u.id
@@ -55420,23 +57136,41 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
          ORDER BY o.created_at DESC LIMIT 200`
       );
       const recentOrders = reconciliationRes.rows;
+      const orderByTxId = /* @__PURE__ */ new Map();
+      for (const ord of recentOrders) {
+        if (ord.shopeepay_tx_id) {
+          orderByTxId.set(String(ord.shopeepay_tx_id).trim(), ord);
+        }
+      }
+      const todayStr = getWibTodayString();
+      let totalToday = 0;
       const reconciledTransactions = rawTransactions.map((tx, idx) => {
-        const txAmount = Number(tx.amount || 0);
-        const txTime = new Date(tx.time || tx.created_at || Date.now()).getTime();
-        const matchedOrder = recentOrders.find((ord) => {
-          const ordAmount = Number(ord.payable_amount || 0);
-          if (ordAmount !== txAmount) return false;
-          const ordTime = new Date(ord.created_at).getTime();
-          const diffMinutes = Math.abs(txTime - ordTime) / (1e3 * 60);
-          return diffMinutes <= 180;
-        });
+        const txId = extractShopeePayTxId(tx) || `TX-${Date.now()}-${idx}`;
+        const txAmount = Math.round(Number(tx.amount || tx.nominal || tx.total || 0));
+        const rawTime = String(tx.time || tx.created_at || tx.timestamp || tx.date || "").trim();
+        const txTimeMs = parseShopeePayTimeMs(rawTime);
+        const effectiveTimeMs = isNaN(txTimeMs) ? Date.now() : txTimeMs;
+        const txWibDate = !isNaN(txTimeMs) ? new Date(txTimeMs + 7 * 60 * 60 * 1e3).toISOString().slice(0, 10) : rawTime.slice(0, 10);
+        if (txWibDate === todayStr) {
+          totalToday += txAmount;
+        }
+        let matchedOrder = txId ? orderByTxId.get(txId) : void 0;
+        if (!matchedOrder && txAmount > 0) {
+          matchedOrder = recentOrders.find((ord) => {
+            const ordAmount = Math.round(Number(ord.payable_amount || ord.price || 0));
+            if (ordAmount !== txAmount) return false;
+            const ordTime = new Date(ord.created_at).getTime();
+            const diffMinutes = Math.abs(effectiveTimeMs - ordTime) / (1e3 * 60);
+            return diffMinutes <= 180;
+          });
+        }
         return {
-          transactionId: tx.transaction_id || tx.id || `TX-${Date.now()}-${idx}`,
+          transactionId: txId,
           amount: txAmount,
           formattedAmount: `Rp ${txAmount.toLocaleString("id-ID")}`,
-          status: tx.status || "Berhasil",
-          time: tx.time || tx.created_at || (/* @__PURE__ */ new Date()).toISOString(),
-          issuer: tx.issuer || tx.payment_method || "ShopeePay",
+          status: String(tx.status || "Berhasil"),
+          time: rawTime || (/* @__PURE__ */ new Date()).toISOString(),
+          issuer: String(tx.issuer || tx.payment_method || "ShopeePay"),
           isMatched: Boolean(matchedOrder),
           order: matchedOrder ? {
             orderCode: matchedOrder.order_code,
@@ -55446,11 +57180,11 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
           } : null
         };
       });
-      const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-      const totalToday = reconciledTransactions.filter((tx) => String(tx.time).startsWith(todayStr)).reduce((sum, tx) => sum + (tx.amount || 0), 0);
       const totalAll = reconciledTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
       const matchedCount = reconciledTransactions.filter((tx) => tx.isMatched).length;
       sendJson(res, 200, {
+        tokenValid: txFetch.ok && !txFetch.sessionExpired,
+        gatewayError: txFetch.ok ? null : txFetch.error || null,
         summary: {
           totalTransactions: reconciledTransactions.length,
           matchedOrdersCount: matchedCount,
@@ -55462,6 +57196,24 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
         },
         transactions: reconciledTransactions
       });
+      return true;
+    } catch (err) {
+      sendJson(res, 500, { success: false, error: err.message });
+      return true;
+    }
+  }
+  if (pathname === "/api/admin/shopeepay" && req.method === "POST") {
+    const rawToken = String(body.token || body.shopeeToken || body.shopeepayToken || "").trim();
+    if (!rawToken) {
+      sendJson(res, 400, {
+        success: false,
+        error: "Token ShopeePay wajib diisi."
+      });
+      return true;
+    }
+    try {
+      const result = await updateShopeePayToken(rawToken);
+      sendJson(res, result.success ? 200 : 502, result);
       return true;
     } catch (err) {
       sendJson(res, 500, { success: false, error: err.message });
@@ -55579,7 +57331,7 @@ var server = import_http.default.createServer((req, res) => {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Cache-Control, Pragma, Authorization, x-admin-key, x-callback-signature, x-callback-event"
+      "Access-Control-Allow-Headers": "Content-Type, Cache-Control, Pragma, Authorization, x-admin-key, x-callback-signature, x-callback-event, x-signature"
     });
     res.end();
     return;
@@ -55613,6 +57365,17 @@ var server = import_http.default.createServer((req, res) => {
     });
     req.on("end", async () => {
       try {
+        if (req.url?.includes("shopeepay")) {
+          const signature = req.headers["x-signature"] || void 0;
+          const { httpStatus, body: respBody } = await processShopeePayWebhookPayload(
+            body,
+            bot,
+            signature
+          );
+          res.writeHead(httpStatus, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(respBody));
+          return;
+        }
         const data = JSON.parse(body || "{}");
         if (req.url?.includes("sakurupiah")) {
           const signature = req.headers["x-callback-signature"] || "";
@@ -55647,60 +57410,6 @@ var server = import_http.default.createServer((req, res) => {
           res.end(JSON.stringify({ status: "ok", order_id: orderId, paid: isPaid }));
           return;
         }
-        if (req.url?.includes("shopeepay")) {
-          let orderId = data.order_id || data.order_code || data.merchant_ref || data.token;
-          const status = String(data.status || data.payment_status || "paid").toLowerCase();
-          let detectedAmount = Number(data.amount || data.nominal || 0);
-          if (!orderId) {
-            if (!detectedAmount) {
-              const fullText = `${data.notification || ""} ${data.text || ""} ${data.message || ""} ${data.body || ""} ${data.not_body || ""} ${body}`;
-              const match = fullText.match(/(?:rp\.?|idr)\s*([0-9.,]+)/i) || fullText.match(/([0-9]{3,7})/);
-              if (match) {
-                const clean = match[1].replace(/[^0-9]/g, "");
-                detectedAmount = parseInt(clean, 10);
-              }
-            }
-            if (detectedAmount > 0) {
-              const matchOrd = await query(
-                `SELECT order_code FROM orders
-                 WHERE payment_status = 'unpaid'
-                   AND (
-                     (invoice_data->>'payable_amount')::numeric = $1
-                     OR (invoice_data->>'amount')::numeric = $1
-                   )
-                   AND created_at >= NOW() - INTERVAL '24 hours'
-                 ORDER BY created_at DESC LIMIT 1`,
-                [detectedAmount]
-              );
-              if (matchOrd.rows.length > 0) {
-                orderId = matchOrd.rows[0].order_code;
-              }
-            }
-          }
-          const isPaid = status === "success" || status === "paid" || status === "settlement" || status === "completed";
-          if (isPaid && orderId) {
-            console.log(`[ShopeePay Webhook] Payment confirmed for order: ${orderId}`);
-            await processOrderPayment(orderId, bot);
-            res.writeHead(200, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({
-              success: true,
-              message: "ShopeePay payment successfully confirmed",
-              order_id: orderId,
-              detected_amount: detectedAmount || null,
-              paid: true
-            }));
-            return;
-          }
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({
-            success: true,
-            message: orderId ? `Status received: ${status || "unknown"}` : detectedAmount > 0 ? `Amount detected (Rp ${detectedAmount.toLocaleString("id-ID")}) but no unpaid order found within last 24h` : `Notification received, no amount or order found`,
-            order_id: orderId || null,
-            detected_amount: detectedAmount || null,
-            paid: false
-          }));
-          return;
-        }
         await initBot({ mode: "webhook" });
         await handleWebhookUpdate(data);
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -55711,6 +57420,49 @@ var server = import_http.default.createServer((req, res) => {
         res.end(JSON.stringify({ ok: false, error: err.message }));
       }
     });
+    return;
+  }
+  if (req.method === "GET" && req.url?.includes("shopeepay")) {
+    res.writeHead(200, {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*"
+    });
+    res.end(
+      JSON.stringify({
+        status: "active",
+        endpoint: "/api/webhooks/shopeepay",
+        service: "DaFung Hub ShopeePay Webhook Handler"
+      })
+    );
+    return;
+  }
+  if (req.method === "GET" && req.url?.includes("check-payments")) {
+    (async () => {
+      try {
+        await initBot({ mode: "webhook" });
+        const count = await checkAndProcessUnpaidShopeeOrders(bot);
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+          "Access-Control-Allow-Origin": "*"
+        });
+        res.end(
+          JSON.stringify({
+            success: true,
+            service: "ShopeePay Payment Auto-Checker",
+            processed: count,
+            timestamp: (/* @__PURE__ */ new Date()).toISOString()
+          })
+        );
+      } catch (err) {
+        console.error("[HTTP Server] /api/check-payments error:", err);
+        res.writeHead(500, {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*"
+        });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    })();
     return;
   }
   if (req.url?.includes("bot-status")) {
@@ -55796,33 +57548,7 @@ server.listen(port, () => {
 });
 setInterval(async () => {
   try {
-    const { query: query2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    const { checkShopeePayPayment: checkShopeePayPayment2 } = await Promise.resolve().then(() => (init_shopeepay(), shopeepay_exports));
-    const unpaidOrders = await query2(
-      `SELECT o.*, p.price as product_price
-       FROM orders o
-       LEFT JOIN products p ON o.product_id = p.id
-       WHERE o.payment_status = 'unpaid'
-         AND o.created_at >= NOW() - INTERVAL '24 hours'
-       ORDER BY o.created_at DESC LIMIT 10`
-    );
-    for (const ord of unpaidOrders.rows) {
-      const invData = typeof ord.invoice_data === "string" ? JSON.parse(ord.invoice_data || "{}") : ord.invoice_data || {};
-      const actualAmount = Number(invData.payable_amount) || Number(invData.amount) || Number(ord.product_price) || 0;
-      const gateway = (invData.gateway || process.env.PAYMENT_GATEWAY || "shopeepay").toLowerCase();
-      if (gateway === "shopeepay" && actualAmount > 0) {
-        const checkResult = await checkShopeePayPayment2({
-          token: invData.token,
-          orderCode: ord.order_code,
-          amount: actualAmount,
-          orderCreatedAt: ord.created_at
-        });
-        if (checkResult.paid) {
-          console.log(`[ShopeePay Poller] Auto-detected payment for order: ${ord.order_code}`);
-          await processOrderPayment(ord.order_code, bot, checkResult.transaction);
-        }
-      }
-    }
+    await checkAndProcessUnpaidShopeeOrders(bot);
   } catch {
   }
 }, 2e4);

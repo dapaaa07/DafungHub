@@ -46,11 +46,64 @@ declare global {
 }
 
 /**
- * Active bot messages tracking per chat to enforce strictly 1 bot message
+ * Active bot messages tracking per chat to enforce strictly 1 temporary navigation message
+ * while keeping first-time credential / fulfillment delivery messages permanently intact.
  */
 const activeBotMessages = new Map<string, Set<number>>();
+const preservedBotMessages = new Set<string>();
+
+const PROTECTED_DELIVERY_MARKERS = [
+  'PEMBAYARAN SUKSES & PESANAN SELESAI',
+  'PESANAN ANDA TELAH SELESAI',
+  'Kredensial / Lisensi Akun',
+  'Kredensial / Detail Akun',
+  'Kredensial Akun Anda',
+  'File Kredensial Terlampir',
+  'Lampiran akun digital',
+  'MEMBERSHIP VIP ANDA TELAH AKTIF',
+  'DEPOSIT SALDO BERHASIL DITAMBAHKAN',
+  'LAMPIRAN FILE PESANAN',
+  'LAMPIRAN KREDENSIAL PESANAN',
+];
+
+function getPreservedMessageKey(chatId: string | number, messageId: number): string {
+  return `${String(chatId)}:${messageId}`;
+}
+
+export function markMessageAsPreserved(chatId: string | number, messageId: number): void {
+  const preservedKey = getPreservedMessageKey(chatId, messageId);
+  preservedBotMessages.add(preservedKey);
+  const msgSet = activeBotMessages.get(String(chatId));
+  if (msgSet) {
+    msgSet.delete(messageId);
+  }
+}
+
+export function isProtectedDeliveryMessage(
+  message?: {
+    message_id?: number;
+    text?: string;
+    caption?: string;
+    chat?: { id?: number | string };
+  } | null,
+  explicitChatId?: string | number
+): boolean {
+  if (!message) return false;
+  const resolvedChatId = explicitChatId ?? message.chat?.id;
+  if (resolvedChatId !== undefined && message.message_id !== undefined) {
+    if (preservedBotMessages.has(getPreservedMessageKey(resolvedChatId, message.message_id))) {
+      return true;
+    }
+  }
+  const content = `${message.text || ''}\n${message.caption || ''}`;
+  if (!content.trim()) return false;
+  return PROTECTED_DELIVERY_MARKERS.some((marker) => content.includes(marker));
+}
 
 export function recordBotMessage(chatId: string | number, messageId: number): void {
+  if (preservedBotMessages.has(getPreservedMessageKey(chatId, messageId))) {
+    return;
+  }
   const key = String(chatId);
   if (!activeBotMessages.has(key)) {
     activeBotMessages.set(key, new Set());
@@ -67,7 +120,9 @@ export async function clearPreviousBotMessages(
   const msgSet = activeBotMessages.get(key);
   if (!msgSet || msgSet.size === 0) return;
 
-  const idsToDelete = Array.from(msgSet).filter((id) => id !== excludeMessageId);
+  const idsToDelete = Array.from(msgSet).filter(
+    (id) => id !== excludeMessageId && !preservedBotMessages.has(getPreservedMessageKey(chatId, id))
+  );
   for (const msgId of idsToDelete) {
     try {
       if (typeof botInstance?.api?.deleteMessage === 'function') {
@@ -102,25 +157,25 @@ export async function cleanupChatMessages(
     }
   }
 
-  // 2. Add callback_query message to tracking if present so it gets cleared
+  // 2. Add callback_query message to tracking ONLY if it is NOT a preserved delivery/credential message
   if (ctx.callbackQuery?.message?.message_id) {
-    recordBotMessage(chatId, ctx.callbackQuery.message.message_id);
+    if (isProtectedDeliveryMessage(ctx.callbackQuery.message, chatId)) {
+      markMessageAsPreserved(chatId, ctx.callbackQuery.message.message_id);
+    } else {
+      recordBotMessage(chatId, ctx.callbackQuery.message.message_id);
+    }
   }
 
-  // 3. Delete all previous bot messages except keepNewMessageId
+  // 3. Delete all previous temporary bot messages except keepNewMessageId and preserved messages
   await clearPreviousBotMessages(chatId, botInstance, keepNewMessageId);
 }
 
-/**
- * Universal safe message dispatcher that works across real Telegram bots,
- * polling contexts, callback queries, and unit test mocks.
- * Automatically cleans up previous messages so only 1 bot message remains.
- */
-export async function sendSafeMessage(
+async function dispatchSafeMessage(
   ctx: Context,
   botInstance: ExtendedBot,
   text: string,
-  options?: Record<string, unknown>
+  options?: Record<string, unknown>,
+  preserveNewMessage: boolean = false
 ): Promise<unknown> {
   const chatId = ctx.chatId || ctx.callbackQuery?.message?.chat?.id || ctx.message?.chat?.id || ctx.from?.id;
 
@@ -154,16 +209,47 @@ export async function sendSafeMessage(
     }
   }
 
-  // Auto-cleanup: remove previous messages so strictly 1 bot message remains
   if (chatId) {
     const newMsgId = (sentResult as { message_id?: number })?.message_id;
     if (newMsgId) {
-      recordBotMessage(chatId, newMsgId);
+      if (preserveNewMessage) {
+        markMessageAsPreserved(chatId, newMsgId);
+      } else {
+        recordBotMessage(chatId, newMsgId);
+      }
     }
     await cleanupChatMessages(ctx, botInstance, newMsgId);
   }
 
   return sentResult;
+}
+
+/**
+ * Universal safe message dispatcher that works across real Telegram bots,
+ * polling contexts, callback queries, and unit test mocks.
+ * Automatically cleans up previous temporary navigation messages.
+ */
+export async function sendSafeMessage(
+  ctx: Context,
+  botInstance: ExtendedBot,
+  text: string,
+  options?: Record<string, unknown>
+): Promise<unknown> {
+  return dispatchSafeMessage(ctx, botInstance, text, options, false);
+}
+
+/**
+ * Preserved safe message dispatcher for credential / fulfillment deliveries.
+ * Cleans up prior temporary invoice/queue prompts while permanently protecting
+ * the delivered message from subsequent automatic chat cleanup.
+ */
+export async function sendPreservedMessage(
+  ctx: Context,
+  botInstance: ExtendedBot,
+  text: string,
+  options?: Record<string, unknown>
+): Promise<unknown> {
+  return dispatchSafeMessage(ctx, botInstance, text, options, true);
 }
 
 /**
@@ -189,7 +275,7 @@ export async function sendSafePhoto(
     try {
       const formData = new FormData();
       formData.append('chat_id', String(chatId));
-      formData.append('photo', new Blob([photo as any], { type: 'image/png' }), 'qris.png');
+      formData.append('photo', new Blob([new Uint8Array(photo)], { type: 'image/png' }), 'qris.png');
       if (options?.caption) formData.append('caption', String(options.caption));
       if (options?.parse_mode) formData.append('parse_mode', String(options.parse_mode));
       if (options?.reply_markup) {
@@ -276,10 +362,22 @@ export async function sendSafePhoto(
   return sentResult;
 }
 
+interface TelegramMediaMessage {
+  chat?: { id?: number | string };
+  message_id?: number;
+  document?: { file_id: string; file_name?: string; mime_type?: string };
+  photo?: Array<{ file_id: string }>;
+  video?: { file_id: string; file_name?: string; mime_type?: string };
+  audio?: { file_id: string; file_name?: string; mime_type?: string };
+  voice?: { file_id: string };
+  animation?: { file_id: string; file_name?: string };
+  sticker?: { file_id: string };
+}
+
 /**
  * Extract media information from any Telegram message (document, photo, video, audio, etc.)
  */
-export function extractMediaFromMessage(message: any): {
+export function extractMediaFromMessage(rawMessage: unknown): {
   hasMedia: boolean;
   type: 'document' | 'photo' | 'video' | 'audio' | 'voice' | 'sticker' | 'animation' | 'none';
   fileId?: string;
@@ -288,7 +386,8 @@ export function extractMediaFromMessage(message: any): {
   fromChatId?: number | string;
   messageId?: number;
 } {
-  if (!message) return { hasMedia: false, type: 'none' };
+  if (!rawMessage || typeof rawMessage !== 'object') return { hasMedia: false, type: 'none' };
+  const message = rawMessage as TelegramMediaMessage;
 
   const fromChatId = message.chat?.id;
   const messageId = message.message_id;
@@ -389,6 +488,27 @@ export function registerHandlers(botInstance: ExtendedBot): void {
       return;
     }
 
+    if (ctx.from?.id) {
+      const { ensureUser } = await import('./commands/buy');
+      await ensureUser(String(ctx.from.id), {
+        username: ctx.from.username,
+        firstName: ctx.from.first_name,
+      }).catch((regErr) => {
+        console.error('[Start] Failed to register user in DB:', regErr);
+      });
+    }
+
+    const text = ctx.message?.text || '';
+    const startPayload = text.trim().split(/\s+/)[1] || '';
+    if (startPayload.startsWith('buy_')) {
+      const prodId = startPayload.slice('buy_'.length).trim();
+      if (prodId) {
+        const { sendCheckoutMethodMenu } = await import('./menu');
+        await sendCheckoutMethodMenu(ctx, botInstance, prodId);
+        return;
+      }
+    }
+
     await sendMainMenu(ctx, botInstance);
   });
 
@@ -432,6 +552,14 @@ export function registerHandlers(botInstance: ExtendedBot): void {
       return;
     }
 
+    if (ctx.from?.id) {
+      const { ensureUser } = await import('./commands/buy');
+      await ensureUser(String(ctx.from.id), {
+        username: ctx.from.username,
+        firstName: ctx.from.first_name,
+      }).catch(() => {});
+    }
+
     const text = ctx.message?.text || '';
     const parts = text.trim().split(/\s+/);
     const orderCode = parts[1];
@@ -455,6 +583,41 @@ export function registerHandlers(botInstance: ExtendedBot): void {
         ],
       },
     });
+  });
+
+  // /pesanan and /orders commands (Order history with delivered credentials)
+  botInstance.command(['pesanan', 'orders'], async (ctx: Context) => {
+    const status = await getBotStatus();
+    if (status === 'maintenance' && !isAdmin(ctx.from?.id)) {
+      await sendMaintenanceMessage(ctx, botInstance);
+      return;
+    }
+
+    const { checkUserChannelMembership, sendChannelJoinPrompt } = await import('../lib/channel-gate');
+    const isMember = await checkUserChannelMembership(ctx.from?.id, botInstance);
+    if (!isMember) {
+      await sendChannelJoinPrompt(ctx, botInstance);
+      return;
+    }
+
+    if (ctx.from?.id) {
+      const { ensureUser } = await import('./commands/buy');
+      await ensureUser(String(ctx.from.id), {
+        username: ctx.from.username,
+        firstName: ctx.from.first_name,
+      }).catch(() => {});
+    }
+
+    const text = ctx.message?.text || '';
+    const parts = text.trim().split(/\s+/);
+    const orderCode = parts[1];
+
+    const { sendOrderStatus, sendOrdersMenu } = await import('./menu');
+    if (orderCode) {
+      await sendOrderStatus(ctx, botInstance, orderCode);
+    } else {
+      await sendOrdersMenu(ctx, botInstance, 0);
+    }
   });
 
   // /buy command
@@ -521,8 +684,8 @@ export function registerHandlers(botInstance: ExtendedBot): void {
         fileId: mediaData.fileId,
         fileName: mediaData.fileName || (mediaData.type === 'photo' ? 'foto.jpg' : 'file'),
         mimeType: mediaData.mimeType,
-        fromChatId: chatId,
-        messageId: ctx.message?.message_id,
+        fromChatId: mediaData.fromChatId || chatId,
+        messageId: mediaData.messageId || ctx.message?.message_id,
         savedAt: Date.now(),
       });
     }
@@ -628,6 +791,161 @@ export function registerHandlers(botInstance: ExtendedBot): void {
         { parse_mode: 'HTML' }
       );
     }
+  });
+
+  botInstance.command('settoken', async (ctx: Context) => {
+    if (!isAdmin(ctx.from?.id)) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '⛔ <b>Akses Ditolak:</b> Perintah ini khusus untuk Owner / Admin DaFung Hub.',
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [[{ text: '🔙 Menu Utama', callback_data: 'menu_main' }]],
+          },
+        }
+      );
+      return;
+    }
+
+    const rawText = ctx.message?.text || '';
+    const tokenArg = rawText.trim().replace(/^\/settoken(?:@\w+)?\s*/i, '').trim();
+
+    if (!tokenArg) {
+      const { getShopeePayTokenStatus } = await import('../lib/shopeepay');
+      const status = await getShopeePayTokenStatus();
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        `🔑 <b>PENGATURAN TOKEN SHOPEEPAY GATEWAY</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━\n` +
+        `• <b>Status Sesi Saat Ini:</b> ${status.valid ? '🟢 AKTIF (VALID)' : '🔴 KEDALUWARSA / TIDAK VALID'}\n` +
+        `• <b>Keterangan Gateway:</b> <code>${escapeHtml(status.message)}</code>\n` +
+        `━━━━━━━━━━━━━━━━━━━\n\n` +
+        `📌 <b>Cara Memperbarui Token Sesi:</b>\n` +
+        `Kirim perintah:\n` +
+        `<code>/settoken B:...token_terbaru_anda...</code>\n\n` +
+        `<i>Pesan berisi token akan otomatis dihapus setelah tersimpan.</i>`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '⏳ Cek Order Belum Bayar', callback_data: 'admin_unpaid_orders' }],
+              [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+            ],
+          },
+        }
+      );
+      return;
+    }
+
+    try {
+      const { updateShopeePayToken } = await import('../lib/shopeepay');
+      const result = await updateShopeePayToken(tokenArg);
+
+      if (!result.success) {
+        await sendSafeMessage(
+          ctx,
+          botInstance,
+          `❌ <b>Gagal Memperbarui Token Gateway</b>\n━━━━━━━━━━━━━━━━━━━\n• <b>Error:</b> <code>${escapeHtml(result.error || result.message)}</code>`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [[{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }]],
+            },
+          }
+        );
+        return;
+      }
+
+      let sweptCount = 0;
+      if (result.valid) {
+        try {
+          const { checkAndProcessUnpaidShopeeOrders } = await import('../lib/fulfillment');
+          sweptCount = await checkAndProcessUnpaidShopeeOrders(botInstance);
+        } catch {
+          // Non-fatal
+        }
+      }
+
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        `${result.valid ? '✅ <b>TOKEN SHOPEEPAY AKTIF & TERVERIFIKASI!</b>' : '⚠️ <b>TOKEN TERSIMPAN, NAMUN BELUM VALID</b>'}\n` +
+        `━━━━━━━━━━━━━━━━━━━\n` +
+        `• <b>Status Sesi:</b> <code>${escapeHtml(result.tokenStatus.toUpperCase())}</code>\n` +
+        `• <b>Pesan Gateway:</b> ${escapeHtml(result.message)}\n` +
+        (sweptCount > 0
+          ? `• <b>Order Terdeteksi Lunas Otomatis:</b> <b>${sweptCount} Pesanan</b> 🎉\n`
+          : '') +
+        `━━━━━━━━━━━━━━━━━━━\n` +
+        `⚡ <i>Deteksi pembayaran QRIS otomatis siap berjalan kembali.</i>`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '⏳ Cek Order Belum Bayar', callback_data: 'admin_unpaid_orders' }],
+              [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+            ],
+          },
+        }
+      );
+    } catch (err) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        `❌ Terjadi kesalahan saat memperbarui token: ${escapeHtml((err as Error).message)}`,
+        { parse_mode: 'HTML' }
+      );
+    }
+  });
+
+  botInstance.command('cektoken', async (ctx: Context) => {
+    if (!isAdmin(ctx.from?.id)) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '⛔ <b>Akses Ditolak:</b> Perintah ini khusus untuk Owner / Admin DaFung Hub.',
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [[{ text: '🔙 Menu Utama', callback_data: 'menu_main' }]],
+          },
+        }
+      );
+      return;
+    }
+
+    const { getShopeePayTokenStatus, getShopeePayAccount } = await import('../lib/shopeepay');
+    const [status, account] = await Promise.all([
+      getShopeePayTokenStatus(),
+      getShopeePayAccount().catch(() => null),
+    ]);
+
+    await sendSafeMessage(
+      ctx,
+      botInstance,
+      `🛡️ <b>STATUS GATEWAY SHOPEEPAY</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━\n` +
+      `• <b>Sesi Token:</b> ${status.valid ? '🟢 AKTIF (VALID)' : '🔴 KEDALUWARSA / TIDAK VALID'}\n` +
+      `• <b>Detail:</b> ${escapeHtml(status.message)}\n` +
+      `• <b>Username Akun:</b> ${escapeHtml(account?.data?.username || 'DappaSecc')}\n` +
+      `• <b>QRIS Statis:</b> ${account?.data?.has_qris_static ? '🟢 Terpasang' : '⚪ Belum ada'}\n` +
+      `━━━━━━━━━━━━━━━━━━━\n` +
+      (status.valid
+        ? `<i>Pembacaan mutasi QRIS otomatis dalam kondisi normal.</i>`
+        : `<i>Perbarui token dengan perintah: <code>/settoken &lt;token_baru&gt;</code></i>`),
+      {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '⏳ Cek Order Belum Bayar', callback_data: 'admin_unpaid_orders' }],
+            [{ text: '🔙 Panel Owner', callback_data: 'admin_panel' }],
+          ],
+        },
+      }
+    );
   });
 
   botInstance.command('addstock', async (ctx: Context) => {
@@ -1006,6 +1324,14 @@ export function registerHandlers(botInstance: ExtendedBot): void {
       if (!isMember) {
         await sendChannelJoinPrompt(ctx, botInstance);
         return;
+      }
+
+      if (ctx.from?.id) {
+        const { ensureUser } = await import('./commands/buy');
+        await ensureUser(String(ctx.from.id), {
+          username: ctx.from.username,
+          firstName: ctx.from.first_name,
+        }).catch(() => {});
       }
 
       await sendSafeMessage(

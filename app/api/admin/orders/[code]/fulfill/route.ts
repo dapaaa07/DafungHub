@@ -38,9 +38,11 @@ export async function POST(
   try {
     const body = await req.json().catch(() => ({}));
     const credentials = (body.credentials || '').trim();
-    const file = body.file as { name?: string; content?: string } | undefined;
+    const mediaObj = (body.media || body.file) as
+      | { name?: string; content?: string; isPhoto?: boolean }
+      | undefined;
 
-    if (!credentials && (!file || !file.content)) {
+    if (!credentials && (!mediaObj || !mediaObj.content)) {
       return NextResponse.json(
         {
           success: false,
@@ -74,7 +76,6 @@ export async function POST(
     const buyerChatId = order.telegram_id;
     const token = process.env.TELEGRAM_BOT_TOKEN;
 
-    const mediaObj = body.media || body.file;
     const storedCredential = mediaObj?.name
       ? `[MEDIA: ${mediaObj.name}] ${credentials || 'Dikirim via lampiran media'}`
       : credentials;
@@ -82,6 +83,20 @@ export async function POST(
 
     // 2. Send delivery to Telegram Buyer
     let sentToTelegram = false;
+    let deliveredMediaMeta: {
+      type: 'photo' | 'document' | 'video' | 'audio' | 'animation';
+      fileId: string;
+      fileName: string;
+      mimeType: string;
+    } | null = null;
+
+    const deliveryInlineKeyboard = [
+      [
+        { text: '📩 Riwayat Pesanan', callback_data: 'menu_orders' },
+        { text: '🛍️ Beli Produk Baru', callback_data: 'menu_products' },
+      ],
+      [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+    ];
 
     if (mediaObj?.content && token && buyerChatId && buyerChatId !== 'Guest') {
       const fileName = mediaObj.name || (mediaObj.isPhoto ? `${orderCode}_voucher.jpg` : `${orderCode}_kredensial.txt`);
@@ -128,10 +143,7 @@ export async function POST(
       formData.append(
         'reply_markup',
         JSON.stringify({
-          inline_keyboard: [
-            [{ text: '🛍️ Beli Produk Baru', callback_data: 'menu_products' }],
-            [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
-          ],
+          inline_keyboard: deliveryInlineKeyboard,
         })
       );
 
@@ -142,6 +154,55 @@ export async function POST(
       });
       const tgJson = await tgRes.json().catch(() => null);
       sentToTelegram = Boolean(tgJson?.ok);
+
+      if (tgJson?.ok && tgJson?.result) {
+        const resMsg = tgJson.result as {
+          document?: { file_id?: string; file_name?: string; mime_type?: string };
+          animation?: { file_id?: string; file_name?: string; mime_type?: string };
+          video?: { file_id?: string; file_name?: string; mime_type?: string };
+          audio?: { file_id?: string; file_name?: string; mime_type?: string };
+          photo?: Array<{ file_id?: string }>;
+        };
+        if (isPhoto && Array.isArray(resMsg.photo) && resMsg.photo.length > 0) {
+          const largest = resMsg.photo[resMsg.photo.length - 1];
+          if (largest?.file_id) {
+            deliveredMediaMeta = {
+              type: 'photo',
+              fileId: largest.file_id,
+              fileName,
+              mimeType,
+            };
+          }
+        } else if (resMsg.document?.file_id) {
+          deliveredMediaMeta = {
+            type: 'document',
+            fileId: resMsg.document.file_id,
+            fileName: resMsg.document.file_name || fileName,
+            mimeType: resMsg.document.mime_type || mimeType,
+          };
+        } else if (resMsg.animation?.file_id) {
+          deliveredMediaMeta = {
+            type: 'animation',
+            fileId: resMsg.animation.file_id,
+            fileName: resMsg.animation.file_name || fileName,
+            mimeType: resMsg.animation.mime_type || mimeType,
+          };
+        } else if (resMsg.video?.file_id) {
+          deliveredMediaMeta = {
+            type: 'video',
+            fileId: resMsg.video.file_id,
+            fileName: resMsg.video.file_name || fileName,
+            mimeType: resMsg.video.mime_type || mimeType,
+          };
+        } else if (resMsg.audio?.file_id) {
+          deliveredMediaMeta = {
+            type: 'audio',
+            fileId: resMsg.audio.file_id,
+            fileName: resMsg.audio.file_name || fileName,
+            mimeType: resMsg.audio.mime_type || mimeType,
+          };
+        }
+      }
     } else if (credentials && buyerChatId && buyerChatId !== 'Guest') {
       // Send as clean text message
       const textMessage =
@@ -159,25 +220,39 @@ export async function POST(
         text: textMessage,
         parse_mode: 'HTML',
         reply_markup: {
-          inline_keyboard: [
-            [{ text: '🛍️ Beli Produk Baru', callback_data: 'menu_products' }],
-            [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
-          ],
+          inline_keyboard: deliveryInlineKeyboard,
         },
       });
       sentToTelegram = Boolean(tgRes.ok);
     }
 
     // 3. Update Order in DB
-    await query(
-      `UPDATE orders
-       SET payment_status = 'paid',
-           fulfillment_status = 'delivered',
-           credential_encrypted = $1,
-           delivered_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [encryptedKey, order.id]
-    );
+    if (deliveredMediaMeta) {
+      await query(
+        `UPDATE orders
+         SET payment_status = 'paid',
+             fulfillment_status = 'delivered',
+             credential_encrypted = $1,
+             delivered_at = CURRENT_TIMESTAMP,
+             invoice_data = jsonb_set(
+               COALESCE(invoice_data::jsonb, '{}'::jsonb),
+               '{delivered_media}',
+               $3::jsonb
+             )
+         WHERE id = $2`,
+        [encryptedKey, order.id, JSON.stringify(deliveredMediaMeta)]
+      );
+    } else {
+      await query(
+        `UPDATE orders
+         SET payment_status = 'paid',
+             fulfillment_status = 'delivered',
+             credential_encrypted = $1,
+             delivered_at = CURRENT_TIMESTAMP
+         WHERE id = $2`,
+        [encryptedKey, order.id]
+      );
+    }
 
     return NextResponse.json(
       {

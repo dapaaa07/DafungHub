@@ -5,6 +5,7 @@ import { query } from './db';
  */
 
 export const TRANSACTION_FEE = 100; // Rp 100 hidden transaction fee on all transactions
+export const BALANCE_PAYMENT_DISCOUNT = 200; // Rp 200 discount when paying with account balance
 export const MEMBERSHIP_PRODUCT_DISCOUNT = 1000; // Rp 1.000 discount per product
 export const MEMBERSHIP_WEEKLY_QUOTA_LIMIT = 20000; // Rp 20.000 max discount per week
 
@@ -203,24 +204,34 @@ export async function getUserMembership(
   };
 }
 
+export type CheckoutPaymentMethod = 'qris' | 'balance';
+
 /**
- * Calculate pricing for checkout: applies VIP discount and adds the +Rp 100 hidden fee.
+ * Calculate pricing for checkout:
+ * - Applies VIP discount (Rp 1.000) on eligible regular products
+ * - On QRIS: adds the +Rp 100 transaction fee
+ * - On Balance (Saldo): Rp 200 cheaper across all non-deposit products and no QRIS gateway fee
  */
 export async function calculateCheckoutPrice(
   telegramIdOrUserId: string,
-  product: { name: string; price: number }
+  product: { name: string; price: number },
+  options?: { paymentMethod?: CheckoutPaymentMethod }
 ): Promise<{
   basePrice: number;
   discount: number;
+  balanceDiscount: number;
   fee: number;
   finalPayableAmount: number;
   isVipDiscountApplied: boolean;
+  isBalanceDiscountApplied: boolean;
   remainingQuotaAfter: number;
   membershipStatus: UserMembershipStatus;
 }> {
   const membershipStatus = await getUserMembership(telegramIdOrUserId);
-  const basePrice = Number(product.price || 0);
-  const isSpecialProduct = isMembershipProduct(product.name) || isDepositProduct(product.name);
+  const paymentMethod: CheckoutPaymentMethod = options?.paymentMethod === 'balance' ? 'balance' : 'qris';
+  const basePrice = Math.max(0, Number(product.price || 0));
+  const isDeposit = isDepositProduct(product.name);
+  const isSpecialProduct = isMembershipProduct(product.name) || isDeposit;
 
   let discount = 0;
   let isVipDiscountApplied = false;
@@ -236,17 +247,24 @@ export async function calculateCheckoutPrice(
     isVipDiscountApplied = true;
   }
 
-  const fee = TRANSACTION_FEE; // Rp 100
   const priceAfterDiscount = Math.max(0, basePrice - discount);
-  const finalPayableAmount = priceAfterDiscount + fee;
+  const isBalancePayment = paymentMethod === 'balance' && !isDeposit;
+  const balanceDiscount = isBalancePayment
+    ? Math.min(BALANCE_PAYMENT_DISCOUNT, priceAfterDiscount)
+    : 0;
+  const isBalanceDiscountApplied = balanceDiscount > 0;
+  const fee = isBalancePayment ? 0 : TRANSACTION_FEE; // Rp 100 on QRIS, Rp 0 on Saldo
+  const finalPayableAmount = Math.max(0, priceAfterDiscount - balanceDiscount) + fee;
   const remainingQuotaAfter = Math.max(0, membershipStatus.remainingWeeklyQuota - discount);
 
   return {
     basePrice,
     discount,
+    balanceDiscount,
     fee,
     finalPayableAmount,
     isVipDiscountApplied,
+    isBalanceDiscountApplied,
     remainingQuotaAfter,
     membershipStatus,
   };

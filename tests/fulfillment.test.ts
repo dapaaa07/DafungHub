@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test, { after, before } from 'node:test';
-import { Bot } from 'node-telegram-bot-api';
-import { ExtendedBot } from '../bot/handler';
+import { Bot, Context } from 'node-telegram-bot-api';
+import { ExtendedBot, sendSafeMessage } from '../bot/handler';
 import { pool, query } from '../lib/db';
 import {
   processOrderPayment,
@@ -199,4 +199,99 @@ test('Fulfillment Engine: adminRetrySupplierFulfill informs admin when balance i
   // Clean up
   await query('DELETE FROM orders WHERE order_code = $1', [testOrderCode]);
   await query('DELETE FROM products WHERE id = $1', [prodId]);
+});
+
+test('Fulfillment Engine: first-time credential delivery message is never auto-deleted on subsequent user actions', async () => {
+  const botInstance = new Bot('dummy_token') as ExtendedBot;
+  const targetBuyerChatId = 999000444;
+  let nextMsgId = 1000;
+  let deliveredCredentialText = '';
+  const deletedMessageIds: number[] = [];
+
+  botInstance.sendMessage = async (_chatId, text) => {
+    nextMsgId += 1;
+    if (text && text.includes('PESANAN ANDA TELAH SELESAI')) {
+      deliveredCredentialText = text;
+    }
+    return { message_id: nextMsgId };
+  };
+
+  botInstance.api.deleteMessage = (async (payload: { chat_id: number | string; message_id: number }) => {
+    deletedMessageIds.push(payload.message_id);
+    return true;
+  }) as unknown as typeof botInstance.api.deleteMessage;
+
+  const userRes = await query<{ id: string }>(
+    `INSERT INTO users (telegram_id, role)
+     VALUES ($1, 'buyer')
+     ON CONFLICT (telegram_id) DO UPDATE SET telegram_id = EXCLUDED.telegram_id
+     RETURNING id`,
+    [String(targetBuyerChatId)]
+  );
+  const userId = userRes.rows[0].id;
+
+  const prodRes = await query<{ id: string }>(
+    `INSERT INTO products (name, price, stock, is_active)
+     VALUES ('Preserved Credential Test Product', 12000, 5, true)
+     RETURNING id`
+  );
+  const prodId = prodRes.rows[0].id;
+
+  const testOrderCode = `TEST-PRESERVE-${Date.now()}`;
+  await query(
+    `INSERT INTO orders (user_id, product_id, order_code, payment_status, fulfillment_status)
+     VALUES ($1, $2, $3, 'paid', 'processing')`,
+    [userId, prodId, testOrderCode]
+  );
+
+  try {
+    // 1. User first navigates to a temporary screen (message_id = 1001)
+    await sendSafeMessage(
+      { chatId: targetBuyerChatId } as unknown as Context,
+      botInstance,
+      'Menunggu pesanan diproses...'
+    );
+
+    // 2. First-time credential delivery happens (message_id = 1002)
+    await adminManualFulfill(testOrderCode, 'vip@buyer.test:SecretPass123', botInstance);
+    const credentialMsgId = 1002;
+    assert.ok(deliveredCredentialText.includes('vip@buyer.test:SecretPass123'));
+
+    // Temporary message 1001 may be cleaned, but credential message 1002 must never be deleted
+    assert.ok(!deletedMessageIds.includes(credentialMsgId), 'Credential message must not be deleted on delivery');
+
+    // 3. User opens another menu via sendSafeMessage (message_id = 1003)
+    await sendSafeMessage(
+      { chatId: targetBuyerChatId } as unknown as Context,
+      botInstance,
+      'Menu Utama DaFung Hub'
+    );
+    assert.ok(!deletedMessageIds.includes(credentialMsgId), 'Credential message must survive subsequent menu actions');
+
+    // 4. User taps an inline button directly on the credential message (including stateless cold-start simulation with unseen message_id 9999)
+    await sendSafeMessage(
+      {
+        chatId: targetBuyerChatId,
+        callbackQuery: {
+          id: 'cb_preserve_test',
+          from: { id: targetBuyerChatId, is_bot: false, first_name: 'Buyer' },
+          data: 'menu_main',
+          message: {
+            message_id: 9999,
+            date: Math.floor(Date.now() / 1000),
+            chat: { id: targetBuyerChatId, type: 'private' },
+            text: '🎉 PESANAN ANDA TELAH SELESAI!\n🔑 Kredensial / Detail Akun:\nvip@buyer.test:SecretPass123',
+          },
+        },
+      } as unknown as Context,
+      botInstance,
+      'Katalog Produk'
+    );
+
+    assert.ok(!deletedMessageIds.includes(9999), 'Stateless guard must prevent deleting credential callback message');
+    assert.ok(!deletedMessageIds.includes(credentialMsgId), 'Preserved credential message ID must remain undeleted');
+  } finally {
+    await query('DELETE FROM orders WHERE order_code = $1', [testOrderCode]);
+    await query('DELETE FROM products WHERE id = $1', [prodId]);
+  }
 });

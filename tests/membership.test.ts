@@ -5,6 +5,7 @@ import {
   MEMBERSHIP_PRODUCT_DISCOUNT,
   MEMBERSHIP_WEEKLY_QUOTA_LIMIT,
   TRANSACTION_FEE,
+  BALANCE_PAYMENT_DISCOUNT,
   isMembershipProduct,
   isDepositProduct,
   findMembershipPackage,
@@ -204,4 +205,69 @@ test('Membership Lifecycle: activateOrExtendMembership activates and extends dur
 
   // Clean up
   await query('DELETE FROM users WHERE id = $1', [userId]);
+});
+
+test('Balance Payment Discount: applies Rp 200 discount and waives QRIS fee across all non-deposit products', async () => {
+  assert.equal(BALANCE_PAYMENT_DISCOUNT, 200, 'Balance payment discount must be Rp 200');
+
+  const regularTgId = `tg_test_bal_reg_${Date.now()}`;
+  const vipTgId = `tg_test_bal_vip_${Date.now()}`;
+  const futureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+  await query(
+    `INSERT INTO users (telegram_id, role, membership_tier, balance)
+     VALUES ($1, 'buyer', 'free', 10000)`,
+    [regularTgId]
+  );
+  await query(
+    `INSERT INTO users (telegram_id, role, membership_tier, membership_expires_at, weekly_discount_used, balance)
+     VALUES ($1, 'buyer', 'vip', $2, 0, 10000)`,
+    [vipTgId, futureDate]
+  );
+
+  try {
+    // 1. Non-VIP buying Rp 5.000 product via Saldo -> Rp 4.800
+    const regBal = await calculateCheckoutPrice(
+      regularTgId,
+      { name: 'CapCut Pro 1 Bulan', price: 5000 },
+      { paymentMethod: 'balance' }
+    );
+    assert.equal(regBal.balanceDiscount, 200);
+    assert.equal(regBal.isBalanceDiscountApplied, true);
+    assert.equal(regBal.fee, 0);
+    assert.equal(regBal.finalPayableAmount, 4800);
+
+    // 2. VIP buying Rp 5.000 product via Saldo -> 5000 - 1000 (VIP) - 200 (Saldo) = Rp 3.800
+    const vipBal = await calculateCheckoutPrice(
+      vipTgId,
+      { name: 'CapCut Pro 1 Bulan', price: 5000 },
+      { paymentMethod: 'balance' }
+    );
+    assert.equal(vipBal.discount, 1000);
+    assert.equal(vipBal.balanceDiscount, 200);
+    assert.equal(vipBal.fee, 0);
+    assert.equal(vipBal.finalPayableAmount, 3800);
+
+    // 3. Membership VIP package via Saldo -> Rp 3.000 - Rp 200 = Rp 2.800
+    const memBal = await calculateCheckoutPrice(
+      regularTgId,
+      { name: 'Membership VIP 1 Bulan', price: 3000 },
+      { paymentMethod: 'balance' }
+    );
+    assert.equal(memBal.discount, 0);
+    assert.equal(memBal.balanceDiscount, 200);
+    assert.equal(memBal.fee, 0);
+    assert.equal(memBal.finalPayableAmount, 2800);
+
+    // 4. Deposit top-up must NOT receive Saldo discount
+    const depBal = await calculateCheckoutPrice(
+      regularTgId,
+      { name: 'Deposit Saldo Rp 10.000', price: 10000 },
+      { paymentMethod: 'balance' }
+    );
+    assert.equal(depBal.balanceDiscount, 0);
+    assert.equal(depBal.isBalanceDiscountApplied, false);
+  } finally {
+    await query('DELETE FROM users WHERE telegram_id IN ($1, $2)', [regularTgId, vipTgId]);
+  }
 });
