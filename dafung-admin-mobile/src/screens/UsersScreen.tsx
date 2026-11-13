@@ -52,11 +52,12 @@ export const UsersScreen: React.FC = () => {
 
   const handleOpenUser = async (user: UserItem) => {
     setSelectedUser(user);
+    setUserOrders([]);
     setShowDetailModal(true);
     setLoadingDetail(true);
     try {
       const res = await api.getUserDetail(user.id);
-      setSelectedUser(res.user);
+      if (res?.user) setSelectedUser(res.user);
       setUserOrders(res.orders || []);
     } catch (err) {
       console.warn('Error loading user detail:', err);

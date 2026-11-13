@@ -24,6 +24,7 @@ export async function GET(
   const userIdOrTg = decodeURIComponent(id).trim();
 
   try {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userIdOrTg);
     const userRes = await query<{
       id: string;
       telegram_id: string;
@@ -36,7 +37,9 @@ export async function GET(
       weekly_discount_used: number;
       created_at: string;
     }>(
-      `SELECT * FROM users WHERE id::text = $1 OR telegram_id = $1 LIMIT 1`,
+      isUuid
+        ? `SELECT * FROM users WHERE id = $1 LIMIT 1`
+        : `SELECT * FROM users WHERE telegram_id = $1 LIMIT 1`,
       [userIdOrTg]
     );
 
@@ -58,9 +61,11 @@ export async function GET(
       fulfillment_status: string;
       created_at: string;
     }>(
-      `SELECT o.order_code, p.name as product_name, p.price, o.payment_status, o.fulfillment_status, o.created_at
+      `SELECT o.order_code, COALESCE(p.name, 'Produk Khusus') as product_name,
+              COALESCE(p.price, (o.invoice_data->>'amount')::int, 0) as price,
+              o.payment_status, o.fulfillment_status, o.created_at
        FROM orders o
-       JOIN products p ON o.product_id = p.id
+       LEFT JOIN products p ON o.product_id = p.id
        WHERE o.user_id = $1
        ORDER BY o.created_at DESC`,
       [user.id]

@@ -54021,7 +54021,7 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
       let valIdx = 1;
       if (status) {
         if (status === "pending_fulfillment" || status === "pending") {
-          conditions.push(`o.fulfillment_status IN ('pending', 'processing')`);
+          conditions.push(`o.payment_status = 'paid' AND o.fulfillment_status IN ('pending', 'processing')`);
         } else if (status === "paid" || status === "unpaid" || status === "cancelled") {
           conditions.push(`o.payment_status = $${valIdx++}`);
           values.push(status);
@@ -54390,8 +54390,9 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
   if (userDetailMatch && req.method === "GET") {
     const id = decodeURIComponent(userDetailMatch[1]);
     try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
       const userRes = await query(
-        `SELECT * FROM users WHERE id = $1 OR telegram_id = $1 LIMIT 1`,
+        isUuid ? `SELECT * FROM users WHERE id = $1 LIMIT 1` : `SELECT * FROM users WHERE telegram_id = $1 LIMIT 1`,
         [id]
       );
       if (userRes.rows.length === 0) {
@@ -54401,9 +54402,10 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
       const user = userRes.rows[0];
       const ordersRes = await query(
         `SELECT o.id, o.order_code, o.payment_status, o.fulfillment_status, o.created_at,
-                p.name as product_name, p.price
+                COALESCE(p.name, 'Produk Khusus') as product_name,
+                COALESCE(p.price, (o.invoice_data->>'amount')::int, 0) as price
          FROM orders o
-         JOIN products p ON o.product_id = p.id
+         LEFT JOIN products p ON o.product_id = p.id
          WHERE o.user_id = $1
          ORDER BY o.created_at DESC LIMIT 50`,
         [user.id]
@@ -54415,7 +54417,15 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
           balance: Number(user.balance || 0),
           isVip: user.membership_tier === "vip" && (!user.membership_expires_at || new Date(user.membership_expires_at) > /* @__PURE__ */ new Date())
         },
-        orders: ordersRes.rows
+        orders: ordersRes.rows.map((o) => ({
+          id: o.id,
+          orderCode: o.order_code,
+          productName: o.product_name,
+          price: Number(o.price || 0),
+          paymentStatus: o.payment_status,
+          fulfillmentStatus: o.fulfillment_status,
+          createdAt: o.created_at
+        }))
       });
       return true;
     } catch (err) {
