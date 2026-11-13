@@ -122,16 +122,16 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                   color={data?.shopeepay.isOnline ? colors.receivedGreen : colors.chargeRed}
                 />
               </View>
-              <Text style={styles.metricLabel}>ShopeePay Gateway</Text>
+              <Text style={styles.metricLabel}>Sistem Pembayaran</Text>
               <Text
                 style={[
                   styles.metricValue,
                   { color: data?.shopeepay.isOnline ? colors.receivedGreen : colors.chargeRed },
                 ]}
               >
-                {data?.shopeepay.isOnline ? 'Online' : 'Sesi Habis'}
+                {data?.shopeepay.isOnline ? 'Aktif' : 'Nonaktif'}
               </Text>
-              <Text style={styles.metricSub}>prastyaaneki.biz.id</Text>
+              <Text style={styles.metricSub}>DaFung Hub API</Text>
             </View>
 
             <View style={styles.metricCard}>

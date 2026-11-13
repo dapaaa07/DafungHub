@@ -13,12 +13,16 @@ export const ShopeePayRow: React.FC<ShopeePayRowProps> = ({ transaction }) => {
   return (
     <View style={styles.container}>
       <View style={styles.iconBox}>
-        <Ionicons name="qr-code-outline" size={20} color={colors.blue} />
+        <Ionicons
+          name={transaction.issuer.toLowerCase().includes('saldo') ? 'wallet-outline' : 'qr-code-outline'}
+          size={20}
+          color={colors.blue}
+        />
       </View>
 
       <View style={styles.contentCol}>
         <View style={styles.headerRow}>
-          <Text style={styles.issuerText}>{transaction.issuer} · QRIS</Text>
+          <Text style={styles.issuerText}>{transaction.issuer}</Text>
           <Text style={[typography.amount, styles.incomeText]}>
             +{transaction.formattedAmount}
           </Text>

@@ -238,14 +238,15 @@ export async function handleAdminHttpRequest(
       let valIdx = 1;
 
       if (status) {
-        if (status === 'pending_fulfillment') {
-          conditions.push(`o.payment_status = 'paid' AND o.fulfillment_status = 'pending'`);
+        if (status === 'pending_fulfillment' || status === 'pending') {
+          conditions.push(`o.payment_status = 'paid' AND o.fulfillment_status IN ('pending', 'processing')`);
         } else if (status === 'paid' || status === 'unpaid' || status === 'cancelled') {
           conditions.push(`o.payment_status = $${valIdx++}`);
           values.push(status);
-        } else if (status === 'fulfilled' || status === 'failed') {
-          conditions.push(`o.fulfillment_status = $${valIdx++}`);
-          values.push(status);
+        } else if (status === 'fulfilled' || status === 'delivered') {
+          conditions.push(`o.fulfillment_status = 'delivered'`);
+        } else if (status === 'failed') {
+          conditions.push(`o.fulfillment_status = 'failed'`);
         }
       }
 
@@ -262,8 +263,9 @@ export async function handleAdminHttpRequest(
       const totalCount = parseInt(countRes.rows[0]?.total || '0', 10);
 
       const ordersSql = `
-        SELECT o.id, o.order_code, o.payment_status, o.fulfillment_status, o.is_delivered,
-               o.delivered_at, o.created_at, o.encrypted_credential, o.invoice_data,
+        SELECT o.id, o.order_code, o.payment_status, o.fulfillment_status,
+               (o.fulfillment_status = 'delivered') as is_delivered,
+               o.delivered_at, o.created_at, o.credential_encrypted as encrypted_credential, o.invoice_data,
                p.id as product_id, p.name as product_name, p.price,
                u.telegram_id, u.username, u.first_name, u.membership_tier
         FROM orders o

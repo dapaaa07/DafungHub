@@ -29,7 +29,7 @@ export async function GET(req: Request) {
     const params: unknown[] = [];
 
     if (status === 'pending') {
-      whereClause += ` AND o.fulfillment_status IN ('pending', 'processing')`;
+      whereClause += ` AND o.payment_status = 'paid' AND o.fulfillment_status IN ('pending', 'processing')`;
     } else if (status === 'paid') {
       params.push('paid');
       whereClause += ` AND o.payment_status = $${params.length}`;

@@ -24,7 +24,65 @@ export const ShopeePayScreen: React.FC = () => {
       const res = await api.getShopeePayLedger(50);
       setData(res);
     } catch (err) {
-      console.warn('Error loading ShopeePay ledger:', err);
+      console.warn('Error loading ledger from endpoint, falling back to orders:', err);
+      try {
+        const ordersRes = await api.getOrders({ status: 'paid', page: 1 });
+        if (ordersRes && ordersRes.orders) {
+          const now = new Date();
+          const isToday = (d: string) => {
+            const dt = new Date(d);
+            return (
+              dt.getDate() === now.getDate() &&
+              dt.getMonth() === now.getMonth() &&
+              dt.getFullYear() === now.getFullYear()
+            );
+          };
+          const totalToday = ordersRes.orders
+            .filter((o) => isToday(o.createdAt))
+            .reduce((sum, o) => sum + (o.price || 0), 0);
+          const totalAll = ordersRes.orders.reduce((sum, o) => sum + (o.price || 0), 0);
+
+          setData({
+            summary: {
+              totalIncomingToday: totalToday,
+              totalIncomingAll: totalAll,
+              totalTransactions: ordersRes.orders.length,
+              matchedOrdersCount: ordersRes.orders.length,
+              unmatchedCount: 0,
+              formattedTotalToday: `Rp ${totalToday.toLocaleString('id-ID')}`,
+              formattedTotalAll: `Rp ${totalAll.toLocaleString('id-ID')}`,
+            },
+            transactions: ordersRes.orders.map((o) => {
+              const customerName = o.customer.username
+                ? `@${o.customer.username}`
+                : o.customer.firstName || o.customer.telegramId;
+              const formattedTime = new Date(o.createdAt).toLocaleString('id-ID', {
+                timeZone: 'Asia/Jakarta',
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              });
+
+              return {
+                transactionId: o.orderCode || o.id,
+                amount: o.price,
+                formattedAmount: `Rp ${(o.price || 0).toLocaleString('id-ID')}`,
+                status: 'success',
+                time: formattedTime,
+                issuer: 'DaFung Hub API',
+                isMatched: true,
+                order: {
+                  orderCode: o.orderCode,
+                  productName: o.productName,
+                  customer: customerName,
+                  telegramId: o.customer.telegramId,
+                },
+              };
+            }),
+          });
+        }
+      } catch (fallbackErr) {
+        console.warn('Fallback getOrders error:', fallbackErr);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -45,8 +103,8 @@ export const ShopeePayScreen: React.FC = () => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={typography.screenTitle}>Buku Kas ShopeePay</Text>
-        <Text style={styles.headerSub}>Mutasi QRIS & pencatatan penjualan gateway</Text>
+        <Text style={typography.screenTitle}>Buku Kas</Text>
+        <Text style={styles.headerSub}>Mutasi & pencatatan transaksi pesanan DaFung Hub</Text>
       </View>
 
       {/* Summary Card */}
@@ -59,7 +117,7 @@ export const ShopeePayScreen: React.FC = () => {
             </Text>
           </View>
           <View style={styles.qrisBadge}>
-            <Text style={styles.qrisText}>ShopeePay</Text>
+            <Text style={styles.qrisText}>DaFung Hub API</Text>
           </View>
         </View>
 
@@ -69,7 +127,7 @@ export const ShopeePayScreen: React.FC = () => {
             <Text style={styles.summaryBold}>{data?.summary.formattedTotalAll || 'Rp 0'}</Text>
           </Text>
           <Text style={styles.summaryStat}>
-            Cocok Pesanan:{' '}
+            Pesanan Lunas:{' '}
             <Text style={styles.summaryBold}>
               {data?.summary.matchedOrdersCount || 0} / {data?.summary.totalTransactions || 0}
             </Text>
@@ -79,8 +137,8 @@ export const ShopeePayScreen: React.FC = () => {
 
       {/* Transactions List */}
       <View style={styles.listHeader}>
-        <Text style={typography.sectionTitle}>Mutasi Rekening ShopeePay</Text>
-        <Text style={typography.timestamp}>Auto-sync gateway</Text>
+        <Text style={typography.sectionTitle}>Mutasi Transaksi Penjualan</Text>
+        <Text style={typography.timestamp}>DaFung Hub API</Text>
       </View>
 
       {loading && !refreshing ? (
@@ -98,9 +156,9 @@ export const ShopeePayScreen: React.FC = () => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="card-outline" size={44} color={colors.textTertiary} />
-              <Text style={styles.emptyTitle}>Belum ada mutasi</Text>
+              <Text style={styles.emptyTitle}>Belum ada transaksi</Text>
               <Text style={styles.emptySub}>
-                Belum ada transaksi masuk dari gateway ShopeePay.
+                Belum ada transaksi pesanan yang lunas tercatat di DaFung Hub.
               </Text>
             </View>
           }

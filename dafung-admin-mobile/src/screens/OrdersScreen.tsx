@@ -23,6 +23,7 @@ export const OrdersScreen: React.FC<{ route?: any }> = ({ route }) => {
   const { pendingCount, refreshNotifications } = useNotifications();
 
   const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'delivered' | 'unpaid'>(
     initialStatus
   );
@@ -40,6 +41,7 @@ export const OrdersScreen: React.FC<{ route?: any }> = ({ route }) => {
 
   const loadOrders = useCallback(async () => {
     try {
+      setErrorMessage(null);
       const res = await api.getOrders({
         status: statusFilter === 'all' ? undefined : statusFilter,
         search: search.trim() || undefined,
@@ -48,6 +50,7 @@ export const OrdersScreen: React.FC<{ route?: any }> = ({ route }) => {
       await refreshNotifications();
     } catch (err) {
       console.warn('Error loading orders:', err);
+      setErrorMessage((err as Error).message || 'Gagal memuat pesanan');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -145,10 +148,20 @@ export const OrdersScreen: React.FC<{ route?: any }> = ({ route }) => {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="receipt-outline" size={44} color={colors.textTertiary} />
-              <Text style={styles.emptyTitle}>Tidak ada pesanan</Text>
+              <Ionicons
+                name={errorMessage ? 'alert-circle-outline' : 'receipt-outline'}
+                size={44}
+                color={errorMessage ? colors.chargeRed : colors.textTertiary}
+              />
+              <Text style={styles.emptyTitle}>
+                {errorMessage ? 'Gagal Memuat Pesanan' : 'Tidak ada pesanan'}
+              </Text>
               <Text style={styles.emptySub}>
-                {search ? 'Tidak ada pesanan yang sesuai kata kunci pencarian.' : 'Belum ada data pesanan pada filter ini.'}
+                {errorMessage
+                  ? errorMessage
+                  : search
+                  ? 'Tidak ada pesanan yang sesuai kata kunci pencarian.'
+                  : 'Belum ada data pesanan pada filter ini.'}
               </Text>
             </View>
           }
