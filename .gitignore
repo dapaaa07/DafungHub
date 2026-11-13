@@ -44,5 +44,10 @@ next-env.d.ts
 # archives
 *.zip
 
+# firebase service account
+*firebase-adminsdk*.json
+firebase-service-account.json
+lib/firebase-service-account.json
+
 # local web storefront (exclude from git & Vercel deployment)
 dafung-web/

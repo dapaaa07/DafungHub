@@ -10,6 +10,7 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 
 import android.content.Intent
 import androidx.core.content.ContextCompat
+import com.google.firebase.messaging.FirebaseMessaging
 import expo.modules.ReactActivityDelegateWrapper
 
 class MainActivity : ReactActivity() {
@@ -21,10 +22,32 @@ class MainActivity : ReactActivity() {
     super.onCreate(null)
 
     try {
-      val serviceIntent = Intent(this, OrderMonitorService::class.java)
-      ContextCompat.startForegroundService(this, serviceIntent)
+      DafungFirebaseMessagingService.createNotificationChannel(this)
     } catch (e: Exception) {
-      // Ignore background start restrictions
+      // Ignore channel creation errors
+    }
+
+    try {
+      val handler = android.os.Handler(android.os.Looper.getMainLooper())
+      fun fetchToken(attempt: Int) {
+        FirebaseMessaging.getInstance().token
+          .addOnCompleteListener { task: com.google.android.gms.tasks.Task<String> ->
+            if (task.isSuccessful) {
+              val fcmToken = task.result
+              android.util.Log.i("DafungFCM", "Native FCM Token SUCCESS: $fcmToken")
+              DafungFirebaseMessagingService.registerTokenToServer(fcmToken)
+            } else {
+              android.util.Log.w("DafungFCM", "Token attempt $attempt failed: ${task.exception?.message}")
+              if (attempt < 5) {
+                handler.postDelayed({ fetchToken(attempt + 1) }, (attempt * 4000).toLong())
+              }
+            }
+          }
+      }
+      // Delay initial attempt by 4 seconds so Google Play Services IPC is ready
+      handler.postDelayed({ fetchToken(1) }, 4000)
+    } catch (e: Exception) {
+      android.util.Log.e("DafungFCM", "Exception setting up token fetch: ${e.message}", e)
     }
   }
 

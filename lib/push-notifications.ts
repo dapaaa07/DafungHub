@@ -42,7 +42,7 @@ export async function registerAdminPushToken(token: string): Promise<void> {
 }
 
 /**
- * Send real-time push notification to all registered admin devices via Expo Push Service
+ * Send real-time push notification to all registered admin devices via Expo Push Service and direct Firebase FCM
  */
 export async function sendAdminPushNotification(data: {
   orderCode: string;
@@ -72,29 +72,52 @@ export async function sendAdminPushNotification(data: {
     const title = data.title || '🔔 Pesanan Baru Masuk!';
     const body = data.body || `${data.productName} (${formattedPrice}) dari ${data.customerName}`;
 
-    const messages = tokens.map((to) => ({
-      to,
-      sound: 'default',
-      title,
-      body,
-      data: { orderCode: data.orderCode },
-      priority: 'high',
-      channelId: 'dafung-orders',
-      _displayInForeground: true,
-    }));
+    const expoTokens = tokens.filter(
+      (t) => t.startsWith('ExponentPushToken[') || t.startsWith('ExpoPushToken[')
+    );
+    const fcmTokens = tokens.filter(
+      (t) => !t.startsWith('ExponentPushToken[') && !t.startsWith('ExpoPushToken[') && t.length > 20
+    );
 
-    const response = await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify(messages),
-    });
+    // 1. Dispatch Expo push notifications
+    if (expoTokens.length > 0) {
+      const messages = expoTokens.map((to) => ({
+        to,
+        sound: 'default',
+        title,
+        body,
+        data: { orderCode: data.orderCode },
+        priority: 'high',
+        channelId: 'dafung-orders',
+        _displayInForeground: true,
+      }));
 
-    const result = await response.json().catch(() => null);
-    console.log('[Expo Push] Notification dispatched to Expo server:', result);
+      fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(messages),
+      })
+        .then((r) => r.json())
+        .then((result) => console.log('[Expo Push] Dispatched to Expo server:', result))
+        .catch((err) => console.warn('[Expo Push] Error sending push notification:', err));
+    }
+
+    // 2. Dispatch Direct Native Firebase Cloud Messaging (FCM) notifications
+    if (fcmTokens.length > 0) {
+      const { sendFcmMessage } = await import('./fcm');
+      for (const token of fcmTokens) {
+        sendFcmMessage({
+          token,
+          title,
+          body,
+          orderCode: data.orderCode,
+        }).catch((fcmErr) => console.warn('[FCM] Error dispatching push:', fcmErr));
+      }
+    }
   } catch (err) {
-    console.warn('[Expo Push] Error sending push notification:', err);
+    console.warn('[Push Notification] Error sending push notification:', err);
   }
 }
