@@ -17,7 +17,8 @@
       "adaptiveIcon": {
         "backgroundColor": "#008CFF"
       },
-      "package": "com.dafunghub.admin"
+      "package": "com.dafunghub.admin",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"

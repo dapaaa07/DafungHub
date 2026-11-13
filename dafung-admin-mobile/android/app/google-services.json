@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "480914885353",
+    "project_id": "dafung-hub-admin",
+    "storage_bucket": "dafung-hub-admin.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:480914885353:android:6e84f69102329429c8be78",
+        "android_client_info": {
+          "package_name": "com.dafunghub.admin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBN53tFA3XfGryaazgIEpo1XzOirVMYuZ4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

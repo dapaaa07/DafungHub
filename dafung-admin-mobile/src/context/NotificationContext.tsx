@@ -75,22 +75,55 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     })();
   }, []);
 
-  // Register Expo push token when authenticated
+  // Register push token (Expo Push Token and Native Device FCM Token) when authenticated
   useEffect(() => {
     if (!isAuthenticated) return;
-    (async () => {
-      try {
-        const tokenData = await Notifications.getExpoPushTokenAsync({
-          projectId: 'c0bab3ff-5f86-4402-81da-724147f1615d',
-        });
-        if (tokenData?.data) {
-          await api.registerPushToken(tokenData.data);
+    let isCancelled = false;
+
+    const timer = setTimeout(async () => {
+      const registerTokens = async (attempt = 1) => {
+        if (isCancelled) return;
+        let registered = false;
+
+        // 1. Try Expo Push Token
+        try {
+          const tokenData = await Notifications.getExpoPushTokenAsync({
+            projectId: 'c0bab3ff-5f86-4402-81da-724147f1615d',
+          });
+          if (tokenData?.data) {
+            console.log('[Push] Registered Expo push token:', tokenData.data);
+            await api.registerPushToken(tokenData.data);
+            registered = true;
+          }
+        } catch (e: any) {
+          console.log(`[Push] Expo push token attempt ${attempt} failed:`, e?.message || e);
         }
-      } catch (e) {
-        // FCM might not be configured in standalone release build
-        console.log('Expo push token registration skipped/failed:', e);
-      }
-    })();
+
+        // 2. Try Native Device Token (FCM)
+        try {
+          const devToken = await Notifications.getDevicePushTokenAsync();
+          if (devToken?.data) {
+            console.log('[Push] Registered Device FCM token:', devToken.data);
+            await api.registerPushToken(devToken.data);
+            registered = true;
+          }
+        } catch (e: any) {
+          console.log(`[Push] Device FCM token attempt ${attempt} failed:`, e?.message || e);
+        }
+
+        if (!registered && attempt < 5 && !isCancelled) {
+          console.log(`[Push] Retrying push token registration in ${attempt * 3}s...`);
+          setTimeout(() => registerTokens(attempt + 1), attempt * 3000);
+        }
+      };
+
+      registerTokens();
+    }, 2500);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
   }, [isAuthenticated]);
 
   const checkOrders = async () => {
