@@ -13666,6 +13666,92 @@ var init_voucher = __esm({
   }
 });
 
+// lib/push-notifications.ts
+var push_notifications_exports = {};
+__export2(push_notifications_exports, {
+  registerAdminPushToken: () => registerAdminPushToken,
+  sendAdminPushNotification: () => sendAdminPushNotification
+});
+async function registerAdminPushToken(token) {
+  if (!token || typeof token !== "string") return;
+  const cleanToken = token.trim();
+  if (!cleanToken) return;
+  try {
+    const res = await query(
+      `SELECT value FROM bot_settings WHERE key = 'admin_push_tokens' LIMIT 1`
+    );
+    let tokens = [];
+    if (res.rows.length > 0 && res.rows[0].value) {
+      try {
+        tokens = JSON.parse(res.rows[0].value);
+      } catch {
+        tokens = [];
+      }
+    }
+    if (!Array.isArray(tokens)) {
+      tokens = [];
+    }
+    if (!tokens.includes(cleanToken)) {
+      tokens.push(cleanToken);
+      await query(
+        `INSERT INTO bot_settings (key, value, updated_at)
+         VALUES ('admin_push_tokens', $1, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()`,
+        [JSON.stringify(tokens)]
+      );
+      console.log(`[Push Notification] Registered new admin push token: ${cleanToken}`);
+    }
+  } catch (err) {
+    console.error("[Push Notification] Error registering token:", err);
+  }
+}
+async function sendAdminPushNotification(data) {
+  try {
+    const res = await query(
+      `SELECT value FROM bot_settings WHERE key = 'admin_push_tokens' LIMIT 1`
+    );
+    if (res.rows.length === 0 || !res.rows[0].value) return;
+    let tokens = [];
+    try {
+      tokens = JSON.parse(res.rows[0].value);
+    } catch {
+      return;
+    }
+    if (!Array.isArray(tokens) || tokens.length === 0) return;
+    const formattedPrice = `Rp ${Number(data.price || 0).toLocaleString("id-ID")}`;
+    const title = data.title || "\u{1F514} Pesanan Baru Masuk!";
+    const body = data.body || `${data.productName} (${formattedPrice}) dari ${data.customerName}`;
+    const messages = tokens.map((to) => ({
+      to,
+      sound: "default",
+      title,
+      body,
+      data: { orderCode: data.orderCode },
+      priority: "high",
+      channelId: "dafung-orders",
+      _displayInForeground: true
+    }));
+    const response = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify(messages)
+    });
+    const result = await response.json().catch(() => null);
+    console.log("[Expo Push] Notification dispatched to Expo server:", result);
+  } catch (err) {
+    console.warn("[Expo Push] Error sending push notification:", err);
+  }
+}
+var init_push_notifications = __esm({
+  "lib/push-notifications.ts"() {
+    "use strict";
+    init_db();
+  }
+});
+
 // lib/membership.ts
 var membership_exports = {};
 __export2(membership_exports, {
@@ -19142,6 +19228,20 @@ async function processOrderPayment(orderCode, botInstance, transactionMeta, opti
     broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
       console.warn("[Broadcast Warning] Failed to broadcast order payment success:", bErr);
     });
+    try {
+      const { sendAdminPushNotification: sendAdminPushNotification2 } = await Promise.resolve().then(() => (init_push_notifications(), push_notifications_exports));
+      const customerDisplay = invData.customer_username ? `@${invData.customer_username}` : invData.customer_first_name || "Pelanggan";
+      sendAdminPushNotification2({
+        orderCode: order.order_code,
+        productName: order.product_name || "Produk Dafung Hub",
+        price: Number(order.price || invData.amount || invData.payable_amount || 0),
+        customerName: customerDisplay
+      }).catch((pushErr) => {
+        console.warn("[Push Notification] Failed to notify admin mobile app:", pushErr);
+      });
+    } catch (pushErr) {
+      console.warn("[Push Notification] Error loading push module:", pushErr);
+    }
   }
   const {
     isMembershipProduct: isMembershipProduct2,
@@ -54560,50 +54660,82 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
       return true;
     }
   }
-  if (pathname === "/api/admin/notifications" && req.method === "GET") {
-    try {
-      const since = parsedUrl.searchParams.get("since") || new Date(Date.now() - 5 * 60 * 1e3).toISOString();
-      const newPaidOrdersRes = await query(
-        `SELECT o.id, o.order_code, p.name as product_name, p.price, o.fulfillment_status,
-                o.created_at, u.telegram_id, u.username, u.first_name, u.membership_tier
-         FROM orders o
-         JOIN products p ON o.product_id = p.id
-         LEFT JOIN users u ON o.user_id = u.id
-         WHERE o.payment_status = 'paid'
-           AND o.created_at > $1
-         ORDER BY o.created_at DESC`,
-        [since]
-      );
-      const pendingFulfillRes = await query(
-        `SELECT COUNT(id) as count FROM orders
-         WHERE payment_status = 'paid' AND fulfillment_status = 'pending'`
-      );
-      const formatted = newPaidOrdersRes.rows.map((row) => ({
-        id: row.id,
-        orderCode: row.order_code,
-        productName: row.product_name,
-        price: Number(row.price),
-        formattedPrice: `Rp ${Number(row.price).toLocaleString("id-ID")}`,
-        fulfillmentStatus: row.fulfillment_status,
-        createdAt: row.created_at,
-        customer: {
-          telegramId: row.telegram_id,
-          username: row.username,
-          firstName: row.first_name,
-          isVip: row.membership_tier === "vip"
+  if (pathname === "/api/admin/notifications") {
+    if (req.method === "POST") {
+      try {
+        const body2 = JSON.parse(bodyStr || "{}");
+        const token = body2.token || body2.pushToken;
+        if (token && typeof token === "string") {
+          const { registerAdminPushToken: registerAdminPushToken2 } = await Promise.resolve().then(() => (init_push_notifications(), push_notifications_exports));
+          await registerAdminPushToken2(token);
+          sendJson(res, 200, { success: true, message: "Push token berhasil didaftarkan." });
+          return true;
         }
-      }));
-      sendJson(res, 200, {
-        hasNewOrders: formatted.length > 0,
-        newOrdersCount: formatted.length,
-        pendingFulfillmentCount: parseInt(pendingFulfillRes.rows[0]?.count || "0", 10),
-        newPaidOrders: formatted,
-        serverTime: (/* @__PURE__ */ new Date()).toISOString()
-      });
-      return true;
-    } catch (err) {
-      sendJson(res, 500, { success: false, error: err.message });
-      return true;
+        sendJson(res, 400, { success: false, error: "Token push tidak valid." });
+        return true;
+      } catch (err) {
+        sendJson(res, 500, { success: false, error: err.message });
+        return true;
+      }
+    }
+    if (req.method === "GET") {
+      try {
+        const newPaidOrdersRes = await query(
+          `SELECT o.id, o.order_code,
+                  COALESCE(p.name, 'Produk Khusus') as product_name,
+                  COALESCE(p.price, (o.invoice_data->>'amount')::int, (o.invoice_data->>'payable_amount')::int, 0) as price,
+                  o.fulfillment_status,
+                  o.created_at,
+                  u.telegram_id,
+                  u.username,
+                  u.first_name,
+                  u.membership_tier,
+                  (o.invoice_data->>'customer_username') as inv_username,
+                  (o.invoice_data->>'customer_first_name') as inv_first_name
+           FROM orders o
+           LEFT JOIN products p ON o.product_id = p.id
+           LEFT JOIN users u ON o.user_id = u.id
+           WHERE o.payment_status = 'paid'
+             AND o.created_at >= NOW() - INTERVAL '2 hours'
+           ORDER BY o.created_at DESC
+           LIMIT 30`
+        );
+        const pendingFulfillRes = await query(
+          `SELECT COUNT(id) as count FROM orders
+           WHERE payment_status = 'paid' AND fulfillment_status IN ('pending', 'processing')`
+        );
+        const formatted = newPaidOrdersRes.rows.map((row) => {
+          const finalUsername = row.username || row.inv_username || null;
+          const finalFirstName = row.first_name || row.inv_first_name || null;
+          const finalPrice = Number(row.price || 0);
+          return {
+            id: row.id,
+            orderCode: row.order_code,
+            productName: row.product_name,
+            price: finalPrice,
+            formattedPrice: `Rp ${finalPrice.toLocaleString("id-ID")}`,
+            fulfillmentStatus: row.fulfillment_status,
+            createdAt: row.created_at,
+            customer: {
+              telegramId: row.telegram_id || "Pembeli",
+              username: finalUsername,
+              firstName: finalFirstName,
+              isVip: row.membership_tier === "vip"
+            }
+          };
+        });
+        sendJson(res, 200, {
+          hasNewOrders: formatted.length > 0,
+          newOrdersCount: formatted.length,
+          pendingFulfillmentCount: parseInt(pendingFulfillRes.rows[0]?.count || "0", 10),
+          newPaidOrders: formatted,
+          serverTime: (/* @__PURE__ */ new Date()).toISOString()
+        });
+        return true;
+      } catch (err) {
+        sendJson(res, 500, { success: false, error: err.message });
+        return true;
+      }
     }
   }
   if (pathname === "/api/admin/broadcast" && req.method === "POST") {

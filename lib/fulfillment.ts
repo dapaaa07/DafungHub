@@ -134,6 +134,25 @@ export async function processOrderPayment(
     broadcastOrderSuccess(order.order_code, botInstance).catch((bErr) => {
       console.warn('[Broadcast Warning] Failed to broadcast order payment success:', bErr);
     });
+
+    // Send real-time push notification to Admin Mobile App
+    try {
+      const { sendAdminPushNotification } = await import('./push-notifications');
+      const customerDisplay = invData.customer_username
+        ? `@${invData.customer_username}`
+        : (invData.customer_first_name as string) || 'Pelanggan';
+
+      sendAdminPushNotification({
+        orderCode: order.order_code,
+        productName: order.product_name || 'Produk Dafung Hub',
+        price: Number(order.price || invData.amount || invData.payable_amount || 0),
+        customerName: customerDisplay,
+      }).catch((pushErr) => {
+        console.warn('[Push Notification] Failed to notify admin mobile app:', pushErr);
+      });
+    } catch (pushErr) {
+      console.warn('[Push Notification] Error loading push module:', pushErr);
+    }
   }
 
   // 2b. Special Handling: Membership VIP Subscription

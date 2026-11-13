@@ -900,66 +900,101 @@ export async function handleAdminHttpRequest(
     }
   }
 
-  // 10. GET /api/admin/notifications
-  if (pathname === '/api/admin/notifications' && req.method === 'GET') {
-    try {
-      const since = parsedUrl.searchParams.get('since') || new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  // 10. GET & POST /api/admin/notifications
+  if (pathname === '/api/admin/notifications') {
+    if (req.method === 'POST') {
+      try {
+        const body = JSON.parse(bodyStr || '{}');
+        const token = body.token || body.pushToken;
+        if (token && typeof token === 'string') {
+          const { registerAdminPushToken } = await import('./push-notifications');
+          await registerAdminPushToken(token);
+          sendJson(res, 200, { success: true, message: 'Push token berhasil didaftarkan.' });
+          return true;
+        }
+        sendJson(res, 400, { success: false, error: 'Token push tidak valid.' });
+        return true;
+      } catch (err) {
+        sendJson(res, 500, { success: false, error: (err as Error).message });
+        return true;
+      }
+    }
 
-      const newPaidOrdersRes = await query<{
-        id: string;
-        order_code: string;
-        product_name: string;
-        price: number | string;
-        fulfillment_status: string;
-        created_at: string | Date;
-        telegram_id: string | null;
-        username: string | null;
-        first_name: string | null;
-        membership_tier: string | null;
-      }>(
-        `SELECT o.id, o.order_code, p.name as product_name, p.price, o.fulfillment_status,
-                o.created_at, u.telegram_id, u.username, u.first_name, u.membership_tier
-         FROM orders o
-         JOIN products p ON o.product_id = p.id
-         LEFT JOIN users u ON o.user_id = u.id
-         WHERE o.payment_status = 'paid'
-           AND o.created_at > $1
-         ORDER BY o.created_at DESC`,
-        [since]
-      );
+    if (req.method === 'GET') {
+      try {
+        const newPaidOrdersRes = await query<{
+          id: string;
+          order_code: string;
+          product_name: string;
+          price: number | string;
+          fulfillment_status: string;
+          created_at: string | Date;
+          telegram_id: string | null;
+          username: string | null;
+          first_name: string | null;
+          membership_tier: string | null;
+          inv_username: string | null;
+          inv_first_name: string | null;
+        }>(
+          `SELECT o.id, o.order_code,
+                  COALESCE(p.name, 'Produk Khusus') as product_name,
+                  COALESCE(p.price, (o.invoice_data->>'amount')::int, (o.invoice_data->>'payable_amount')::int, 0) as price,
+                  o.fulfillment_status,
+                  o.created_at,
+                  u.telegram_id,
+                  u.username,
+                  u.first_name,
+                  u.membership_tier,
+                  (o.invoice_data->>'customer_username') as inv_username,
+                  (o.invoice_data->>'customer_first_name') as inv_first_name
+           FROM orders o
+           LEFT JOIN products p ON o.product_id = p.id
+           LEFT JOIN users u ON o.user_id = u.id
+           WHERE o.payment_status = 'paid'
+             AND o.created_at >= NOW() - INTERVAL '2 hours'
+           ORDER BY o.created_at DESC
+           LIMIT 30`
+        );
 
-      const pendingFulfillRes = await query<{ count: string }>(
-        `SELECT COUNT(id) as count FROM orders
-         WHERE payment_status = 'paid' AND fulfillment_status = 'pending'`
-      );
+        const pendingFulfillRes = await query<{ count: string }>(
+          `SELECT COUNT(id) as count FROM orders
+           WHERE payment_status = 'paid' AND fulfillment_status IN ('pending', 'processing')`
+        );
 
-      const formatted = newPaidOrdersRes.rows.map((row) => ({
-        id: row.id,
-        orderCode: row.order_code,
-        productName: row.product_name,
-        price: Number(row.price),
-        formattedPrice: `Rp ${Number(row.price).toLocaleString('id-ID')}`,
-        fulfillmentStatus: row.fulfillment_status,
-        createdAt: row.created_at,
-        customer: {
-          telegramId: row.telegram_id,
-          username: row.username,
-          firstName: row.first_name,
-          isVip: row.membership_tier === 'vip',
-        },
-      }));
+        const formatted = newPaidOrdersRes.rows.map((row) => {
+          const finalUsername = row.username || row.inv_username || null;
+          const finalFirstName = row.first_name || row.inv_first_name || null;
+          const finalPrice = Number(row.price || 0);
 
-      sendJson(res, 200, {
-        hasNewOrders: formatted.length > 0,
-        newOrdersCount: formatted.length,
-        pendingFulfillmentCount: parseInt(pendingFulfillRes.rows[0]?.count || '0', 10),
-        newPaidOrders: formatted,
-        serverTime: new Date().toISOString(),
-      });
-      return true;
-    } catch (err) {
-      sendJson(res, 500, { success: false, error: (err as Error).message });
-      return true;
+          return {
+            id: row.id,
+            orderCode: row.order_code,
+            productName: row.product_name,
+            price: finalPrice,
+            formattedPrice: `Rp ${finalPrice.toLocaleString('id-ID')}`,
+            fulfillmentStatus: row.fulfillment_status,
+            createdAt: row.created_at,
+            customer: {
+              telegramId: row.telegram_id || 'Pembeli',
+              username: finalUsername,
+              firstName: finalFirstName,
+              isVip: row.membership_tier === 'vip',
+            },
+          };
+        });
+
+        sendJson(res, 200, {
+          hasNewOrders: formatted.length > 0,
+          newOrdersCount: formatted.length,
+          pendingFulfillmentCount: parseInt(pendingFulfillRes.rows[0]?.count || '0', 10),
+          newPaidOrders: formatted,
+          serverTime: new Date().toISOString(),
+        });
+        return true;
+      } catch (err) {
+        sendJson(res, 500, { success: false, error: (err as Error).message });
+        return true;
+      }
     }
   }
 

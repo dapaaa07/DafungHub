@@ -1,15 +1,45 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { verifyAdminRequest, unauthorizedResponse } from '@/lib/admin-auth';
+import { registerAdminPushToken } from '@/lib/push-notifications';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-key',
 };
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
+export async function POST(req: Request) {
+  if (!verifyAdminRequest(req)) {
+    return unauthorizedResponse();
+  }
+
+  try {
+    const body = await req.json().catch(() => ({}));
+    const token = body.token || body.pushToken;
+
+    if (token && typeof token === 'string') {
+      await registerAdminPushToken(token);
+      return NextResponse.json(
+        { success: true, message: 'Push token berhasil didaftarkan.' },
+        { status: 200, headers: CORS_HEADERS }
+      );
+    }
+
+    return NextResponse.json(
+      { success: false, error: 'Token push tidak valid.' },
+      { status: 400, headers: CORS_HEADERS }
+    );
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: (error as Error).message || 'Gagal mendaftarkan push token.' },
+      { status: 500, headers: CORS_HEADERS }
+    );
+  }
 }
 
 export async function GET(req: Request) {
@@ -18,19 +48,8 @@ export async function GET(req: Request) {
   }
 
   try {
-    const url = new URL(req.url);
-    const sinceParam = url.searchParams.get('since');
-
-    let sinceDate: Date;
-    if (sinceParam) {
-      const parsed = new Date(sinceParam);
-      sinceDate = isNaN(parsed.getTime()) ? new Date(Date.now() - 60000) : parsed;
-    } else {
-      // Default to last 5 minutes if no since param provided
-      sinceDate = new Date(Date.now() - 300000);
-    }
-
-    // 1. Fetch orders marked as paid since given timestamp
+    // 1. Fetch recent paid orders from the last 2 hours (up to 30 orders)
+    // The mobile client uses seenOrderCodes to filter out orders already notified
     const newOrdersRes = await query<{
       id: string;
       order_code: string;
@@ -42,16 +61,27 @@ export async function GET(req: Request) {
       username: string | null;
       first_name: string | null;
       membership_tier: string | null;
+      inv_username: string | null;
+      inv_first_name: string | null;
     }>(
-      `SELECT o.id, o.order_code, p.name as product_name, p.price, o.fulfillment_status,
-              o.created_at, u.telegram_id, u.username, u.first_name, u.membership_tier
+      `SELECT o.id, o.order_code,
+              COALESCE(p.name, 'Produk Khusus') as product_name,
+              COALESCE(p.price, (o.invoice_data->>'amount')::int, (o.invoice_data->>'payable_amount')::int, 0) as price,
+              o.fulfillment_status,
+              o.created_at,
+              u.telegram_id,
+              u.username,
+              u.first_name,
+              u.membership_tier,
+              (o.invoice_data->>'customer_username') as inv_username,
+              (o.invoice_data->>'customer_first_name') as inv_first_name
        FROM orders o
-       JOIN products p ON o.product_id = p.id
-       JOIN users u ON o.user_id = u.id
+       LEFT JOIN products p ON o.product_id = p.id
+       LEFT JOIN users u ON o.user_id = u.id
        WHERE o.payment_status = 'paid'
-         AND o.created_at > $1
-       ORDER BY o.created_at DESC`,
-      [sinceDate]
+         AND o.created_at >= NOW() - INTERVAL '2 hours'
+       ORDER BY o.created_at DESC
+       LIMIT 30`
     );
 
     // 2. Count total orders currently pending fulfillment
@@ -70,21 +100,27 @@ export async function GET(req: Request) {
         hasNewOrders: newOrdersRes.rows.length > 0,
         newOrdersCount: newOrdersRes.rows.length,
         pendingFulfillmentCount: pendingCount,
-        newPaidOrders: newOrdersRes.rows.map((row) => ({
-          id: row.id,
-          orderCode: row.order_code,
-          productName: row.product_name,
-          price: row.price,
-          formattedPrice: `Rp ${row.price.toLocaleString('id-ID')}`,
-          fulfillmentStatus: row.fulfillment_status,
-          createdAt: row.created_at,
-          customer: {
-            telegramId: row.telegram_id,
-            username: row.username,
-            firstName: row.first_name,
-            isVip: Boolean(row.membership_tier && row.membership_tier !== 'free'),
-          },
-        })),
+        newPaidOrders: newOrdersRes.rows.map((row) => {
+          const finalUsername = row.username || row.inv_username || null;
+          const finalFirstName = row.first_name || row.inv_first_name || null;
+          const finalPrice = Number(row.price || 0);
+
+          return {
+            id: row.id,
+            orderCode: row.order_code,
+            productName: row.product_name,
+            price: finalPrice,
+            formattedPrice: `Rp ${finalPrice.toLocaleString('id-ID')}`,
+            fulfillmentStatus: row.fulfillment_status,
+            createdAt: row.created_at,
+            customer: {
+              telegramId: row.telegram_id || 'Pembeli',
+              username: finalUsername,
+              firstName: finalFirstName,
+              isVip: Boolean(row.membership_tier && row.membership_tier !== 'free'),
+            },
+          };
+        }),
         serverTime: new Date().toISOString(),
       },
       { status: 200, headers: CORS_HEADERS }

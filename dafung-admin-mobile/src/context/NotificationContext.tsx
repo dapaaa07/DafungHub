@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { Platform, AppState, AppStateStatus } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { api, NotificationCheckData } from '../api/client';
@@ -46,6 +46,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [latestNotification, setLatestNotification] = useState<OrderNotification | null>(null);
   const lastCheckTimeRef = useRef<string>(new Date(Date.now() - 60000).toISOString());
   const seenOrderCodesRef = useRef<Set<string>>(new Set());
+  const isInitialCheckRef = useRef<boolean>(true);
 
   // Setup Android notification channel & request permission
   useEffect(() => {
@@ -55,9 +56,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           await Notifications.setNotificationChannelAsync('dafung-orders', {
             name: 'Pesanan Baru Dafung Hub',
             importance: Notifications.AndroidImportance.MAX,
-            vibrationPattern: [0, 250, 250, 250],
+            vibrationPattern: [0, 300, 200, 300],
             lightColor: '#008CFF',
             sound: 'default',
+            enableVibrate: true,
+            showBadge: true,
           });
         }
         await Notifications.requestPermissionsAsync();
@@ -67,6 +70,24 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     })();
   }, []);
 
+  // Register Expo push token when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    (async () => {
+      try {
+        const tokenData = await Notifications.getExpoPushTokenAsync({
+          projectId: 'c0bab3ff-5f86-4402-81da-724147f1615d',
+        });
+        if (tokenData?.data) {
+          await api.registerPushToken(tokenData.data);
+        }
+      } catch (e) {
+        // FCM might not be configured in standalone release build
+        console.log('Expo push token registration skipped/failed:', e);
+      }
+    })();
+  }, [isAuthenticated]);
+
   const checkOrders = async () => {
     if (!isAuthenticated) return;
 
@@ -75,52 +96,62 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setPendingCount(data.pendingFulfillmentCount || 0);
       lastCheckTimeRef.current = data.serverTime || new Date().toISOString();
 
-      if (data.hasNewOrders && data.newPaidOrders?.length > 0) {
-        // Find orders we haven't alerted for yet
-        const unnotified = data.newPaidOrders.filter(
-          (o) => !seenOrderCodesRef.current.has(o.orderCode)
-        );
+      if (data.newPaidOrders && data.newPaidOrders.length > 0) {
+        if (isInitialCheckRef.current) {
+          // On first check, prime seen orders so old orders don't spam notifications
+          data.newPaidOrders.forEach((o) => seenOrderCodesRef.current.add(o.orderCode));
+          isInitialCheckRef.current = false;
+        } else {
+          // Find orders we haven't alerted for yet
+          const unnotified = data.newPaidOrders.filter(
+            (o) => !seenOrderCodesRef.current.has(o.orderCode)
+          );
 
-        if (unnotified.length > 0) {
-          unnotified.forEach((o) => seenOrderCodesRef.current.add(o.orderCode));
-          const newest = unnotified[0];
+          if (unnotified.length > 0) {
+            unnotified.forEach((o) => seenOrderCodesRef.current.add(o.orderCode));
+            const newest = unnotified[0];
 
-          setLatestNotification({
-            id: newest.id,
-            orderCode: newest.orderCode,
-            productName: newest.productName,
-            price: newest.price,
-            formattedPrice: newest.formattedPrice,
-            customerName: newest.customer.username
-              ? `@${newest.customer.username}`
-              : newest.customer.firstName || newest.customer.telegramId,
-            timestamp: newest.createdAt,
-          });
-
-          // Haptic alert on device
-          try {
-            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          } catch {
-            // Ignore if haptics unsupported
-          }
-
-          // Native Android System Notification
-          try {
             const customerDisplay = newest.customer.username
               ? `@${newest.customer.username}`
               : newest.customer.firstName || newest.customer.telegramId;
-            await Notifications.scheduleNotificationAsync({
-              content: {
-                title: '🔔 Pesanan Baru Masuk!',
-                body: `${newest.productName} (${newest.formattedPrice}) dari ${customerDisplay}`,
-                data: { orderCode: newest.orderCode },
-                sound: 'default',
-              },
-              trigger: null,
+
+            setLatestNotification({
+              id: newest.id,
+              orderCode: newest.orderCode,
+              productName: newest.productName,
+              price: newest.price,
+              formattedPrice: newest.formattedPrice,
+              customerName: customerDisplay,
+              timestamp: newest.createdAt,
             });
-          } catch (notifErr) {
-            console.warn('Native notification error:', notifErr);
+
+            // Haptic alert on device
+            try {
+              await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch {
+              // Ignore if haptics unsupported
+            }
+
+            // Native Android System Notification with channelId
+            try {
+              await Notifications.scheduleNotificationAsync({
+                content: {
+                  title: '🔔 Pesanan Baru Masuk!',
+                  body: `${newest.productName} (${newest.formattedPrice}) dari ${customerDisplay}`,
+                  data: { orderCode: newest.orderCode },
+                  sound: 'default',
+                  channelId: 'dafung-orders',
+                },
+                trigger: null,
+              });
+            } catch (notifErr) {
+              console.warn('Native notification error:', notifErr);
+            }
           }
+        }
+      } else {
+        if (isInitialCheckRef.current) {
+          isInitialCheckRef.current = false;
         }
       }
     } catch {
@@ -134,12 +165,22 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     // Initial check
     checkOrders();
 
-    // Poll every 10 seconds
+    // Poll every 5 seconds for fast real-time notifications
     const interval = setInterval(() => {
       checkOrders();
-    }, 10000);
+    }, 5000);
 
-    return () => clearInterval(interval);
+    // Refresh immediately when app returns to foreground
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        checkOrders();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
   }, [isAuthenticated]);
 
   const clearNotification = () => {

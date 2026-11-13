@@ -324,6 +324,12 @@ export const api = {
     return request<NotificationCheckData>(`/api/admin/notifications${qs}`);
   },
 
+  registerPushToken: (token: string) =>
+    request<{ success: boolean; message: string }>('/api/admin/notifications', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    }),
+
   sendBroadcast: (
     text: string,
     media?: { name: string; content: string; isPhoto?: boolean }
