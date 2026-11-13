@@ -137,12 +137,16 @@ export interface EnrichedProductItem {
 export interface UserItem {
   id: string;
   telegramId: string;
+  telegram_id?: string;
   role: string;
   balance: number;
   username: string | null;
   firstName: string | null;
+  first_name?: string | null;
   membershipTier: string;
+  membership_tier?: string;
   membershipExpiresAt: string | null;
+  membership_expires_at?: string | null;
   isVip: boolean;
   createdAt: string;
   stats: {
@@ -289,13 +293,22 @@ export const api = {
       }
     ),
 
-  getUsers: (params?: { search?: string; page?: number }) => {
+  getUsers: (params?: { search?: string; page?: number; limit?: number }) => {
     const sp = new URLSearchParams();
     if (params?.search) sp.set('search', params.search);
     if (params?.page) sp.set('page', String(params.page));
-    return request<{ success: boolean; users: UserItem[]; pagination: any }>(
-      `/api/admin/users?${sp.toString()}`
-    );
+    if (params?.limit) sp.set('limit', String(params.limit));
+    return request<{
+      success: boolean;
+      users: UserItem[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+        hasMore?: boolean;
+      };
+    }>(`/api/admin/users?${sp.toString()}`);
   },
 
   getUserDetail: (id: string) =>

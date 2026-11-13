@@ -13,6 +13,13 @@ export const UserRow: React.FC<UserRowProps> = ({ user, onPress }) => {
   const initial = (user.firstName?.[0] || user.username?.[0] || 'U').toUpperCase();
   const displayName = user.firstName || (user.username ? `@${user.username}` : `User ${user.telegramId}`);
 
+  const isVip = Boolean(
+    user.isVip ||
+    ((user.membershipTier === 'vip' || user.membership_tier === 'vip') &&
+     (!user.membershipExpiresAt && !user.membership_expires_at ||
+      new Date(user.membershipExpiresAt || user.membership_expires_at!) > new Date()))
+  );
+
   return (
     <Pressable
       style={({ pressed }) => [styles.container, pressed && styles.pressed]}
@@ -27,7 +34,7 @@ export const UserRow: React.FC<UserRowProps> = ({ user, onPress }) => {
           <Text style={typography.feedName} numberOfLines={1}>
             {displayName}
           </Text>
-          {user.isVip && (
+          {isVip && (
             <View style={styles.vipBadge}>
               <Text style={styles.vipText}>VIP</Text>
             </View>

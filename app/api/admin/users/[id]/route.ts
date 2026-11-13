@@ -71,18 +71,29 @@ export async function GET(
       [user.id]
     );
 
+    const isVip = Boolean(
+      user.membership_tier === 'vip' &&
+      (!user.membership_expires_at || new Date(user.membership_expires_at) > new Date())
+    );
+    const tier = isVip ? 'vip' : 'free';
+
     return NextResponse.json(
       {
         success: true,
         user: {
           id: user.id,
           telegramId: user.telegram_id,
+          telegram_id: user.telegram_id,
           role: user.role,
-          balance: user.balance,
+          balance: Number(user.balance || 0),
           username: user.username,
           firstName: user.first_name,
-          membershipTier: user.membership_tier || 'free',
+          first_name: user.first_name,
+          membershipTier: tier,
+          membership_tier: tier,
           membershipExpiresAt: user.membership_expires_at,
+          membership_expires_at: user.membership_expires_at,
+          isVip,
           weeklyDiscountUsed: user.weekly_discount_used,
           createdAt: user.created_at,
         },

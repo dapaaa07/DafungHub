@@ -20,7 +20,7 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const search = url.searchParams.get('search') || '';
-    const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') || '50', 10)));
+    const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10)));
     const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
     const offset = (page - 1) * limit;
 
@@ -75,30 +75,45 @@ export async function GET(req: Request) {
       params
     );
 
+    const totalPages = Math.ceil(totalCount / limit);
+
     return NextResponse.json(
       {
         success: true,
-        users: usersRes.rows.map((row) => ({
-          id: row.id,
-          telegramId: row.telegram_id,
-          role: row.role,
-          balance: row.balance,
-          username: row.username,
-          firstName: row.first_name,
-          membershipTier: row.membership_tier || 'free',
-          membershipExpiresAt: row.membership_expires_at,
-          isVip: Boolean(row.membership_tier && row.membership_tier !== 'free'),
-          createdAt: row.created_at,
-          stats: {
-            totalOrders: parseInt(row.total_orders, 10) || 0,
-            totalSpent: parseInt(row.total_spent, 10) || 0,
-          },
-        })),
+        users: usersRes.rows.map((row) => {
+          const isVip = Boolean(
+            row.membership_tier === 'vip' &&
+            (!row.membership_expires_at || new Date(row.membership_expires_at) > new Date())
+          );
+          const tier = isVip ? 'vip' : 'free';
+
+          return {
+            id: row.id,
+            telegramId: row.telegram_id,
+            telegram_id: row.telegram_id,
+            role: row.role,
+            balance: Number(row.balance || 0),
+            username: row.username,
+            firstName: row.first_name,
+            first_name: row.first_name,
+            membershipTier: tier,
+            membership_tier: tier,
+            membershipExpiresAt: row.membership_expires_at,
+            membership_expires_at: row.membership_expires_at,
+            isVip,
+            createdAt: row.created_at,
+            stats: {
+              totalOrders: parseInt(row.total_orders, 10) || 0,
+              totalSpent: parseInt(row.total_spent, 10) || 0,
+            },
+          };
+        }),
         pagination: {
           page,
           limit,
           total: totalCount,
-          totalPages: Math.ceil(totalCount / limit),
+          totalPages,
+          hasMore: page < totalPages,
         },
         timestamp: new Date().toISOString(),
       },

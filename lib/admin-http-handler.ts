@@ -601,7 +601,7 @@ export async function handleAdminHttpRequest(
     try {
       const search = parsedUrl.searchParams.get('search');
       const page = Math.max(1, parseInt(parsedUrl.searchParams.get('page') || '1', 10));
-      const limit = Math.max(1, parseInt(parsedUrl.searchParams.get('limit') || '25', 10));
+      const limit = Math.min(100, Math.max(1, parseInt(parsedUrl.searchParams.get('limit') || '20', 10)));
       const offset = (page - 1) * limit;
 
       const conditions: string[] = [];
@@ -649,22 +649,34 @@ export async function handleAdminHttpRequest(
         total_spent: string | number;
       }>(usersSql, [...values, limit, offset]);
 
-      const formatted = usersRes.rows.map((row) => ({
-        id: row.id,
-        telegramId: row.telegram_id,
-        role: row.role,
-        balance: Number(row.balance || 0),
-        username: row.username,
-        firstName: row.first_name,
-        membershipTier: row.membership_tier,
-        membershipExpiresAt: row.membership_expires_at,
-        isVip: row.membership_tier === 'vip' && (!row.membership_expires_at || new Date(row.membership_expires_at) > new Date()),
-        createdAt: row.created_at,
-        stats: {
-          totalOrders: Number(row.total_orders || 0),
-          totalSpent: Number(row.total_spent || 0),
-        },
-      }));
+      const totalPages = Math.ceil(totalCount / limit);
+      const formatted = usersRes.rows.map((row) => {
+        const isVip = Boolean(
+          row.membership_tier === 'vip' &&
+          (!row.membership_expires_at || new Date(row.membership_expires_at) > new Date())
+        );
+        const tier = isVip ? 'vip' : 'free';
+        return {
+          id: row.id,
+          telegramId: row.telegram_id,
+          telegram_id: row.telegram_id,
+          role: row.role,
+          balance: Number(row.balance || 0),
+          username: row.username,
+          firstName: row.first_name,
+          first_name: row.first_name,
+          membershipTier: tier,
+          membership_tier: tier,
+          membershipExpiresAt: row.membership_expires_at,
+          membership_expires_at: row.membership_expires_at,
+          isVip,
+          createdAt: row.created_at,
+          stats: {
+            totalOrders: Number(row.total_orders || 0),
+            totalSpent: Number(row.total_spent || 0),
+          },
+        };
+      });
 
       sendJson(res, 200, {
         success: true,
@@ -673,7 +685,8 @@ export async function handleAdminHttpRequest(
           page,
           limit,
           total: totalCount,
-          totalPages: Math.ceil(totalCount / limit),
+          totalPages,
+          hasMore: page < totalPages,
         },
       });
       return true;
@@ -719,12 +732,28 @@ export async function handleAdminHttpRequest(
         [user.id]
       );
 
+      const isVip = Boolean(
+        user.membership_tier === 'vip' &&
+        (!user.membership_expires_at || new Date(user.membership_expires_at) > new Date())
+      );
+      const tier = isVip ? 'vip' : 'free';
+
       sendJson(res, 200, {
         success: true,
         user: {
           ...user,
+          id: user.id,
+          telegramId: user.telegram_id,
+          telegram_id: user.telegram_id,
           balance: Number(user.balance || 0),
-          isVip: user.membership_tier === 'vip' && (!user.membership_expires_at || new Date(user.membership_expires_at) > new Date()),
+          username: user.username,
+          firstName: user.first_name,
+          first_name: user.first_name,
+          membershipTier: tier,
+          membership_tier: tier,
+          membershipExpiresAt: user.membership_expires_at,
+          membership_expires_at: user.membership_expires_at,
+          isVip,
         },
         orders: ordersRes.rows.map((o: any) => ({
           id: o.id,

@@ -27,37 +27,106 @@ export const UsersScreen: React.FC = () => {
   const [userOrders, setUserOrders] = useState<any[]>([]);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalUsers, setTotalUsers] = useState(0);
 
-  const loadUsers = useCallback(async () => {
-    try {
-      const res = await api.getUsers({ search: search.trim() || undefined });
-      setUsers(res.users || []);
-    } catch (err) {
-      console.warn('Error loading users:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [search]);
+  const loadUsers = useCallback(
+    async (targetPage = 1, append = false) => {
+      try {
+        if (!append) {
+          if (targetPage === 1) setLoading(true);
+        } else {
+          setLoadingMore(true);
+        }
+
+        const res = await api.getUsers({
+          search: search.trim() || undefined,
+          page: targetPage,
+          limit: 20,
+        });
+
+        const newUsers = res.users || [];
+        if (append) {
+          setUsers((prev) => {
+            const seen = new Set(prev.map((u) => u.id));
+            const filtered = newUsers.filter((u) => !seen.has(u.id));
+            return [...prev, ...filtered];
+          });
+        } else {
+          setUsers(newUsers);
+        }
+
+        setPage(targetPage);
+        const total = res.pagination?.total ?? (append ? users.length + newUsers.length : newUsers.length);
+        const totalPages = res.pagination?.totalPages ?? Math.ceil(total / 20);
+        setTotalUsers(total);
+        setHasMore(targetPage < totalPages && newUsers.length > 0);
+      } catch (err) {
+        console.warn('Error loading users:', err);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+        setLoadingMore(false);
+      }
+    },
+    [search, users.length]
+  );
 
   useEffect(() => {
-    loadUsers();
-  }, [loadUsers]);
+    setPage(1);
+    loadUsers(1, false);
+  }, [search]);
 
   const onRefresh = () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    loadUsers();
+    loadUsers(1, false);
+  };
+
+  const handleLoadMore = () => {
+    if (loading || loadingMore || !hasMore) return;
+    loadUsers(page + 1, true);
   };
 
   const handleOpenUser = async (user: UserItem) => {
-    setSelectedUser(user);
+    const isVipInitial = Boolean(
+      user.isVip ||
+      ((user.membershipTier === 'vip' || user.membership_tier === 'vip') &&
+       (!user.membershipExpiresAt && !user.membership_expires_at ||
+        new Date(user.membershipExpiresAt || user.membership_expires_at!) > new Date()))
+    );
+
+    setSelectedUser({
+      ...user,
+      isVip: isVipInitial,
+      membershipTier: isVipInitial ? 'vip' : 'free',
+      membership_tier: isVipInitial ? 'vip' : 'free',
+    });
     setUserOrders([]);
     setShowDetailModal(true);
     setLoadingDetail(true);
+
     try {
       const res = await api.getUserDetail(user.id);
-      if (res?.user) setSelectedUser(res.user);
+      if (res?.user) {
+        const u = res.user;
+        const isVipDetail = Boolean(
+          u.isVip ||
+          ((u.membershipTier === 'vip' || u.membership_tier === 'vip') &&
+           (!u.membershipExpiresAt && !u.membership_expires_at ||
+            new Date(u.membershipExpiresAt || u.membership_expires_at) > new Date()))
+        );
+        setSelectedUser({
+          ...u,
+          telegramId: u.telegramId || u.telegram_id,
+          balance: Number(u.balance || 0),
+          isVip: isVipDetail,
+          membershipTier: isVipDetail ? 'vip' : 'free',
+          membership_tier: isVipDetail ? 'vip' : 'free',
+        });
+      }
       setUserOrders(res.orders || []);
     } catch (err) {
       console.warn('Error loading user detail:', err);
@@ -66,12 +135,21 @@ export const UsersScreen: React.FC = () => {
     }
   };
 
+  const isSelectedUserVip = Boolean(
+    selectedUser?.isVip === true ||
+    ((selectedUser?.membershipTier === 'vip' || selectedUser?.membership_tier === 'vip') &&
+     (!selectedUser?.membershipExpiresAt && !selectedUser?.membership_expires_at ||
+      new Date(selectedUser.membershipExpiresAt || selectedUser.membership_expires_at) > new Date()))
+  );
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={typography.screenTitle}>Data Pelanggan</Text>
-        <Text style={styles.headerSub}>Daftar pembeli, saldo akun, dan riwayat transaksi</Text>
+        <Text style={styles.headerSub}>
+          {totalUsers > 0 ? `Total ${totalUsers} pelanggan terdaftar` : 'Daftar pembeli, saldo akun, dan riwayat transaksi'}
+        </Text>
       </View>
 
       {/* Search Input */}
@@ -84,7 +162,7 @@ export const UsersScreen: React.FC = () => {
           placeholderTextColor={colors.textTertiary}
           style={styles.searchInput}
           returnKeyType="search"
-          onSubmitEditing={loadUsers}
+          onSubmitEditing={() => loadUsers(1, false)}
         />
         {search.length > 0 && (
           <Pressable onPress={() => setSearch('')} hitSlop={8}>
@@ -94,7 +172,7 @@ export const UsersScreen: React.FC = () => {
       </View>
 
       {/* Users List */}
-      {loading && !refreshing ? (
+      {loading && !refreshing && users.length === 0 ? (
         <View style={styles.centerLoading}>
           <ActivityIndicator size="large" color={colors.blue} />
         </View>
@@ -103,8 +181,24 @@ export const UsersScreen: React.FC = () => {
           data={users}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <UserRow user={item} onPress={handleOpenUser} />}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.3}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.blue} />
+          }
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={styles.footerLoader}>
+                <ActivityIndicator size="small" color={colors.blue} />
+                <Text style={styles.footerText}>Memuat pelanggan lainnya...</Text>
+              </View>
+            ) : !hasMore && users.length > 0 ? (
+              <View style={styles.footerEnd}>
+                <Text style={styles.footerText}>
+                  Semua {totalUsers} pelanggan telah ditampilkan
+                </Text>
+              </View>
+            ) : null
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -150,9 +244,19 @@ export const UsersScreen: React.FC = () => {
                   </View>
                   <View style={styles.userStatCard}>
                     <Text style={styles.userStatLabel}>Membership</Text>
-                    <Text style={styles.userStatVal}>
-                      {selectedUser?.membershipTier === 'free' ? 'Biasa' : 'VIP Member'}
+                    <Text
+                      style={[
+                        styles.userStatVal,
+                        isSelectedUserVip ? { color: '#B27400' } : null,
+                      ]}
+                    >
+                      {isSelectedUserVip ? 'VIP Member' : 'Biasa'}
                     </Text>
+                    {isSelectedUserVip && (selectedUser?.membershipExpiresAt || selectedUser?.membership_expires_at) && (
+                      <Text style={[typography.timestamp, { fontSize: 10, marginTop: 3 }]}>
+                        s.d. {new Date(selectedUser.membershipExpiresAt || selectedUser.membership_expires_at).toLocaleDateString('id-ID')}
+                      </Text>
+                    )}
                   </View>
                 </View>
 
@@ -332,5 +436,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     marginTop: 2,
+  },
+  footerLoader: {
+    paddingVertical: 18,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  footerEnd: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  footerText: {
+    ...typography.timestamp,
+    fontSize: 12,
   },
 });
