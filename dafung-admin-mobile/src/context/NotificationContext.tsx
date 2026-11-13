@@ -11,6 +11,7 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    priority: Notifications.AndroidNotificationPriority.MAX,
   }),
 });
 
@@ -29,6 +30,7 @@ interface NotificationContextType {
   latestNotification: OrderNotification | null;
   clearNotification: () => void;
   refreshNotifications: () => Promise<void>;
+  testNotification: () => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType>({
@@ -36,6 +38,7 @@ const NotificationContext = createContext<NotificationContextType>({
   latestNotification: null,
   clearNotification: () => {},
   refreshNotifications: async () => {},
+  testNotification: async () => {},
 });
 
 export const useNotifications = () => useContext(NotificationContext);
@@ -56,11 +59,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           await Notifications.setNotificationChannelAsync('dafung-orders', {
             name: 'Pesanan Baru Dafung Hub',
             importance: Notifications.AndroidImportance.MAX,
-            vibrationPattern: [0, 300, 200, 300],
+            vibrationPattern: [0, 500, 200, 500],
             lightColor: '#008CFF',
             sound: 'default',
             enableVibrate: true,
             showBadge: true,
+            lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+            bypassDnd: true,
           });
         }
         await Notifications.requestPermissionsAsync();
@@ -97,56 +102,63 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       lastCheckTimeRef.current = data.serverTime || new Date().toISOString();
 
       if (data.newPaidOrders && data.newPaidOrders.length > 0) {
-        if (isInitialCheckRef.current) {
-          // On first check, prime seen orders so old orders don't spam notifications
-          data.newPaidOrders.forEach((o) => seenOrderCodesRef.current.add(o.orderCode));
-          isInitialCheckRef.current = false;
-        } else {
-          // Find orders we haven't alerted for yet
-          const unnotified = data.newPaidOrders.filter(
-            (o) => !seenOrderCodesRef.current.has(o.orderCode)
-          );
+        const now = Date.now();
+        // Find orders we haven't alerted for yet
+        const unnotified = data.newPaidOrders.filter((o) => {
+          if (seenOrderCodesRef.current.has(o.orderCode)) return false;
+          // If initial check on app boot, only alert orders paid in the last 15 minutes
+          if (isInitialCheckRef.current) {
+            const ageMs = now - new Date(o.createdAt).getTime();
+            return ageMs < 15 * 60 * 1000;
+          }
+          return true;
+        });
 
-          if (unnotified.length > 0) {
-            unnotified.forEach((o) => seenOrderCodesRef.current.add(o.orderCode));
-            const newest = unnotified[0];
+        // Mark all current orders as seen so they won't repeat
+        data.newPaidOrders.forEach((o) => seenOrderCodesRef.current.add(o.orderCode));
+        isInitialCheckRef.current = false;
 
-            const customerDisplay = newest.customer.username
-              ? `@${newest.customer.username}`
-              : newest.customer.firstName || newest.customer.telegramId;
+        if (unnotified.length > 0) {
+          const newest = unnotified[0];
+          console.log('[NotificationContext] Alerting for new order:', newest.orderCode);
 
-            setLatestNotification({
-              id: newest.id,
-              orderCode: newest.orderCode,
-              productName: newest.productName,
-              price: newest.price,
-              formattedPrice: newest.formattedPrice,
-              customerName: customerDisplay,
-              timestamp: newest.createdAt,
+          const customerDisplay = newest.customer.username
+            ? `@${newest.customer.username}`
+            : newest.customer.firstName || newest.customer.telegramId;
+
+          setLatestNotification({
+            id: newest.id,
+            orderCode: newest.orderCode,
+            productName: newest.productName,
+            price: newest.price,
+            formattedPrice: newest.formattedPrice,
+            customerName: customerDisplay,
+            timestamp: newest.createdAt,
+          });
+
+          // Haptic alert on device
+          try {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } catch {
+            // Ignore if haptics unsupported
+          }
+
+          // Native Android System Notification with channelId in trigger
+          try {
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: '🔔 Pesanan Baru Masuk!',
+                body: `${newest.productName} (${newest.formattedPrice}) dari ${customerDisplay}`,
+                data: { orderCode: newest.orderCode },
+                sound: 'default',
+              },
+              trigger: {
+                seconds: 1,
+                channelId: 'dafung-orders',
+              },
             });
-
-            // Haptic alert on device
-            try {
-              await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            } catch {
-              // Ignore if haptics unsupported
-            }
-
-            // Native Android System Notification with channelId
-            try {
-              await Notifications.scheduleNotificationAsync({
-                content: {
-                  title: '🔔 Pesanan Baru Masuk!',
-                  body: `${newest.productName} (${newest.formattedPrice}) dari ${customerDisplay}`,
-                  data: { orderCode: newest.orderCode },
-                  sound: 'default',
-                  channelId: 'dafung-orders',
-                },
-                trigger: null,
-              });
-            } catch (notifErr) {
-              console.warn('Native notification error:', notifErr);
-            }
+          } catch (notifErr) {
+            console.warn('Native notification error:', notifErr);
           }
         }
       } else {
@@ -191,6 +203,43 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     await checkOrders();
   };
 
+  const testNotification = async () => {
+    const dummy: OrderNotification = {
+      id: 'test-' + Date.now(),
+      orderCode: 'ORD-TES-' + Math.floor(Math.random() * 89999 + 10000),
+      productName: 'Canva Pro 1 Bulan (Tes Notifikasi)',
+      price: 15000,
+      formattedPrice: 'Rp 15.000',
+      customerName: '@DappaSecc',
+      timestamp: new Date().toISOString(),
+    };
+
+    setLatestNotification(dummy);
+
+    try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      // Ignore
+    }
+
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '🔔 Pesanan Baru Masuk!',
+          body: `${dummy.productName} (${dummy.formattedPrice}) dari ${dummy.customerName}`,
+          data: { orderCode: dummy.orderCode },
+          sound: 'default',
+        },
+        trigger: {
+          seconds: 1,
+          channelId: 'dafung-orders',
+        },
+      });
+    } catch (err) {
+      console.warn('Test notification error:', err);
+    }
+  };
+
   return (
     <NotificationContext.Provider
       value={{
@@ -198,6 +247,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         latestNotification,
         clearNotification,
         refreshNotifications,
+        testNotification,
       }}
     >
       {children}

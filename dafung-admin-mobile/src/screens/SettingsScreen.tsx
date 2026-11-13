@@ -15,10 +15,12 @@ import * as Haptics from 'expo-haptics';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { api, getBaseApiUrl, setBaseApiUrl } from '../api/client';
 
 export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { logout } = useAuth();
+  const { testNotification } = useNotifications();
   const [isMaintenance, setIsMaintenance] = useState(false);
   const [channel, setChannel] = useState('@DafungHub');
   const [apiUrl, setApiUrl] = useState('');
@@ -170,6 +172,30 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
               <Text style={typography.button}>Simpan Pengaturan</Text>
             )}
           </Pressable>
+
+          {/* Section: Test Notifikasi */}
+          <Text style={styles.sectionHeader}>Uji Notifikasi Pesanan</Text>
+          <View style={styles.card}>
+            <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 12, lineHeight: 18 }}>
+              Tes apakah suara, getaran haptik, dan banner notifikasi pesanan baru muncul dengan benar di layar HP Anda.
+            </Text>
+            <Pressable
+              style={{
+                backgroundColor: colors.blue,
+                borderRadius: 12,
+                paddingVertical: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onPress={async () => {
+                await testNotification();
+              }}
+            >
+              <Ionicons name="notifications" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Uji Notifikasi Sekarang</Text>
+            </Pressable>
+          </View>
 
           {/* Section: Session */}
           <Pressable style={styles.logoutBtn} onPress={handleLogout}>

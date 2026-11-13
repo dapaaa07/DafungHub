@@ -128,8 +128,6 @@ function RootNavigator() {
   return (
     <NavigationContainer>
       <StatusBar style="dark" />
-      <NotificationBanner />
-
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           <Stack.Screen name="Login" component={LoginScreen} />
@@ -140,6 +138,7 @@ function RootNavigator() {
           </>
         )}
       </Stack.Navigator>
+      <NotificationBanner />
     </NavigationContainer>
   );
 }
