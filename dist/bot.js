@@ -20745,9 +20745,11 @@ async function sendProductDetail(ctx, botInstance, productId, platformId = "all"
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u2022 Nama: <b>${escapeHtml4(prod.name)}</b>
 ` + priceSection + `\u2022 Status: <b>${statusStr}</b>
-` + (prod.description ? `
+` + (prod.description && prod.description.trim() ? `
 \u{1F4DD} <b>Deskripsi / Ketentuan:</b>
-${escapeHtml4(prod.description.substring(0, 300))}
+<blockquote>${escapeHtml4(
+      prod.description.trim().length > 3500 ? `${prod.description.trim().substring(0, 3500)}...` : prod.description.trim()
+    )}</blockquote>
 ` : "") + `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 Sentuh tombol di bawah untuk memilih metode pembayaran (QRIS / Saldo):`;
     const buttons = [];

@@ -78,6 +78,8 @@ test('sendProductDetail: Claude Api 10M Tokens displays full setup guide and URL
 
   assert.ok(sentText.includes('DETAIL PRODUK'));
   assert.ok(sentText.includes('Claude Api 10M Tokens 30 Day'));
+  assert.ok(sentText.includes('<blockquote>'), 'Must wrap description in blockquote');
+  assert.ok(sentText.includes('</blockquote>'), 'Must close blockquote');
   assert.ok(sentText.includes('https://bedrock.com.de/'));
   assert.ok(sentText.includes('Step 2: Configure your API'));
   assert.ok(sentText.includes('https://api.bedrock.com.de/'));

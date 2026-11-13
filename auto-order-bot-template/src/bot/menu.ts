@@ -272,7 +272,7 @@ export async function sendProductDetail(
     `• <b>Status:</b> ${isAvailable ? '🟢 Tersedia (Ready)' : '🔴 Stok Habis'}\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
     `📝 <b>Keterangan:</b>\n` +
-    `${escapeHtml(prod.description || 'Akun digital berkualitas garansi full durasi.')}\n\n` +
+    `<blockquote>${escapeHtml(prod.description || 'Akun digital berkualitas garansi full durasi.')}</blockquote>\n\n` +
     `🛡️ <b>Kebijakan Garansi:</b> Full durasi selama masa langganan aktif.`;
 
   const buttons = [];

@@ -734,11 +734,11 @@ export async function sendProductDetail(
       priceSection +
       `• Status: <b>${statusStr}</b>\n` +
       (prod.description && prod.description.trim()
-        ? `\n📝 <b>Deskripsi / Ketentuan:</b>\n${escapeHtml(
-            prod.description.trim().length > 3000
-              ? `${prod.description.trim().substring(0, 3000)}...`
+        ? `\n📝 <b>Deskripsi / Ketentuan:</b>\n<blockquote>${escapeHtml(
+            prod.description.trim().length > 3500
+              ? `${prod.description.trim().substring(0, 3500)}...`
               : prod.description.trim()
-          )}\n`
+          )}</blockquote>\n`
         : '') +
       `━━━━━━━━━━━━━━━━━━━\n` +
       `Sentuh tombol di bawah untuk memilih metode pembayaran (QRIS / Saldo):`;
