@@ -36,6 +36,9 @@ export const metadata: Metadata = {
   },
 };
 
+import { CustomerAuthProvider } from '@/components/CustomerAuthContext';
+import AuthModal from '@/components/AuthModal';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -52,7 +55,10 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-[#F8F9FA] text-[#121212] antialiased flex flex-col">
-        {children}
+        <CustomerAuthProvider>
+          {children}
+          <AuthModal />
+        </CustomerAuthProvider>
       </body>
     </html>
   );

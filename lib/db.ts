@@ -6,7 +6,13 @@ export type FulfillmentStatus = 'pending' | 'processing' | 'delivered';
 
 export interface User {
   id: string;
-  telegram_id: string;
+  telegram_id?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  name?: string | null;
+  password_hash?: string | null;
+  google_id?: string | null;
+  avatar_url?: string | null;
   role: UserRole;
   balance?: number;
   username?: string | null;
@@ -16,6 +22,7 @@ export interface User {
   weekly_discount_used?: number;
   weekly_discount_reset_at?: Date | null;
   created_at: Date;
+  updated_at?: Date | null;
 }
 
 export interface Product {

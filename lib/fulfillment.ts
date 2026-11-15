@@ -48,7 +48,7 @@ export async function processOrderPayment(
   options?: { allowRetryQueued?: boolean }
 ): Promise<FulfillmentResult> {
   // 1. Fetch Order and Buyer details
-  const orderRes = await query<Order & { telegram_id: string; product_name: string; product_price: number }>(
+  const orderRes = await query<Order & { telegram_id: string | null; product_name: string; product_price: number }>(
     `SELECT o.*, u.telegram_id, p.name as product_name, p.price as product_price
      FROM orders o
      JOIN users u ON o.user_id = u.id
@@ -207,28 +207,31 @@ export async function processOrderPayment(
       `• 🎁 <b>Promo & Restock Spesial:</b> Akses lebih awal ke akun langka.\n\n` +
       `🛒 <i>Mulai belanja akun premium dengan harga lebih murah sekarang lewat katalog bot!</i>`;
 
-    await sendPreservedMessage(
-      { chatId: order.telegram_id } as never,
-      botInstance,
-      buyerMembershipMessage,
-      {
-        parse_mode: 'HTML',
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: '🛍️ Buka Katalog Produk', callback_data: 'menu_products' }],
-            [{ text: '👤 Cek Profil Saya', callback_data: 'menu_profile' }],
-            [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
-          ],
-        },
-      }
-    );
+    if (order.telegram_id) {
+      await sendPreservedMessage(
+        { chatId: order.telegram_id } as never,
+        botInstance,
+        buyerMembershipMessage,
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🛍️ Buka Katalog Produk', callback_data: 'menu_products' }],
+              [{ text: '👤 Cek Profil Saya', callback_data: 'menu_profile' }],
+              [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+            ],
+          },
+        }
+      );
+    }
 
     // Notify Owner
+    const buyerDisplay = order.telegram_id || (invData.buyer_name as string) || (invData.buyer_email as string) || (invData.buyer_phone as string) || 'Website Buyer';
     const ownerMembershipAlert =
       `💎 <b>PEMBELIAN MEMBERSHIP VIP BARU</b>\n` +
       `━━━━━━━━━━━━━━━━━━━\n` +
       `• <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>\n` +
-      `• <b>Pembeli:</b> <code>${escapeHtml(order.telegram_id)}</code>\n` +
+      `• <b>Pembeli:</b> <code>${escapeHtml(buyerDisplay)}</code>\n` +
       `• <b>Paket:</b> ${escapeHtml(order.product_name)}\n` +
       `• <b>Metode Bayar:</b> ${isBalancePayment ? `💰 Saldo Akun (${balancePaidStr})` : '📱 QRIS'}\n` +
       `• <b>Masa Aktif:</b> s/d ${formatWibDate(act.newExpiresAt)}\n` +
@@ -283,28 +286,31 @@ export async function processOrderPayment(
       `━━━━━━━━━━━━━━━━━━━\n\n` +
       `Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>👤 Profil</b> untuk melihat total saldo Anda.`;
 
-    await sendPreservedMessage(
-      { chatId: order.telegram_id } as never,
-      botInstance,
-      buyerDepositMessage,
-      {
-        parse_mode: 'HTML',
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: '👤 Lihat Profil & Saldo', callback_data: 'menu_profile' }],
-            [{ text: '🛍️ Beli Produk', callback_data: 'menu_products' }],
-            [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
-          ],
-        },
-      }
-    );
+    if (order.telegram_id) {
+      await sendPreservedMessage(
+        { chatId: order.telegram_id } as never,
+        botInstance,
+        buyerDepositMessage,
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '👤 Lihat Profil & Saldo', callback_data: 'menu_profile' }],
+              [{ text: '🛍️ Beli Produk', callback_data: 'menu_products' }],
+              [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+            ],
+          },
+        }
+      );
+    }
 
     // Notify Owner
+    const depositBuyerDisplay = order.telegram_id || (invData.buyer_name as string) || (invData.buyer_email as string) || (invData.buyer_phone as string) || 'Website Buyer';
     const ownerDepositAlert =
       `💰 <b>DEPOSIT USER BERHASIL MASUK</b>\n` +
       `━━━━━━━━━━━━━━━━━━━\n` +
       `• <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>\n` +
-      `• <b>Pembeli:</b> <code>${escapeHtml(order.telegram_id)}</code>\n` +
+      `• <b>Pembeli:</b> <code>${escapeHtml(depositBuyerDisplay)}</code>\n` +
       `• <b>Nominal Deposit:</b> <b>Rp ${depositAmount.toLocaleString('id-ID')}</b>\n` +
       (cashback > 0 ? `• <b>Cashback Voucher:</b> +Rp ${cashback.toLocaleString('id-ID')} (${escapeHtml(String(invData.voucher_code))})\n` : '') +
       `━━━━━━━━━━━━━━━━━━━`;
@@ -419,28 +425,31 @@ export async function processOrderPayment(
           `<code>${escapeHtml(deliveredKey)}</code>\n\n` +
           `📌 <i>Simpan kredensial ini baik-baik. Garansi berlaku sesuai ketentuan produk. Terima kasih telah berbelanja di DaFung Hub!</i>`;
 
-        await sendPreservedMessage(
-          { chatId: buyerChatId } as never,
-          botInstance,
-          buyerSuccessMessage,
-          {
-            parse_mode: 'HTML',
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: '📩 Riwayat Pesanan', callback_data: 'menu_orders' }, { text: '🛍️ Beli Produk Lain', callback_data: 'menu_products' }],
-                [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
-              ],
-            },
-          }
-        );
+        if (buyerChatId) {
+          await sendPreservedMessage(
+            { chatId: buyerChatId } as never,
+            botInstance,
+            buyerSuccessMessage,
+            {
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '📩 Riwayat Pesanan', callback_data: 'menu_orders' }, { text: '🛍️ Beli Produk Lain', callback_data: 'menu_products' }],
+                  [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+                ],
+              },
+            }
+          );
+        }
 
         // Notify Owner
+        const buyerOwnerDisplay = buyerChatId || (invData.buyer_name as string) || (invData.buyer_email as string) || (invData.buyer_phone as string) || 'Website Buyer';
         const ownerAlert =
           `✅ <b>ORDER SELESAI OTOMATIS (H2H INSTAN)</b>\n` +
           `━━━━━━━━━━━━━━━━━━━\n` +
           `• <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>\n` +
           `• <b>Produk:</b> ${escapeHtml(order.product_name)}\n` +
-          `• <b>Pembeli:</b> <code>${escapeHtml(buyerChatId)}</code>\n` +
+          `• <b>Pembeli:</b> <code>${escapeHtml(buyerOwnerDisplay)}</code>\n` +
           paymentMethodLineOwner +
           `• <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString('id-ID')}\n` +
           `• <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString('id-ID')}\n` +
@@ -493,31 +502,34 @@ export async function processOrderPayment(
     `⏳ <i>Pesanan Anda sedang disiapkan oleh antrean sistem kami (estimasi 1–10 menit).</i>\n` +
     `<i>Kredensial akun digital akan langsung dikirimkan otomatis ke chat ini begitu siap!</i>`;
 
-  await sendSafeMessage(
-    { chatId: buyerChatId } as never,
-    botInstance,
-    buyerQueueMessage,
-    {
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '🔄 Cek Status Pesanan', callback_data: `status_${order.order_code}` }],
-          [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
-        ],
-      },
-    }
-  );
+  if (buyerChatId) {
+    await sendSafeMessage(
+      { chatId: buyerChatId } as never,
+      botInstance,
+      buyerQueueMessage,
+      {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🔄 Cek Status Pesanan', callback_data: `status_${order.order_code}` }],
+            [{ text: '🔙 Menu Utama', callback_data: 'menu_main' }],
+          ],
+        },
+      }
+    );
+  }
 
   const memberInfo = await getUserMembership(order.user_id).catch(() => null);
   const vipPriorityBadge = memberInfo?.isVip ? ' ⭐ <b>[VIP MEMBER - PRIORITAS]</b>' : '';
 
   // Send Actionable Alert to Owner
+  const queueBuyerDisplay = buyerChatId || (invData.buyer_name as string) || (invData.buyer_email as string) || (invData.buyer_phone as string) || 'Website Buyer';
   const ownerQueueAlert =
     `🔔 <b>PESANAN BARU MASUK (MODE ANTREAN)</b>\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
     `• <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code> <i>(Sentuh untuk salin)</i>\n` +
     `• <b>Produk:</b> ${escapeHtml(order.product_name)}\n` +
-    `• <b>Pembeli:</b> <code>${escapeHtml(buyerChatId)}</code>${vipPriorityBadge}\n` +
+    `• <b>Pembeli:</b> <code>${escapeHtml(queueBuyerDisplay)}</code>${vipPriorityBadge}\n` +
     paymentMethodLineOwner +
     `• <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString('id-ID')}\n` +
     `• <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString('id-ID')}\n` +

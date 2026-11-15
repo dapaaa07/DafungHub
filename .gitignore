@@ -51,3 +51,9 @@ lib/firebase-service-account.json
 
 # local web storefront (exclude from git & Vercel deployment)
 dafung-web/
+
+# user temporary files & docs
+*.docx
+*.rar
+sda2greedy/
+.agents/
