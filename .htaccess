@@ -1,0 +1,14 @@
+# DaFung Hub - cPanel Apache & Node.js Passenger Configuration
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Force HTTPS
+  RewriteCond %{HTTPS} off
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # Allow static files directly
+  RewriteCond %{REQUEST_URI} ^/_next/static/(.*)$ [OR]
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^ - [L]
+</IfModule>
