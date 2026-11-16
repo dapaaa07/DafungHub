@@ -82,10 +82,10 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden lg:flex items-center gap-7 xl:gap-8 text-sm font-semibold">
+          <nav className="hidden lg:flex items-center gap-5 xl:gap-8 text-xs xl:text-sm font-semibold whitespace-nowrap">
             <Link
               href="/#katalog"
-              className={`transition-colors py-1.5 relative ${
+              className={`whitespace-nowrap py-1.5 transition-colors relative ${
                 activeSection === 'katalog'
                   ? 'text-[#121212] font-extrabold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#FFDE00]'
                   : 'text-gray-600 hover:text-[#121212]'
@@ -95,7 +95,7 @@ export default function Navbar() {
             </Link>
             <Link
               href="/#keunggulan"
-              className={`transition-colors py-1.5 relative ${
+              className={`whitespace-nowrap py-1.5 transition-colors relative ${
                 activeSection === 'keunggulan'
                   ? 'text-[#121212] font-extrabold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#FFDE00]'
                   : 'text-gray-600 hover:text-[#121212]'
@@ -105,7 +105,7 @@ export default function Navbar() {
             </Link>
             <Link
               href="/#cara-order"
-              className={`transition-colors py-1.5 relative ${
+              className={`whitespace-nowrap py-1.5 transition-colors relative ${
                 activeSection === 'cara-order'
                   ? 'text-[#121212] font-extrabold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#FFDE00]'
                   : 'text-gray-600 hover:text-[#121212]'
@@ -115,7 +115,7 @@ export default function Navbar() {
             </Link>
             <Link
               href="/#garansi"
-              className={`transition-colors py-1.5 relative ${
+              className={`whitespace-nowrap py-1.5 transition-colors relative ${
                 activeSection === 'garansi'
                   ? 'text-[#121212] font-extrabold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#FFDE00]'
                   : 'text-gray-600 hover:text-[#121212]'
@@ -125,7 +125,7 @@ export default function Navbar() {
             </Link>
             <Link
               href="/#faq"
-              className={`transition-colors py-1.5 relative ${
+              className={`whitespace-nowrap py-1.5 transition-colors relative ${
                 activeSection === 'faq'
                   ? 'text-[#121212] font-extrabold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#FFDE00]'
                   : 'text-gray-600 hover:text-[#121212]'
@@ -136,18 +136,18 @@ export default function Navbar() {
           </nav>
 
           {/* Desktop Direct Action Buttons & Auth */}
-          <div className="hidden sm:flex items-center gap-3 lg:pl-6 lg:border-l lg:border-gray-200">
+          <div className="hidden sm:flex items-center gap-2.5 xl:gap-3 shrink-0 whitespace-nowrap">
             {/* Telegram Bot Button */}
             {isOnline && (
               <a
                 href={`https://t.me/${TELEGRAM_BOT_USERNAME}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-gray-700 hover:text-black bg-gray-100 hover:bg-gray-200 transition-all"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-gray-700 hover:text-black bg-gray-100 hover:bg-gray-200 transition-all whitespace-nowrap shrink-0"
                 title="Bot Telegram Online 24 Jam"
               >
                 <Send className="w-3.5 h-3.5 text-[#3AA8E8]" />
-                <span>Telegram Bot</span>
+                <span className="whitespace-nowrap">Telegram Bot</span>
               </a>
             )}
 
@@ -276,10 +276,10 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={() => openAuthModal('login')}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-[#121212] hover:bg-[#252525] shadow-sm transition-all hover:scale-[1.02]"
+                className="inline-flex items-center gap-2 px-3.5 py-2 xl:px-4 xl:py-2.5 rounded-xl text-xs font-bold text-white bg-[#121212] hover:bg-[#252525] shadow-sm transition-all hover:scale-[1.02] whitespace-nowrap shrink-0"
               >
                 <UserIcon className="w-3.5 h-3.5 text-[#FFDE00]" />
-                <span>Masuk / Daftar</span>
+                <span className="whitespace-nowrap">Masuk / Daftar</span>
               </button>
             )}
 
@@ -290,10 +290,10 @@ export default function Navbar() {
               )}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-[#121212] bg-[#FFDE00] hover:bg-[#FFE838] shadow-sm transition-all hover:scale-[1.02]"
+              className="inline-flex items-center gap-1.5 px-3 py-2 xl:px-4 xl:py-2.5 rounded-xl text-xs font-bold text-[#121212] bg-[#FFDE00] hover:bg-[#FFE838] shadow-sm transition-all hover:scale-[1.02] whitespace-nowrap shrink-0"
             >
               <MessageCircle className="w-4 h-4 text-[#121212]" />
-              <span>Chat CS WA</span>
+              <span className="whitespace-nowrap">Chat CS WA</span>
             </a>
           </div>
 
