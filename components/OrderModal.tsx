@@ -35,7 +35,7 @@ interface OrderModalProps {
 export default function OrderModal({ product, onClose }: OrderModalProps) {
   const router = useRouter();
   const { botStatus } = useBotStatus();
-  const { customer, openAuthModal } = useCustomerAuth();
+  const { customer, openAuthModal, openTopUpModal } = useCustomerAuth();
   const isOnline = botStatus === 'online';
 
   const [paymentMethod, setPaymentMethod] = useState<'qris' | 'balance'>('qris');
@@ -93,10 +93,12 @@ Mohon panduan ketersediaan & metode pembayarannya. Terima kasih!`;
 
     try {
       if (paymentMethod === 'balance' && customer.balance < estimatedTotal) {
+        const shortfall = estimatedTotal - customer.balance;
         setErrorMessage(
-          `Saldo akun Anda (${formatRupiah(customer.balance)}) tidak mencukupi untuk pesanan ini.`
+          `Saldo akun Anda (${formatRupiah(customer.balance)}) kurang ${formatRupiah(shortfall)}. Membuka menu isi saldo...`
         );
         setIsSubmitting(false);
+        openTopUpModal(shortfall);
         return;
       }
 
@@ -271,7 +273,26 @@ Mohon panduan ketersediaan & metode pembayarannya. Terima kasih!`;
                     </span>
                   </div>
                   <span className="text-[10px] text-gray-500 leading-tight">
-                    {customer ? `Saldo: ${formatRupiah(customer.balance)}` : 'Masuk akun untuk pakai'}
+                    {customer ? (
+                      customer.balance >= estimatedTotal ? (
+                        `Saldo: ${formatRupiah(customer.balance)}`
+                      ) : (
+                        <span className="text-amber-700 font-bold flex items-center justify-between">
+                          <span>Saldo: {formatRupiah(customer.balance)}</span>
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openTopUpModal(estimatedTotal - customer.balance);
+                            }}
+                            className="text-[#121212] underline font-extrabold ml-1 hover:text-black"
+                          >
+                            + Isi Saldo
+                          </span>
+                        </span>
+                      )
+                    ) : (
+                      'Masuk akun untuk pakai'
+                    )}
                   </span>
                 </button>
               </div>

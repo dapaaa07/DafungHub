@@ -23,7 +23,7 @@ import Footer from '@/components/Footer';
 import { useCustomerAuth } from '@/components/CustomerAuthContext';
 
 export default function AccountPage() {
-  const { customer, isLoading, openAuthModal, logout } = useCustomerAuth();
+  const { customer, isLoading, openAuthModal, openTopUpModal, logout } = useCustomerAuth();
 
   if (isLoading) {
     return (
@@ -155,33 +155,40 @@ export default function AccountPage() {
               </div>
             </div>
 
-            <div className="pt-4 border-t border-gray-100 space-y-2">
-              <span className="text-[11px] font-bold text-gray-700 block">
-                Ingin Top-Up Saldo?
-              </span>
-              <div className="flex gap-2">
-                <a
-                  href={`https://wa.me/${CS_WHATSAPP_INTL}?text=${encodeURIComponent(
-                    `Halo CS Dafung Hub, saya ingin top-up saldo akun website: ${customer.email || customer.phone || customer.name}`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#FFDE00] hover:bg-[#FFE838] text-[#121212] font-black text-xs shadow-sm transition-all"
-                >
-                  <MessageCircle className="w-4 h-4 text-[#121212]" />
-                  <span>Top-Up via WhatsApp</span>
-                </a>
-
-                <a
-                  href={`https://t.me/${TELEGRAM_BOT_USERNAME}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center p-2.5 rounded-xl bg-[#121212] hover:bg-[#252525] text-white shadow-sm transition-all"
-                  title="Top-Up di Telegram Bot"
-                >
-                  <Send className="w-4 h-4 text-[#3AA8E8]" />
-                </a>
+            <div className="pt-4 border-t border-gray-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold text-gray-800">
+                  Isi Ulang Saldo Akun:
+                </span>
+                <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
+                  QRIS Otomatis 24 Jam
+                </span>
               </div>
+
+              {/* Quick Preset Buttons */}
+              <div className="grid grid-cols-3 gap-1.5">
+                {[10000, 25000, 50000, 100000, 200000, 500000].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => openTopUpModal(amt)}
+                    className="py-2 px-1 text-center rounded-xl border border-gray-200 bg-gray-50 hover:bg-[#121212] hover:text-[#FFDE00] text-gray-800 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                  >
+                    {amt >= 100000 ? `Rp ${(amt / 1000).toLocaleString('id-ID')}k` : `Rp ${amt.toLocaleString('id-ID')}`}
+                  </button>
+                ))}
+              </div>
+
+              {/* Main Top-Up Button */}
+              <button
+                type="button"
+                onClick={() => openTopUpModal()}
+                className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-[#121212] hover:bg-[#252525] active:scale-[0.99] text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
+              >
+                <Wallet className="w-4 h-4 text-[#FFDE00]" />
+                <span>Top-Up Saldo Instan (QRIS)</span>
+                <ArrowRight className="w-3.5 h-3.5 text-[#FFDE00]" />
+              </button>
             </div>
           </div>
 

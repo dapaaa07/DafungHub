@@ -83,6 +83,37 @@ export async function resolveWebProduct(productId: string): Promise<Product | nu
     }
   }
 
+  // 2b. If deposit product (e.g. deposit_10000 or dep_10000)
+  if (!product && (trimmedId.startsWith('deposit_') || trimmedId.startsWith('dep_'))) {
+    try {
+      const amount = parseInt(trimmedId.replace(/^(deposit_|dep_)/, ''), 10);
+      if (amount && !isNaN(amount) && amount >= 1000) {
+        const prodName = `Deposit Saldo Rp ${amount.toLocaleString('id-ID')}`;
+        const existingByName = await query<Product>(
+          'SELECT * FROM products WHERE name = $1 LIMIT 1',
+          [prodName]
+        );
+        if (existingByName.rows.length > 0) {
+          product = existingByName.rows[0];
+          if (product.price !== amount) {
+            product.price = amount;
+            await query('UPDATE products SET price = $1 WHERE id = $2', [amount, product.id]).catch(() => {});
+          }
+        } else {
+          const ins = await query<Product>(
+            `INSERT INTO products (name, price, stock, is_active)
+             VALUES ($1, $2, 9999, true)
+             RETURNING *`,
+            [prodName, amount]
+          );
+          product = ins.rows[0];
+        }
+      }
+    } catch (dErr) {
+      console.error('[Web Order] Error resolving deposit product:', dErr);
+    }
+  }
+
   // 3. If not found in DB, check supplier catalog
   if (!product) {
     try {

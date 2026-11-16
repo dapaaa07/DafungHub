@@ -14,6 +14,7 @@ import {
   Loader2,
   Sparkles,
   MessageCircle,
+  Wallet,
 } from 'lucide-react';
 import { formatRupiah, CS_WHATSAPP_INTL } from '@/lib/pricing';
 import Navbar from '@/components/Navbar';
@@ -242,45 +243,87 @@ export default function OrderClient({ code }: { code: string }) {
                   </div>
                 </div>
 
-                {/* Delivered Credentials Card */}
-                {order.isDelivered && order.credentials && (
-                  <div className="p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-300 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-emerald-900 font-extrabold text-xs sm:text-sm">
-                        <Sparkles className="w-4 h-4 text-emerald-600" />
-                        <span>Kredensial Akun Digital Anda:</span>
+                {/* Delivered Credentials or Deposit Confirmation Card */}
+                {order.isDelivered && (
+                  order.productName.toLowerCase().includes('deposit') ? (
+                    <div className="p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-300 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                          <Wallet className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-emerald-900 font-extrabold text-sm sm:text-base">
+                            Top-Up Saldo Berhasil Masuk! 🎉
+                          </h3>
+                          <p className="text-xs text-emerald-700 mt-0.5">
+                            Saldo akun Anda telah bertambah secara otomatis dan siap digunakan untuk transaksi.
+                          </p>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => handleCopy(order.credentials!, 'key')}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs shadow-sm transition-all"
-                      >
-                        {copiedKey ? (
-                          <>
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Tersalin!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Salin Akun</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
 
-                    <div className="p-3.5 bg-white rounded-xl border border-emerald-200">
-                      <pre className="font-mono text-xs text-gray-800 whitespace-pre-wrap break-all leading-relaxed">
-                        {order.credentials}
-                      </pre>
-                    </div>
+                      {order.credentials && (
+                        <div className="p-3.5 bg-white rounded-xl border border-emerald-200">
+                          <pre className="font-mono text-xs text-gray-800 whitespace-pre-wrap break-all leading-relaxed">
+                            {order.credentials}
+                          </pre>
+                        </div>
+                      )}
 
-                    <div className="flex items-center gap-2 text-[11px] text-emerald-800">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>
-                        Simpan data akun di tempat aman. Garansi berlaku selama durasi paket aktif.
-                      </span>
+                      <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                        <Link
+                          href="/account"
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs sm:text-sm shadow-sm transition-all"
+                        >
+                          <Wallet className="w-4 h-4" />
+                          <span>Cek Saldo di Akun Saya</span>
+                        </Link>
+                        <Link
+                          href="/"
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-emerald-100/50 border border-emerald-300 text-emerald-800 font-bold text-xs sm:text-sm transition-all"
+                        >
+                          <span>Beli Layanan Sekarang</span>
+                        </Link>
+                      </div>
                     </div>
-                  </div>
+                  ) : order.credentials ? (
+                    <div className="p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-300 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-emerald-900 font-extrabold text-xs sm:text-sm">
+                          <Sparkles className="w-4 h-4 text-emerald-600" />
+                          <span>Kredensial Akun Digital Anda:</span>
+                        </div>
+                        <button
+                          onClick={() => handleCopy(order.credentials!, 'key')}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs shadow-sm transition-all"
+                        >
+                          {copiedKey ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Tersalin!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Salin Akun</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="p-3.5 bg-white rounded-xl border border-emerald-200">
+                        <pre className="font-mono text-xs text-gray-800 whitespace-pre-wrap break-all leading-relaxed">
+                          {order.credentials}
+                        </pre>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[11px] text-emerald-800">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>
+                          Simpan data akun di tempat aman. Garansi berlaku selama durasi paket aktif.
+                        </span>
+                      </div>
+                    </div>
+                  ) : null
                 )}
 
                 {/* UNPAID QRIS SECTION */}

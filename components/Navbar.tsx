@@ -13,7 +13,7 @@ export default function Navbar() {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { botStatus } = useBotStatus();
-  const { customer, openAuthModal, logout } = useCustomerAuth();
+  const { customer, openAuthModal, openTopUpModal, logout } = useCustomerAuth();
   const isOnline = botStatus === 'online';
 
   useEffect(() => {
@@ -159,11 +159,23 @@ export default function Navbar() {
                       <p className="text-xs font-bold text-gray-800 truncate">
                         {customer.email || customer.phone || customer.name}
                       </p>
-                      <div className="mt-1 flex items-center gap-1.5">
-                        <Wallet className="w-3 h-3 text-emerald-600" />
-                        <span className="text-xs font-extrabold text-emerald-600">
-                          {formatRupiah(customer.balance)}
-                        </span>
+                      <div className="mt-1 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Wallet className="w-3 h-3 text-emerald-600" />
+                          <span className="text-xs font-extrabold text-emerald-600">
+                            {formatRupiah(customer.balance)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUserDropdownOpen(false);
+                            openTopUpModal();
+                          }}
+                          className="px-2 py-0.5 rounded-md bg-[#FFDE00] hover:bg-[#FFE838] text-[#121212] font-black text-[10px] shadow-2xs transition-all cursor-pointer"
+                        >
+                          + Top Up
+                        </button>
                       </div>
                     </div>
 
@@ -268,9 +280,21 @@ export default function Navbar() {
                   </span>
                 )}
               </div>
-              <div className="text-xs font-bold text-emerald-600 flex items-center gap-1.5">
-                <Wallet className="w-3.5 h-3.5" />
-                <span>Saldo: {formatRupiah(customer.balance)}</span>
+              <div className="text-xs font-bold text-emerald-600 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Wallet className="w-3.5 h-3.5" />
+                  <span>Saldo: {formatRupiah(customer.balance)}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    openTopUpModal();
+                  }}
+                  className="px-2.5 py-0.5 rounded-md bg-[#FFDE00] text-[#121212] font-black text-[10px] cursor-pointer"
+                >
+                  + Top Up
+                </button>
               </div>
               <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-200/60">
                 <Link

@@ -38,6 +38,7 @@ export const metadata: Metadata = {
 
 import { CustomerAuthProvider } from '@/components/CustomerAuthContext';
 import AuthModal from '@/components/AuthModal';
+import TopUpModal from '@/components/TopUpModal';
 
 export default function RootLayout({
   children,
@@ -58,6 +59,7 @@ export default function RootLayout({
         <CustomerAuthProvider>
           {children}
           <AuthModal />
+          <TopUpModal />
         </CustomerAuthProvider>
       </body>
     </html>
