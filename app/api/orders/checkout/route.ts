@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCustomerFromRequest, ensureCustomerUser, signCustomerToken, CUSTOMER_COOKIE_NAME, TOKEN_EXPIRY_DAYS } from '@/lib/customer-auth';
+import { getCustomerFromRequest } from '@/lib/customer-auth';
 import { createWebOrder } from '@/lib/web-order';
 
 export async function POST(req: NextRequest) {
@@ -21,29 +21,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let customer = await getCustomerFromRequest(req);
-    let shouldSetCookie = false;
-    let newSessionToken = '';
-
+    const customer = await getCustomerFromRequest(req);
     if (!customer) {
-      if (!targetEmail && !targetPhone) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Silakan masuk ke akun Anda atau masukkan email / nomor WhatsApp untuk melanjutkan.',
-          },
-          { status: 401 }
-        );
-      }
-
-      customer = await ensureCustomerUser({
-        email: targetEmail,
-        phone: targetPhone,
-        name: targetName,
-      });
-
-      newSessionToken = signCustomerToken(customer);
-      shouldSetCookie = true;
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Silakan masuk ke akun Anda terlebih dahulu untuk melakukan pemesanan.',
+          requiresAuth: true,
+        },
+        { status: 401 }
+      );
     }
 
     const result = await createWebOrder({
@@ -60,19 +47,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result, { status: 400 });
     }
 
-    const response = NextResponse.json(result, { status: 200 });
-
-    if (shouldSetCookie && newSessionToken) {
-      response.cookies.set(CUSTOMER_COOKIE_NAME, newSessionToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: TOKEN_EXPIRY_DAYS * 24 * 3600,
-      });
-    }
-
-    return response;
+    return NextResponse.json(result, { status: 200 });
   } catch (error) {
     console.error('[/api/orders/checkout] Error:', error);
     return NextResponse.json(

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://dafung-hub.vercel.app'),
+  metadataBase: new URL('https://store.dafung.web.id'),
   title: 'Dafung Hub — Pusat Langganan & Produk Digital Premium',
   description:
     'Platform resmi langganan produk digital premium: Netflix, CapCut, Canva, Claude AI, Gemini, Office 365, VPN, dan banyak lagi. Proses cepat, garansi full durasi, order otomatis via Telegram Bot & WhatsApp.',
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Dafung Hub — Pusat Langganan Digital Premium',
     description: 'Beli akun digital premium garansi full durasi. Proses instan otomatis.',
-    url: 'https://dafung-hub.vercel.app',
+    url: 'https://store.dafung.web.id',
     siteName: 'Dafung Hub',
     images: [
       {
