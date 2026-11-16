@@ -403,3 +403,37 @@ export async function ensureCustomerUser(params: {
   );
   return insertRes.rows[0];
 }
+
+/**
+ * Resolves the trusted public origin/base URL of the application.
+ */
+export function getRequestBaseUrl(req?: Request | { headers: Headers }): string {
+  if (process.env.GOOGLE_REDIRECT_URI) {
+    try {
+      const parsed = new URL(process.env.GOOGLE_REDIRECT_URI);
+      return parsed.origin;
+    } catch {
+      // ignore
+    }
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
+  if (appUrl && !appUrl.includes('0.0.0.0')) {
+    return appUrl.replace(/\/$/, '');
+  }
+
+  if (req) {
+    const forwardedHost = req.headers.get('x-forwarded-host');
+    const host = forwardedHost || req.headers.get('host');
+    const proto =
+      req.headers.get('x-forwarded-proto') ||
+      (host?.includes('localhost') ? 'http' : 'https');
+
+    if (host && !host.startsWith('0.0.0.0')) {
+      return `${proto}://${host}`;
+    }
+  }
+
+  return 'https://store.dafung.web.id';
+}
+

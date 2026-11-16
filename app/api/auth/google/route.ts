@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getRequestBaseUrl } from '@/lib/customer-auth';
 
 export async function GET(req: NextRequest) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -14,12 +15,13 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const { searchParams, origin } = new URL(req.url);
+  const { searchParams } = new URL(req.url);
   const returnTo = searchParams.get('returnTo') || '/';
 
   // Construct OAuth callback redirect URI
+  const baseUrl = getRequestBaseUrl(req);
   const redirectUri =
-    process.env.GOOGLE_REDIRECT_URI || `${origin}/api/auth/google/callback`;
+    process.env.GOOGLE_REDIRECT_URI || `${baseUrl}/api/auth/google/callback`;
 
   // Encode state with returnTo
   const state = Buffer.from(JSON.stringify({ returnTo })).toString('base64url');

@@ -11,7 +11,7 @@ try {
 }
 
 const dev = false;
-const hostname = process.env.HOSTNAME || '0.0.0.0';
+const hostname = process.env.HOSTNAME || '127.0.0.1';
 const port = parseInt(process.env.PORT, 10) || 3000;
 
 const app = next({ dev, hostname, port });

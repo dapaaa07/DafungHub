@@ -4,10 +4,12 @@ import {
   signCustomerToken,
   CUSTOMER_COOKIE_NAME,
   TOKEN_EXPIRY_DAYS,
+  getRequestBaseUrl,
 } from '@/lib/customer-auth';
 
 export async function GET(req: NextRequest) {
-  const { searchParams, origin } = new URL(req.url);
+  const { searchParams } = new URL(req.url);
+  const baseUrl = getRequestBaseUrl(req);
   const code = searchParams.get('code');
   const state = searchParams.get('state');
   const error = searchParams.get('error');
@@ -26,7 +28,7 @@ export async function GET(req: NextRequest) {
 
   if (error || !code) {
     const errorMsg = encodeURIComponent(error || 'Google login dibatalkan.');
-    return NextResponse.redirect(`${origin}${returnTo}?auth_error=${errorMsg}`);
+    return NextResponse.redirect(`${baseUrl}${returnTo}?auth_error=${errorMsg}`);
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -34,14 +36,14 @@ export async function GET(req: NextRequest) {
 
   if (!clientId || !clientSecret) {
     return NextResponse.redirect(
-      `${origin}${returnTo}?auth_error=${encodeURIComponent(
+      `${baseUrl}${returnTo}?auth_error=${encodeURIComponent(
         'Kredensial Google OAuth server belum lengkap.'
       )}`
     );
   }
 
   const redirectUri =
-    process.env.GOOGLE_REDIRECT_URI || `${origin}/api/auth/google/callback`;
+    process.env.GOOGLE_REDIRECT_URI || `${baseUrl}/api/auth/google/callback`;
 
   try {
     // 1. Exchange authorization code for tokens
@@ -63,7 +65,7 @@ export async function GET(req: NextRequest) {
     if (!tokenResponse.ok || !tokenData.access_token) {
       console.error('[Google OAuth] Token exchange error:', tokenData);
       return NextResponse.redirect(
-        `${origin}${returnTo}?auth_error=${encodeURIComponent('Gagal verifikasi token Google.')}`
+        `${baseUrl}${returnTo}?auth_error=${encodeURIComponent('Gagal verifikasi token Google.')}`
       );
     }
 
@@ -78,7 +80,7 @@ export async function GET(req: NextRequest) {
     if (!userinfoResponse.ok || !googleUser.id || !googleUser.email) {
       console.error('[Google OAuth] Userinfo fetch error:', googleUser);
       return NextResponse.redirect(
-        `${origin}${returnTo}?auth_error=${encodeURIComponent('Gagal membaca profil Akun Google.')}`
+        `${baseUrl}${returnTo}?auth_error=${encodeURIComponent('Gagal membaca profil Akun Google.')}`
       );
     }
 
@@ -92,7 +94,7 @@ export async function GET(req: NextRequest) {
 
     // 4. Sign session token & set cookie
     const token = signCustomerToken(user);
-    const redirectUrl = `${origin}${returnTo}${returnTo.includes('?') ? '&' : '?'}auth=success`;
+    const redirectUrl = `${baseUrl}${returnTo}${returnTo.includes('?') ? '&' : '?'}auth=success`;
     const response = NextResponse.redirect(redirectUrl);
 
     response.cookies.set({
@@ -109,7 +111,7 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     console.error('[Google OAuth Callback Exception]:', err);
     return NextResponse.redirect(
-      `${origin}${returnTo}?auth_error=${encodeURIComponent('Terjadi kesalahan saat memproses login Google.')}`
+      `${baseUrl}${returnTo}?auth_error=${encodeURIComponent('Terjadi kesalahan saat memproses login Google.')}`
     );
   }
 }
