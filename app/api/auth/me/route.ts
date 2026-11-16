@@ -5,16 +5,30 @@ export async function GET(req: NextRequest) {
   try {
     const user = await getCustomerFromRequest(req);
     if (!user) {
-      return NextResponse.json({ success: false, user: null });
+      return NextResponse.json({
+        success: false,
+        authenticated: false,
+        customer: null,
+        user: null,
+      });
     }
 
+    const profile = formatCustomerProfile(user);
     return NextResponse.json({
       success: true,
-      user: formatCustomerProfile(user),
+      authenticated: true,
+      customer: profile,
+      user: profile,
     });
   } catch (error: any) {
     return NextResponse.json(
-      { success: false, user: null, error: error.message },
+      {
+        success: false,
+        authenticated: false,
+        customer: null,
+        user: null,
+        error: error.message,
+      },
       { status: 500 }
     );
   }

@@ -32,8 +32,9 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.authenticated && data.customer) {
-          setCustomer(data.customer);
+        const profile = data.customer || data.user;
+        if (profile) {
+          setCustomer(profile);
           return;
         }
       }
@@ -47,6 +48,15 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     refreshCustomer();
+
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('auth') === 'success') {
+        refreshCustomer();
+        url.searchParams.delete('auth');
+        window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+      }
+    }
   }, [refreshCustomer]);
 
   const openAuthModal = useCallback((mode: 'login' | 'register' = 'login') => {
@@ -69,7 +79,10 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
       if (!res.ok || !data.success) {
         return { success: false, error: data.error || 'Gagal masuk akun.' };
       }
-      setCustomer(data.customer);
+      const profile = data.customer || data.user;
+      if (profile) {
+        setCustomer(profile);
+      }
       setIsAuthModalOpen(false);
       return { success: true };
     } catch (err) {
@@ -88,7 +101,10 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
       if (!res.ok || !data.success) {
         return { success: false, error: data.error || 'Gagal mendaftar akun.' };
       }
-      setCustomer(data.customer);
+      const profile = data.customer || data.user;
+      if (profile) {
+        setCustomer(profile);
+      }
       setIsAuthModalOpen(false);
       return { success: true };
     } catch (err) {
