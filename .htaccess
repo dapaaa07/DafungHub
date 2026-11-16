@@ -1,5 +1,16 @@
 # DaFung Hub - cPanel Apache & Node.js Passenger Configuration
 
+# Disable LiteSpeed Cache completely so Next.js pages are never stale
+<IfModule LiteSpeed>
+  CacheLookup off
+  CacheDisable public /
+  CacheDisable private /
+</IfModule>
+
+<IfModule mod_headers.c>
+  Header always set X-LiteSpeed-Cache-Control "no-cache, no-store"
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
