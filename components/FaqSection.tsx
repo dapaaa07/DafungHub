@@ -17,15 +17,13 @@ export default function FaqSection() {
   const faqs: FaqItem[] = [
     {
       q: 'Berapa lama proses pengiriman akun setelah saya order?',
-      a: isOnline
-        ? 'Pemesanan melalui Bot Telegram diproses otomatis dalam 1–5 menit setelah pembayaran QRIS terkonfirmasi. Untuk pemesanan via WhatsApp CS, tim admin kami akan memproses secepatnya pada jam operasional.'
-        : 'Pemesanan melalui WhatsApp CS diproses secepatnya dalam hitungan menit pada jam operasional. Tim admin kami akan langsung memandu aktivasi dan mengirimkan kredensial secara aman.',
+      a: 'Pemesanan langsung via Website Checkout maupun Bot Telegram diproses otomatis dalam 1–5 menit setelah pembayaran QRIS atau saldo terkonfirmasi. Kredensial akun langsung tampil di layar browser dan tersimpan di menu Riwayat Pesanan (untuk pemesanan web) atau dikirim ke chat Telegram Anda.',
     },
     {
       q: 'Bagaimana alur pemesanan saat ini?',
       a: isOnline
-        ? 'Anda dapat memesan secara otomatis 24 jam melalui Bot Telegram resmi (@dafung_hub_bot) dengan invoice QRIS instan, atau konsultasi langsung dengan admin via WhatsApp CS resmi.'
-        : 'Saat ini pemesanan dialihkan langsung ke WhatsApp CS resmi Dafung Hub karena sistem Bot Telegram sedang dalam pemeliharaan (maintenance). Tim CS kami siap melayani konsultasi dan transaksi Anda 1-on-1.',
+        ? 'Anda dapat memesan melalui 2 cara praktis: langsung di Website ini dengan klik Beli Sekarang pada katalog produk, atau melalui Bot Telegram resmi (@dafung_hub_bot) 24 jam otomatis. Keduanya menggunakan QRIS instan dan bergaransi penuh.'
+        : 'Anda dapat memesan langsung via Website Checkout 24 jam otomatis atau melalui WhatsApp CS resmi kami sementara Bot Telegram dalam pemeliharaan berkala.',
     },
     {
       q: 'Bagaimana jika akun mengalami kendala sebelum masa aktif habis?',

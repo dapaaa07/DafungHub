@@ -109,7 +109,7 @@ export async function GET(
         }
       } catch (decErr) {
         console.error('[Order Poll] Credential decryption error:', decErr);
-        cleanCredentials = '⚠️ Gagal mendekripsi kredensial. Silakan hubungi Customer Support.';
+        cleanCredentials = 'Gagal mendekripsi kredensial. Silakan hubungi Customer Support.';
       }
     }
 

@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
         try {
           credentials = decrypt(row.credential_encrypted);
         } catch {
-          credentials = '⚠️ Kredensial tidak dapat didekripsi.';
+          credentials = 'Kredensial tidak dapat didekripsi.';
         }
       }
 

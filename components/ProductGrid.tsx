@@ -126,15 +126,11 @@ export default function ProductGrid({ initialProducts }: ProductGridProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
         {/* Section Heading */}
         <div className="text-center max-w-3xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFDE00]/20 text-yellow-900 border border-yellow-300 text-xs font-bold uppercase tracking-wider">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Katalog Resmi Supplier Live</span>
-          </div>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-[#121212] tracking-tight">
             Pilih Paket Digital Kebutuhan Anda
           </h2>
           <p className="text-sm sm:text-base text-gray-600">
-            Semua produk bergaransi penuh, harga distributor terbaik, dan siap dikirim otomatis melalui Bot Telegram atau WhatsApp Admin.
+            Semua produk bergaransi penuh, harga distributor terbaik, dan siap dipesan otomatis via Website Checkout maupun Bot Telegram 24 jam.
           </p>
         </div>
 

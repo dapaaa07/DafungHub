@@ -216,7 +216,7 @@ Mohon panduan ketersediaan & metode pembayarannya. Terima kasih!`;
                 </div>
               </div>
               <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200">
-                Paling Cepat ⚡
+                Paling Cepat
               </span>
             </div>
 
@@ -310,7 +310,7 @@ Mohon panduan ketersediaan & metode pembayarannya. Terima kasih!`;
                       </span>
                       {isVip && (
                         <span className="px-1.5 py-0.2 rounded bg-[#FFDE00] text-[#121212] text-[9px] font-black shrink-0">
-                          VIP ⭐
+                          VIP
                         </span>
                       )}
                     </div>

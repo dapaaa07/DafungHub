@@ -417,7 +417,7 @@ export default function AccountPage() {
                 </span>
                 {isVip ? (
                   <span className="px-2.5 py-0.5 rounded-full bg-[#FFDE00] text-[#121212] text-[10px] font-black shadow-sm">
-                    VIP AKTIF ⭐
+                    VIP AKTIF
                   </span>
                 ) : (
                   <span className="px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-bold">
@@ -429,7 +429,7 @@ export default function AccountPage() {
               {isVip ? (
                 <div className="space-y-2">
                   <div className="text-2xl font-black text-[#121212]">
-                    Status VIP Premium ⭐
+                    Status VIP Premium
                   </div>
                   {membershipData?.formattedExpiresAt || customer.membership_expires_at ? (
                     <div className="flex items-center gap-1.5 text-xs text-gray-600">
@@ -523,7 +523,7 @@ export default function AccountPage() {
             <div className="text-right hidden sm:block">
               <span className="text-xs font-bold text-gray-400 block">Metode Pembayaran:</span>
               <span className="text-xs font-extrabold text-gray-800">
-                💰 Saldo Akun (Instan) atau 📱 QRIS
+                Saldo Akun (Instan) atau QRIS
               </span>
             </div>
           </div>

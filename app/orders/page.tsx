@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Loader2,
   User as UserIcon,
+  X,
 } from 'lucide-react';
 import { formatRupiah } from '@/lib/pricing';
 import Navbar from '@/components/Navbar';
@@ -250,7 +251,7 @@ export default function CustomerOrdersPage() {
                   onClick={() => setSelectedOrder(null)}
                   className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-black"
                 >
-                  ✕
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 

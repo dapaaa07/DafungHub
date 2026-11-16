@@ -270,7 +270,7 @@ export default function OrderClient({ code }: { code: string }) {
                         </div>
                         <div>
                           <h3 className="text-emerald-900 font-extrabold text-sm sm:text-base">
-                            Top-Up Saldo Berhasil Masuk! 🎉
+                            Top-Up Saldo Berhasil Masuk!
                           </h3>
                           <p className="text-xs text-emerald-700 mt-0.5">
                             Saldo akun Anda telah bertambah secara otomatis dan siap digunakan untuk transaksi.

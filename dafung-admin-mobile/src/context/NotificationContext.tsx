@@ -180,7 +180,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           try {
             await Notifications.scheduleNotificationAsync({
               content: {
-                title: '🔔 Pesanan Baru Masuk!',
+                title: 'Pesanan Baru Masuk!',
                 body: `${newest.productName} (${newest.formattedPrice}) dari ${customerDisplay}`,
                 data: { orderCode: newest.orderCode },
                 sound: 'default',
@@ -258,7 +258,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: '🔔 Pesanan Baru Masuk!',
+          title: 'Pesanan Baru Masuk!',
           body: `${dummy.productName} (${dummy.formattedPrice}) dari ${dummy.customerName}`,
           data: { orderCode: dummy.orderCode },
           sound: 'default',

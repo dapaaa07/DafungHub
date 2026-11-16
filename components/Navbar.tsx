@@ -11,6 +11,8 @@ import { useCustomerAuth } from './CustomerAuthContext';
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [activeSection, setActiveSection] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { botStatus } = useBotStatus();
   const { customer, openAuthModal, openTopUpModal, logout } = useCustomerAuth();
@@ -26,51 +28,49 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  return (
-    <header className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-md border-b border-gray-200">
-      {/* Top Announcement Bar */}
-      <div className="bg-[#121212] text-white text-xs py-1.5 px-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap">
-            <span className="inline-flex items-center gap-1 font-semibold text-[#FFDE00]">
-              <Zap className="w-3.5 h-3.5 fill-[#FFDE00]" /> Info Layanan:
-            </span>
-            <span className="inline-flex items-center gap-2 text-gray-300">
-              {isOnline ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 inline-block" />
-                  <span>Bot Telegram & Web Checkout Aktif 24 Jam — Otomatis & Cepat!</span>
-                </>
-              ) : (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0 inline-block" />
-                  <span className="text-amber-200">Bot Telegram sedang maintenance. Web Checkout & WhatsApp CS tetap melayani!</span>
-                </>
-              )}
-            </span>
-          </div>
-          <div className="hidden md:flex items-center gap-4 text-gray-300 text-xs">
-            <span className="flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#3AA8E8]" /> Garansi Full Durasi
-            </span>
-            <a
-              href={`https://wa.me/${CS_WHATSAPP_INTL}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-[#FFDE00] transition-colors"
-            >
-              CS WA: 0812-9495-0241
-            </a>
-          </div>
-        </div>
-      </div>
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
 
+      // Dynamic active section detection
+      const sections = ['katalog', 'keunggulan', 'cara-order', 'garansi', 'faq'];
+      const scrollPos = window.scrollY + 120;
+      for (const sectionId of sections) {
+        const el = document.getElementById(sectionId);
+        if (el) {
+          const top = el.offsetTop;
+          const height = el.offsetHeight;
+          if (scrollPos >= top && scrollPos < top + height) {
+            setActiveSection(sectionId);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  return (
+    <header
+      className={`sticky top-0 z-50 w-full transition-all duration-300 ${
+        isScrolled
+          ? 'bg-white/95 backdrop-blur-md shadow-xs border-b border-gray-200'
+          : 'bg-white border-b border-gray-100'
+      }`}
+    >
       {/* Main Navbar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+        <div
+          className={`flex items-center justify-between transition-all duration-300 ${
+            isScrolled ? 'h-16' : 'h-20'
+          }`}
+        >
           {/* Brand Logo */}
-          <Link href="/" className="flex items-center gap-2 group py-2">
-            <div className="relative h-12 w-48 sm:w-56 group-hover:scale-[1.02] transition-transform">
+          <Link href="/" className="flex items-center gap-2 group py-2 shrink-0">
+            <div className="relative h-11 w-44 sm:h-12 sm:w-52 group-hover:scale-[1.02] transition-transform">
               <Image
                 src="/logo-transparent.png"
                 alt="Dafung Hub — Layanan Digital Premium"
@@ -82,26 +82,61 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden lg:flex items-center gap-8 text-sm font-semibold text-gray-700">
-            <Link href="/#katalog" className="hover:text-[#121212] transition-colors">
+          <nav className="hidden lg:flex items-center gap-7 xl:gap-8 text-sm font-semibold">
+            <Link
+              href="/#katalog"
+              className={`transition-colors py-1.5 relative ${
+                activeSection === 'katalog'
+                  ? 'text-[#121212] font-extrabold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#FFDE00]'
+                  : 'text-gray-600 hover:text-[#121212]'
+              }`}
+            >
               Katalog Produk
             </Link>
-            <Link href="/#keunggulan" className="hover:text-[#121212] transition-colors">
+            <Link
+              href="/#keunggulan"
+              className={`transition-colors py-1.5 relative ${
+                activeSection === 'keunggulan'
+                  ? 'text-[#121212] font-extrabold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#FFDE00]'
+                  : 'text-gray-600 hover:text-[#121212]'
+              }`}
+            >
               Keunggulan
             </Link>
-            <Link href="/#cara-order" className="hover:text-[#121212] transition-colors">
+            <Link
+              href="/#cara-order"
+              className={`transition-colors py-1.5 relative ${
+                activeSection === 'cara-order'
+                  ? 'text-[#121212] font-extrabold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#FFDE00]'
+                  : 'text-gray-600 hover:text-[#121212]'
+              }`}
+            >
               Cara Order
             </Link>
-            <Link href="/#garansi" className="hover:text-[#121212] transition-colors">
+            <Link
+              href="/#garansi"
+              className={`transition-colors py-1.5 relative ${
+                activeSection === 'garansi'
+                  ? 'text-[#121212] font-extrabold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#FFDE00]'
+                  : 'text-gray-600 hover:text-[#121212]'
+              }`}
+            >
               Kebijakan Garansi
             </Link>
-            <Link href="/#faq" className="hover:text-[#121212] transition-colors">
+            <Link
+              href="/#faq"
+              className={`transition-colors py-1.5 relative ${
+                activeSection === 'faq'
+                  ? 'text-[#121212] font-extrabold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#FFDE00]'
+                  : 'text-gray-600 hover:text-[#121212]'
+              }`}
+            >
               FAQ
             </Link>
           </nav>
 
           {/* Desktop Direct Action Buttons & Auth */}
-          <div className="hidden sm:flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-3 lg:pl-6 lg:border-l lg:border-gray-200">
             {/* Telegram Bot Button */}
             {isOnline && (
               <a
@@ -296,8 +331,8 @@ export default function Navbar() {
                       {customer.username ? `@${customer.username}` : (customer.name || customer.email || 'Pelanggan')}
                     </span>
                     {customer.membership_tier === 'vip' && (
-                      <span className="px-2 py-0.5 rounded-md bg-[#FFDE00] text-[#121212] text-[10px] font-extrabold">
-                        VIP ⭐
+                      <span className="px-2 py-0.5 rounded-md bg-[#FFDE00] text-[#121212] text-[10px] font-black inline-flex items-center gap-1">
+                        VIP
                       </span>
                     )}
                   </div>
