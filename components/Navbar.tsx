@@ -3,12 +3,14 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Send, MessageCircle, Menu, X, ShieldCheck, Zap, User as UserIcon, Wallet, LogOut, PackageCheck, ChevronDown, Sparkles, Crown } from 'lucide-react';
-import { CS_WHATSAPP_INTL, TELEGRAM_BOT_USERNAME, formatRupiah } from '@/lib/pricing';
+import { usePathname } from 'next/navigation';
+import { Send, Menu, X, User as UserIcon, Wallet, LogOut, PackageCheck, ChevronDown, Crown } from 'lucide-react';
+import { TELEGRAM_BOT_USERNAME, formatRupiah } from '@/lib/pricing';
 import { useBotStatus } from './BotStatusContext';
 import { useCustomerAuth } from './CustomerAuthContext';
 
 export default function Navbar() {
+  const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -83,6 +85,16 @@ export default function Navbar() {
 
           {/* Desktop Nav Links */}
           <nav className="hidden lg:flex items-center gap-5 xl:gap-8 text-xs xl:text-sm font-semibold whitespace-nowrap">
+            <Link
+              href="/"
+              className={`whitespace-nowrap py-1.5 transition-colors relative ${
+                pathname === '/' && !activeSection
+                  ? 'text-[#121212] font-extrabold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#FFDE00]'
+                  : 'text-gray-600 hover:text-[#121212]'
+              }`}
+            >
+              Beranda
+            </Link>
             <Link
               href="/#keunggulan"
               className={`whitespace-nowrap py-1.5 transition-colors relative ${
@@ -282,19 +294,6 @@ export default function Navbar() {
                 <span className="whitespace-nowrap">Masuk / Daftar</span>
               </button>
             )}
-
-            {/* WhatsApp CS Button */}
-            <a
-              href={`https://wa.me/${CS_WHATSAPP_INTL}?text=${encodeURIComponent(
-                'Halo CS Dafung Hub, saya ingin konsultasi produk digital premium.'
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-2 xl:px-4 xl:py-2.5 rounded-xl text-xs font-bold text-[#121212] bg-[#FFDE00] hover:bg-[#FFE838] shadow-sm transition-all hover:scale-[1.02] whitespace-nowrap shrink-0"
-            >
-              <MessageCircle className="w-4 h-4 text-[#121212]" />
-              <span className="whitespace-nowrap">Chat CS WA</span>
-            </a>
           </div>
 
           {/* Mobile Menu Button */}
@@ -402,6 +401,13 @@ export default function Navbar() {
 
           <nav className="flex flex-col space-y-2 text-base font-semibold text-gray-800">
             <Link
+              href="/"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2 rounded-lg hover:bg-gray-100"
+            >
+              Beranda
+            </Link>
+            <Link
               href="/#keunggulan"
               onClick={() => setMobileMenuOpen(false)}
               className="px-3 py-2 rounded-lg hover:bg-gray-100"
@@ -436,32 +442,40 @@ export default function Navbar() {
             >
               FAQ
             </Link>
+
+            {isOnline && (
+              <a
+                href={`https://t.me/${TELEGRAM_BOT_USERNAME}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg hover:bg-gray-100 flex items-center justify-between text-[#3AA8E8]"
+              >
+                <div className="flex items-center gap-2">
+                  <Send className="w-4 h-4" />
+                  <span>Bot Telegram</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-bold border border-emerald-200">
+                  Online
+                </span>
+              </a>
+            )}
           </nav>
 
-          <div className="pt-2 border-t border-gray-100 flex flex-col gap-2">
-            <a
-              href={`https://wa.me/${CS_WHATSAPP_INTL}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-[#FFDE00] text-[#121212] font-bold text-sm shadow-sm"
-            >
-              <MessageCircle className="w-4 h-4 text-[#121212]" />
-              <span>Pesan via WhatsApp CS (Aktif)</span>
-            </a>
-
-            {customer && (
+          {customer && (
+            <div className="pt-2 border-t border-gray-100">
               <button
                 type="button"
                 onClick={() => {
                   setMobileMenuOpen(false);
                   logout();
                 }}
-                className="w-full py-2.5 rounded-xl text-center text-xs font-bold text-red-600 bg-red-50 border border-red-100"
+                className="w-full py-2.5 rounded-xl text-center text-xs font-bold text-red-600 bg-red-50 border border-red-100 cursor-pointer"
               >
                 Keluar dari Akun
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </header>

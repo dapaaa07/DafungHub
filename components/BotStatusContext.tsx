@@ -15,13 +15,6 @@ const BotStatusContext = createContext<BotStatusContextValue>({
 });
 
 function getStatusEndpoint(): string {
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    // When running on shared hosting (e.g. store.dafung.web.id), point to Vercel API
-    if (host.includes('dafung.web.id')) {
-      return 'https://dafung-hub.vercel.app/api/bot-status';
-    }
-  }
   return '/api/bot-status';
 }
 

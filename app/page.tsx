@@ -7,25 +7,21 @@ import HowItWorks from '@/components/HowItWorks';
 import GuaranteeSection from '@/components/GuaranteeSection';
 import FaqSection from '@/components/FaqSection';
 import Footer from '@/components/Footer';
-import { BotStatusProvider } from '@/components/BotStatusContext';
 import { getAllEnrichedProducts } from '@/lib/supplier';
-import { getBotStatus } from '@/lib/settings';
 
 export const instant = false;
 
 export default async function HomePage() {
   await connection();
 
-  const [products, botStatus] = await Promise.all([
+  const [products] = await Promise.all([
     getAllEnrichedProducts(),
-    getBotStatus(),
   ]);
 
   return (
-    <BotStatusProvider initialStatus={botStatus}>
-      <div className="flex flex-col min-h-screen bg-[#F8F9FA] text-[#121212]">
-        {/* Top Sticky Navbar */}
-        <Navbar />
+    <div className="flex flex-col min-h-screen bg-[#F8F9FA] text-[#121212]">
+      {/* Top Sticky Navbar */}
+      <Navbar />
 
         <main className="flex-1">
           {/* Hero Section */}
@@ -50,6 +46,5 @@ export default async function HomePage() {
         {/* Official Footer */}
         <Footer />
       </div>
-    </BotStatusProvider>
   );
 }

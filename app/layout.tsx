@@ -37,8 +37,10 @@ export const metadata: Metadata = {
 };
 
 import { CustomerAuthProvider } from '@/components/CustomerAuthContext';
+import { BotStatusProvider } from '@/components/BotStatusContext';
 import AuthModal from '@/components/AuthModal';
 import TopUpModal from '@/components/TopUpModal';
+import FloatingWhatsApp from '@/components/FloatingWhatsApp';
 
 export default function RootLayout({
   children,
@@ -55,12 +57,15 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen bg-[#F8F9FA] text-[#121212] antialiased flex flex-col">
-        <CustomerAuthProvider>
-          {children}
-          <AuthModal />
-          <TopUpModal />
-        </CustomerAuthProvider>
+      <body className="min-h-screen bg-[#F8F9FA] text-[#121212] antialiased flex flex-col relative">
+        <BotStatusProvider>
+          <CustomerAuthProvider>
+            {children}
+            <AuthModal />
+            <TopUpModal />
+            <FloatingWhatsApp />
+          </CustomerAuthProvider>
+        </BotStatusProvider>
       </body>
     </html>
   );
