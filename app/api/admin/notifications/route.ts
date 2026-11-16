@@ -57,24 +57,32 @@ export async function GET(req: Request) {
       price: number;
       fulfillment_status: string;
       created_at: string;
-      telegram_id: string;
+      user_id: string | null;
+      telegram_id: string | null;
       username: string | null;
+      user_name: string | null;
+      user_email: string | null;
       first_name: string | null;
       membership_tier: string | null;
       inv_username: string | null;
       inv_first_name: string | null;
+      inv_customer_id: string | null;
     }>(
       `SELECT o.id, o.order_code,
               COALESCE(p.name, 'Produk Khusus') as product_name,
               COALESCE(p.price, (o.invoice_data->>'amount')::int, (o.invoice_data->>'payable_amount')::int, 0) as price,
               o.fulfillment_status,
               o.created_at,
+              u.id as user_id,
               u.telegram_id,
               u.username,
+              u.name as user_name,
+              u.email as user_email,
               u.first_name,
               u.membership_tier,
               (o.invoice_data->>'customer_username') as inv_username,
-              (o.invoice_data->>'customer_first_name') as inv_first_name
+              (o.invoice_data->>'customer_first_name') as inv_first_name,
+              (o.invoice_data->>'customer_id') as inv_customer_id
        FROM orders o
        LEFT JOIN products p ON o.product_id = p.id
        LEFT JOIN users u ON o.user_id = u.id
@@ -101,8 +109,9 @@ export async function GET(req: Request) {
         newOrdersCount: newOrdersRes.rows.length,
         pendingFulfillmentCount: pendingCount,
         newPaidOrders: newOrdersRes.rows.map((row) => {
-          const finalUsername = row.username || row.inv_username || null;
-          const finalFirstName = row.first_name || row.inv_first_name || null;
+          const displayId = row.telegram_id || row.inv_customer_id || (row.user_id ? `WEB-${row.user_id.replace(/-/g, '').slice(0, 8).toUpperCase()}` : 'Pembeli');
+          const finalUsername = row.username || row.inv_username || (row.user_email ? row.user_email.split('@')[0] : null);
+          const finalFirstName = row.first_name || row.inv_first_name || row.user_name || (finalUsername ? `@${finalUsername}` : 'Pelanggan');
           const finalPrice = Number(row.price || 0);
 
           return {
@@ -114,7 +123,9 @@ export async function GET(req: Request) {
             fulfillmentStatus: row.fulfillment_status,
             createdAt: row.created_at,
             customer: {
-              telegramId: row.telegram_id || 'Pembeli',
+              telegramId: displayId,
+              telegram_id: displayId,
+              displayId: displayId,
               username: finalUsername,
               firstName: finalFirstName,
               isVip: Boolean(row.membership_tier && row.membership_tier !== 'free'),

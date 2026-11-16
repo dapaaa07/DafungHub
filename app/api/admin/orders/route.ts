@@ -76,8 +76,11 @@ export async function GET(req: Request) {
       credential_encrypted: string | null;
       delivered_at: string | null;
       created_at: string;
-      telegram_id: string;
+      user_id: string | null;
+      telegram_id: string | null;
       username: string | null;
+      user_name: string | null;
+      user_email: string | null;
       first_name: string | null;
       membership_tier: string | null;
     }>(
@@ -85,7 +88,7 @@ export async function GET(req: Request) {
               COALESCE(p.price, (o.invoice_data->>'amount')::int, 0) as product_price,
               o.payment_status, o.fulfillment_status, o.invoice_data, o.credential_encrypted,
               o.delivered_at, o.created_at,
-              COALESCE(u.telegram_id, 'Guest') as telegram_id, u.username, u.first_name, u.membership_tier
+              u.id as user_id, u.telegram_id, u.username, u.name as user_name, u.email as user_email, u.first_name, u.membership_tier
        FROM orders o
        LEFT JOIN products p ON o.product_id = p.id
        LEFT JOIN users u ON o.user_id = u.id
@@ -98,26 +101,33 @@ export async function GET(req: Request) {
     return NextResponse.json(
       {
         success: true,
-        orders: ordersRes.rows.map((row) => ({
-          id: row.id,
-          orderCode: row.order_code,
-          productId: row.product_id,
-          productName: row.product_name,
-          price: row.product_price,
-          paymentStatus: row.payment_status,
-          fulfillmentStatus: row.fulfillment_status,
-          isDelivered: row.fulfillment_status === 'delivered',
-          deliveredAt: row.delivered_at,
-          createdAt: row.created_at,
-          hasEncryptedCredential: Boolean(row.credential_encrypted),
-          customer: {
-            telegramId: row.telegram_id,
-            username: row.username,
-            firstName: row.first_name,
-            isVip: row.membership_tier && row.membership_tier !== 'free',
-          },
-          invoiceData: row.invoice_data,
-        })),
+        orders: ordersRes.rows.map((row) => {
+          const displayId = row.telegram_id || (row.user_id ? `WEB-${row.user_id.replace(/-/g, '').slice(0, 8).toUpperCase()}` : 'WEB-BUYER');
+          const username = row.username || (row.user_email ? row.user_email.split('@')[0] : null);
+
+          return {
+            id: row.id,
+            orderCode: row.order_code,
+            productId: row.product_id,
+            productName: row.product_name,
+            price: row.product_price,
+            paymentStatus: row.payment_status,
+            fulfillmentStatus: row.fulfillment_status,
+            isDelivered: row.fulfillment_status === 'delivered',
+            deliveredAt: row.delivered_at,
+            createdAt: row.created_at,
+            hasEncryptedCredential: Boolean(row.credential_encrypted),
+            customer: {
+              telegramId: displayId,
+              telegram_id: displayId,
+              displayId: displayId,
+              username: username,
+              firstName: row.first_name || row.user_name || username || 'Pelanggan',
+              isVip: row.membership_tier && row.membership_tier !== 'free',
+            },
+            invoiceData: row.invoice_data,
+          };
+        }),
         pagination: {
           page,
           limit,

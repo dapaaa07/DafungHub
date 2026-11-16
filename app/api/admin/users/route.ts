@@ -30,7 +30,7 @@ export async function GET(req: Request) {
     if (search.trim()) {
       params.push(`%${search.trim()}%`);
       const pIdx = params.length;
-      whereClause += ` AND (u.telegram_id ILIKE $${pIdx} OR u.username ILIKE $${pIdx} OR u.first_name ILIKE $${pIdx})`;
+      whereClause += ` AND (u.telegram_id ILIKE $${pIdx} OR u.username ILIKE $${pIdx} OR u.first_name ILIKE $${pIdx} OR u.name ILIKE $${pIdx} OR u.email ILIKE $${pIdx} OR u.id::text ILIKE $${pIdx})`;
     }
 
     // Total count
@@ -52,6 +52,8 @@ export async function GET(req: Request) {
       role: string;
       balance: number;
       username: string | null;
+      name: string | null;
+      email: string | null;
       first_name: string | null;
       membership_tier: string | null;
       membership_expires_at: string | null;
@@ -61,7 +63,7 @@ export async function GET(req: Request) {
     }>(
       `SELECT
         u.id, u.telegram_id, u.role, COALESCE(u.balance, 0) as balance,
-        u.username, u.first_name, u.membership_tier, u.membership_expires_at,
+        u.username, u.name, u.email, u.first_name, u.membership_tier, u.membership_expires_at,
         u.created_at,
         COUNT(CASE WHEN o.payment_status = 'paid' THEN 1 END)::text as total_orders,
         COALESCE(SUM(CASE WHEN o.payment_status = 'paid' THEN p.price ELSE 0 END), 0)::text as total_spent
@@ -86,16 +88,19 @@ export async function GET(req: Request) {
             (!row.membership_expires_at || new Date(row.membership_expires_at) > new Date())
           );
           const tier = isVip ? 'vip' : 'free';
+          const displayId = row.telegram_id || `WEB-${row.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+          const username = row.username || (row.email ? row.email.split('@')[0] : null);
 
           return {
             id: row.id,
-            telegramId: row.telegram_id,
-            telegram_id: row.telegram_id,
+            telegramId: displayId,
+            telegram_id: displayId,
+            displayId: displayId,
             role: row.role,
             balance: Number(row.balance || 0),
-            username: row.username,
-            firstName: row.first_name,
-            first_name: row.first_name,
+            username: username,
+            firstName: row.first_name || row.name || username || 'Pelanggan',
+            first_name: row.first_name || row.name || username || 'Pelanggan',
             membershipTier: tier,
             membership_tier: tier,
             membershipExpiresAt: row.membership_expires_at,

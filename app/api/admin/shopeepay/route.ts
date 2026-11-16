@@ -32,15 +32,18 @@ export async function GET(req: Request) {
       created_at: string;
       shopeepay_tx_id: string | null;
       payment_method: string | null;
+      user_id: string | null;
       username: string | null;
+      user_name: string | null;
+      user_email: string | null;
       first_name: string | null;
-      telegram_id: string;
+      telegram_id: string | null;
     }>(
       `SELECT o.id, o.order_code, p.name as product_name, p.price, o.created_at,
               o.invoice_data->>'payable_amount' as payable_amount,
               o.invoice_data->>'shopeepay_tx_id' as shopeepay_tx_id,
               o.invoice_data->>'payment_method' as payment_method,
-              u.username, u.first_name, u.telegram_id
+              u.id as user_id, u.username, u.name as user_name, u.email as user_email, u.first_name, u.telegram_id
        FROM orders o
        JOIN products p ON o.product_id = p.id
        JOIN users u ON o.user_id = u.id
@@ -76,6 +79,9 @@ export async function GET(req: Request) {
       const txId = ord.shopeepay_tx_id || ord.order_code || `TX-${Date.now()}-${idx}`;
       const method = (ord.payment_method || '').toLowerCase();
       const issuer = method === 'saldo' ? 'Saldo Akun' : 'QRIS (Dafung Hub)';
+      const displayId = ord.telegram_id || (ord.user_id ? `WEB-${ord.user_id.replace(/-/g, '').slice(0, 8).toUpperCase()}` : 'WEB-BUYER');
+      const username = ord.username || (ord.user_email ? ord.user_email.split('@')[0] : null);
+      const custName = username ? `@${username}` : (ord.first_name || ord.user_name || `ID: ${displayId}`);
 
       return {
         transactionId: txId,
@@ -92,8 +98,9 @@ export async function GET(req: Request) {
         order: {
           orderCode: ord.order_code,
           productName: ord.product_name,
-          customer: ord.username ? `@${ord.username}` : ord.first_name || ord.telegram_id,
-          telegramId: ord.telegram_id,
+          customer: custName,
+          telegramId: displayId,
+          telegram_id: displayId,
         },
       };
     });

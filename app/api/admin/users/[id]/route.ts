@@ -25,12 +25,17 @@ export async function GET(
 
   try {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userIdOrTg);
+    const isWebId = userIdOrTg.toUpperCase().startsWith('WEB-');
+    const webHex = isWebId ? userIdOrTg.substring(4).toLowerCase() : '';
+
     const userRes = await query<{
       id: string;
-      telegram_id: string;
+      telegram_id: string | null;
       role: string;
       balance: number;
       username: string | null;
+      name: string | null;
+      email: string | null;
       first_name: string | null;
       membership_tier: string | null;
       membership_expires_at: string | null;
@@ -39,8 +44,10 @@ export async function GET(
     }>(
       isUuid
         ? `SELECT * FROM users WHERE id = $1 LIMIT 1`
+        : isWebId
+        ? `SELECT * FROM users WHERE replace(id::text, '-', '') ILIKE $1 || '%' OR telegram_id = $2 LIMIT 1`
         : `SELECT * FROM users WHERE telegram_id = $1 LIMIT 1`,
-      [userIdOrTg]
+      isWebId ? [webHex, userIdOrTg] : [userIdOrTg]
     );
 
     if (userRes.rows.length === 0) {
@@ -76,19 +83,24 @@ export async function GET(
       (!user.membership_expires_at || new Date(user.membership_expires_at) > new Date())
     );
     const tier = isVip ? 'vip' : 'free';
+    const displayId = user.telegram_id || `WEB-${user.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+    const username = user.username || (user.email ? user.email.split('@')[0] : null);
 
     return NextResponse.json(
       {
         success: true,
         user: {
           id: user.id,
-          telegramId: user.telegram_id,
-          telegram_id: user.telegram_id,
+          telegramId: displayId,
+          telegram_id: displayId,
+          displayId: displayId,
           role: user.role,
           balance: Number(user.balance || 0),
-          username: user.username,
-          firstName: user.first_name,
-          first_name: user.first_name,
+          username: username,
+          firstName: user.first_name || user.name || username || 'Pelanggan',
+          first_name: user.first_name || user.name || username || 'Pelanggan',
+          name: user.name || user.first_name || username || 'Pelanggan',
+          email: user.email || null,
           membershipTier: tier,
           membership_tier: tier,
           membershipExpiresAt: user.membership_expires_at,

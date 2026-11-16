@@ -267,7 +267,7 @@ export async function handleAdminHttpRequest(
                (o.fulfillment_status = 'delivered') as is_delivered,
                o.delivered_at, o.created_at, o.credential_encrypted as encrypted_credential, o.invoice_data,
                p.id as product_id, p.name as product_name, p.price,
-               u.telegram_id, u.username, u.first_name, u.membership_tier
+               u.id as user_id, u.telegram_id, u.username, u.name as user_name, u.email as user_email, u.first_name, u.membership_tier
         FROM orders o
         JOIN products p ON o.product_id = p.id
         LEFT JOIN users u ON o.user_id = u.id
@@ -288,32 +288,41 @@ export async function handleAdminHttpRequest(
         created_at: string;
         encrypted_credential: string | null;
         invoice_data: unknown;
+        user_id: string | null;
         telegram_id: string | null;
         username: string | null;
+        user_name: string | null;
+        user_email: string | null;
         first_name: string | null;
         membership_tier: string | null;
       }>(ordersSql, [...values, limit, offset]);
 
-      const formatted = ordersRes.rows.map((row) => ({
-        id: row.id,
-        orderCode: row.order_code,
-        productId: row.product_id,
-        productName: row.product_name,
-        price: Number(row.price),
-        paymentStatus: row.payment_status,
-        fulfillmentStatus: row.fulfillment_status,
-        isDelivered: row.is_delivered,
-        deliveredAt: row.delivered_at,
-        createdAt: row.created_at,
-        hasEncryptedCredential: Boolean(row.encrypted_credential),
-        customer: {
-          telegramId: row.telegram_id,
-          username: row.username,
-          firstName: row.first_name,
-          isVip: row.membership_tier === 'vip',
-        },
-        invoiceData: typeof row.invoice_data === 'string' ? JSON.parse(row.invoice_data || '{}') : (row.invoice_data || {}),
-      }));
+      const formatted = ordersRes.rows.map((row) => {
+        const displayId = row.telegram_id || (row.user_id ? `WEB-${row.user_id.replace(/-/g, '').slice(0, 8).toUpperCase()}` : 'WEB-BUYER');
+        const username = row.username || (row.user_email ? row.user_email.split('@')[0] : null);
+        return {
+          id: row.id,
+          orderCode: row.order_code,
+          productId: row.product_id,
+          productName: row.product_name,
+          price: Number(row.price),
+          paymentStatus: row.payment_status,
+          fulfillmentStatus: row.fulfillment_status,
+          isDelivered: row.is_delivered,
+          deliveredAt: row.delivered_at,
+          createdAt: row.created_at,
+          hasEncryptedCredential: Boolean(row.encrypted_credential),
+          customer: {
+            telegramId: displayId,
+            telegram_id: displayId,
+            displayId: displayId,
+            username: username,
+            firstName: row.first_name || row.user_name || username || 'Pelanggan',
+            isVip: row.membership_tier === 'vip',
+          },
+          invoiceData: typeof row.invoice_data === 'string' ? JSON.parse(row.invoice_data || '{}') : (row.invoice_data || {}),
+        };
+      });
 
       sendJson(res, 200, {
         success: true,
@@ -623,7 +632,7 @@ export async function handleAdminHttpRequest(
       const totalCount = parseInt(countRes.rows[0]?.total || '0', 10);
 
       const usersSql = `
-        SELECT u.id, u.telegram_id, u.role, u.balance, u.username, u.first_name,
+        SELECT u.id, u.telegram_id, u.role, u.balance, u.username, u.name, u.email, u.first_name,
                u.membership_tier, u.membership_expires_at, u.created_at,
                COUNT(o.id) as total_orders,
                COALESCE(SUM(CASE WHEN o.payment_status = 'paid' THEN p.price ELSE 0 END), 0) as total_spent
@@ -641,6 +650,8 @@ export async function handleAdminHttpRequest(
         role: string;
         balance: number | string | null;
         username: string | null;
+        name: string | null;
+        email: string | null;
         first_name: string | null;
         membership_tier: string | null;
         membership_expires_at: string | Date | null;
@@ -656,15 +667,19 @@ export async function handleAdminHttpRequest(
           (!row.membership_expires_at || new Date(row.membership_expires_at) > new Date())
         );
         const tier = isVip ? 'vip' : 'free';
+        const displayId = row.telegram_id || `WEB-${row.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+        const username = row.username || (row.email ? row.email.split('@')[0] : null);
+
         return {
           id: row.id,
-          telegramId: row.telegram_id,
-          telegram_id: row.telegram_id,
+          telegramId: displayId,
+          telegram_id: displayId,
+          displayId: displayId,
           role: row.role,
           balance: Number(row.balance || 0),
-          username: row.username,
-          firstName: row.first_name,
-          first_name: row.first_name,
+          username: username,
+          firstName: row.first_name || row.name || username || 'Pelanggan',
+          first_name: row.first_name || row.name || username || 'Pelanggan',
           membershipTier: tier,
           membership_tier: tier,
           membershipExpiresAt: row.membership_expires_at,
@@ -702,9 +717,17 @@ export async function handleAdminHttpRequest(
     const id = decodeURIComponent(userDetailMatch[1]);
     try {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      const isWebId = id.toUpperCase().startsWith('WEB-');
+      const webHex = isWebId ? id.substring(4).toLowerCase() : '';
+
       const userRes = await query<
         Record<string, unknown> & {
           id: string;
+          telegram_id?: string | null;
+          username?: string | null;
+          name?: string | null;
+          email?: string | null;
+          first_name?: string | null;
           balance?: number | string | null;
           membership_tier?: string | null;
           membership_expires_at?: string | Date | null;
@@ -712,8 +735,10 @@ export async function handleAdminHttpRequest(
       >(
         isUuid
           ? `SELECT * FROM users WHERE id = $1 LIMIT 1`
+          : isWebId
+          ? `SELECT * FROM users WHERE replace(id::text, '-', '') ILIKE $1 || '%' OR telegram_id = $2 LIMIT 1`
           : `SELECT * FROM users WHERE telegram_id = $1 LIMIT 1`,
-        [id]
+        isWebId ? [webHex, id] : [id]
       );
       if (userRes.rows.length === 0) {
         sendJson(res, 404, { success: false, error: 'User tidak ditemukan.' });
@@ -737,18 +762,21 @@ export async function handleAdminHttpRequest(
         (!user.membership_expires_at || new Date(user.membership_expires_at) > new Date())
       );
       const tier = isVip ? 'vip' : 'free';
+      const displayId = user.telegram_id || `WEB-${user.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+      const username = user.username || (user.email ? (user.email as string).split('@')[0] : null);
 
       sendJson(res, 200, {
         success: true,
         user: {
           ...user,
           id: user.id,
-          telegramId: user.telegram_id,
-          telegram_id: user.telegram_id,
+          telegramId: displayId,
+          telegram_id: displayId,
+          displayId: displayId,
           balance: Number(user.balance || 0),
-          username: user.username,
-          firstName: user.first_name,
-          first_name: user.first_name,
+          username: username,
+          firstName: user.first_name || user.name || username || 'Pelanggan',
+          first_name: user.first_name || user.name || username || 'Pelanggan',
           membershipTier: tier,
           membership_tier: tier,
           membershipExpiresAt: user.membership_expires_at,
@@ -787,13 +815,16 @@ export async function handleAdminHttpRequest(
         price: number;
         shopeepay_tx_id: string | null;
         product_name: string;
-        telegram_id: string;
+        user_id: string | null;
+        telegram_id: string | null;
         username: string | null;
+        user_name: string | null;
+        user_email: string | null;
       }>(
         `SELECT o.order_code, o.payment_status, o.created_at,
                 (o.invoice_data->>'payable_amount') as payable_amount,
                 (o.invoice_data->>'shopeepay_tx_id') as shopeepay_tx_id,
-                p.price, p.name as product_name, u.telegram_id, u.username
+                p.price, p.name as product_name, u.id as user_id, u.telegram_id, u.username, u.name as user_name, u.email as user_email
          FROM orders o
          JOIN products p ON o.product_id = p.id
          LEFT JOIN users u ON o.user_id = u.id
@@ -846,12 +877,18 @@ export async function handleAdminHttpRequest(
           issuer: String(tx.issuer || tx.payment_method || 'ShopeePay'),
           isMatched: Boolean(matchedOrder),
           order: matchedOrder
-            ? {
-                orderCode: matchedOrder.order_code,
-                productName: matchedOrder.product_name,
-                customer: matchedOrder.username ? `@${matchedOrder.username}` : `ID: ${matchedOrder.telegram_id}`,
-                telegramId: matchedOrder.telegram_id,
-              }
+            ? (() => {
+                const displayId = matchedOrder.telegram_id || (matchedOrder.user_id ? `WEB-${matchedOrder.user_id.replace(/-/g, '').slice(0, 8).toUpperCase()}` : 'WEB-BUYER');
+                const username = matchedOrder.username || (matchedOrder.user_email ? matchedOrder.user_email.split('@')[0] : null);
+                const custName = username ? `@${username}` : (matchedOrder.user_name || `ID: ${displayId}`);
+                return {
+                  orderCode: matchedOrder.order_code,
+                  productName: matchedOrder.product_name,
+                  customer: custName,
+                  telegramId: displayId,
+                  telegram_id: displayId,
+                };
+              })()
             : null,
         };
       });
@@ -929,24 +966,32 @@ export async function handleAdminHttpRequest(
           price: number | string;
           fulfillment_status: string;
           created_at: string | Date;
+          user_id: string | null;
           telegram_id: string | null;
           username: string | null;
+          user_name: string | null;
+          user_email: string | null;
           first_name: string | null;
           membership_tier: string | null;
           inv_username: string | null;
           inv_first_name: string | null;
+          inv_customer_id: string | null;
         }>(
           `SELECT o.id, o.order_code,
                   COALESCE(p.name, 'Produk Khusus') as product_name,
                   COALESCE(p.price, (o.invoice_data->>'amount')::int, (o.invoice_data->>'payable_amount')::int, 0) as price,
                   o.fulfillment_status,
                   o.created_at,
+                  u.id as user_id,
                   u.telegram_id,
                   u.username,
+                  u.name as user_name,
+                  u.email as user_email,
                   u.first_name,
                   u.membership_tier,
                   (o.invoice_data->>'customer_username') as inv_username,
-                  (o.invoice_data->>'customer_first_name') as inv_first_name
+                  (o.invoice_data->>'customer_first_name') as inv_first_name,
+                  (o.invoice_data->>'customer_id') as inv_customer_id
            FROM orders o
            LEFT JOIN products p ON o.product_id = p.id
            LEFT JOIN users u ON o.user_id = u.id
@@ -962,8 +1007,9 @@ export async function handleAdminHttpRequest(
         );
 
         const formatted = newPaidOrdersRes.rows.map((row) => {
-          const finalUsername = row.username || row.inv_username || null;
-          const finalFirstName = row.first_name || row.inv_first_name || null;
+          const displayId = row.telegram_id || row.inv_customer_id || (row.user_id ? `WEB-${row.user_id.replace(/-/g, '').slice(0, 8).toUpperCase()}` : 'Pembeli');
+          const finalUsername = row.username || row.inv_username || (row.user_email ? row.user_email.split('@')[0] : null);
+          const finalFirstName = row.first_name || row.inv_first_name || row.user_name || (finalUsername ? `@${finalUsername}` : 'Pelanggan');
           const finalPrice = Number(row.price || 0);
 
           return {
@@ -975,7 +1021,9 @@ export async function handleAdminHttpRequest(
             fulfillmentStatus: row.fulfillment_status,
             createdAt: row.created_at,
             customer: {
-              telegramId: row.telegram_id || 'Pembeli',
+              telegramId: displayId,
+              telegram_id: displayId,
+              displayId: displayId,
               username: finalUsername,
               firstName: finalFirstName,
               isVip: row.membership_tier === 'vip',

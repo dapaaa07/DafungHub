@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Send, MessageCircle, Menu, X, ShieldCheck, Zap, User as UserIcon, Wallet, LogOut, PackageCheck, ChevronDown, Sparkles } from 'lucide-react';
+import { Send, MessageCircle, Menu, X, ShieldCheck, Zap, User as UserIcon, Wallet, LogOut, PackageCheck, ChevronDown, Sparkles, Crown } from 'lucide-react';
 import { CS_WHATSAPP_INTL, TELEGRAM_BOT_USERNAME, formatRupiah } from '@/lib/pricing';
 import { useBotStatus } from './BotStatusContext';
 import { useCustomerAuth } from './CustomerAuthContext';
@@ -127,7 +127,7 @@ export default function Navbar() {
                   <div className="flex flex-col text-left">
                     <div className="flex items-center gap-1.5">
                       <span className="font-extrabold text-xs text-[#121212] max-w-[120px] truncate">
-                        {customer.name || customer.email || customer.phone || 'Pelanggan'}
+                        {customer.username ? `@${customer.username}` : (customer.name || customer.email || 'Pelanggan')}
                       </span>
                       {customer.membership_tier === 'vip' && (
                         <span className="px-1.5 py-0.2 rounded-md bg-[#FFDE00] text-[#121212] text-[9px] font-black">
@@ -143,7 +143,7 @@ export default function Navbar() {
                     {customer.avatar_url ? (
                       <img src={customer.avatar_url} alt="" className="w-full h-full rounded-lg object-cover" />
                     ) : (
-                      (customer.name?.[0] || customer.email?.[0] || 'U').toUpperCase()
+                      (customer.name?.[0] || customer.username?.[0] || customer.email?.[0] || 'U').toUpperCase()
                     )}
                   </div>
                   <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
@@ -151,15 +151,23 @@ export default function Navbar() {
 
                 {/* Dropdown Menu */}
                 {userDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 animate-in fade-in zoom-in-95">
-                    <div className="px-4 py-2 border-b border-gray-100">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                        Akun Dafung Hub
-                      </span>
-                      <p className="text-xs font-bold text-gray-800 truncate">
-                        {customer.email || customer.phone || customer.name}
+                  <div className="absolute right-0 mt-2 w-60 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 animate-in fade-in zoom-in-95">
+                    <div className="px-4 py-2 border-b border-gray-100 space-y-0.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                          Akun Pelanggan
+                        </span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
+                          ID: {customer.display_id || customer.telegram_id || `WEB-${customer.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`}
+                        </span>
+                      </div>
+                      <p className="text-xs font-black text-gray-900 truncate">
+                        {customer.username ? `@${customer.username}` : (customer.name || 'Pelanggan')}
                       </p>
-                      <div className="mt-1 flex items-center justify-between">
+                      {customer.email && (
+                        <p className="text-[10px] text-gray-400 truncate">{customer.email}</p>
+                      )}
+                      <div className="pt-1.5 flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
                           <Wallet className="w-3 h-3 text-emerald-600" />
                           <span className="text-xs font-extrabold text-emerald-600">
@@ -190,12 +198,26 @@ export default function Navbar() {
                       </Link>
 
                       <Link
+                        href="/account#membership"
+                        onClick={() => setUserDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 hover:text-black transition-colors"
+                      >
+                        <Crown className="w-4 h-4 text-amber-500 fill-amber-500/20" />
+                        <span>Kelola VIP Membership</span>
+                        {customer.membership_tier === 'vip' && (
+                          <span className="ml-auto text-[9px] bg-yellow-100 text-yellow-900 font-extrabold px-1.5 py-0.2 rounded">
+                            AKTIF
+                          </span>
+                        )}
+                      </Link>
+
+                      <Link
                         href="/account"
                         onClick={() => setUserDropdownOpen(false)}
                         className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 hover:text-black transition-colors"
                       >
                         <UserIcon className="w-4 h-4 text-purple-600" />
-                        <span>Profil & Saldo Akun</span>
+                        <span>Profil & Dompet Saldo</span>
                       </Link>
                     </div>
 
@@ -269,16 +291,20 @@ export default function Navbar() {
             <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200 space-y-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase">Akun Anda</span>
-                  <div className="font-extrabold text-sm text-[#121212]">
-                    {customer.name || customer.email || customer.phone}
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-extrabold text-sm text-[#121212]">
+                      {customer.username ? `@${customer.username}` : (customer.name || customer.email || 'Pelanggan')}
+                    </span>
+                    {customer.membership_tier === 'vip' && (
+                      <span className="px-2 py-0.5 rounded-md bg-[#FFDE00] text-[#121212] text-[10px] font-extrabold">
+                        VIP ⭐
+                      </span>
+                    )}
                   </div>
-                </div>
-                {customer.membership_tier === 'vip' && (
-                  <span className="px-2 py-0.5 rounded-md bg-[#FFDE00] text-[#121212] text-[10px] font-extrabold">
-                    VIP ⭐
+                  <span className="text-[10px] text-gray-500 font-mono">
+                    ID: {customer.display_id || customer.telegram_id || `WEB-${customer.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`}
                   </span>
-                )}
+                </div>
               </div>
               <div className="text-xs font-bold text-emerald-600 flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
@@ -296,20 +322,27 @@ export default function Navbar() {
                   + Top Up
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-200/60">
+              <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-gray-200/60">
                 <Link
                   href="/orders"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="py-2 text-center rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-700"
+                  className="py-2 text-center rounded-xl bg-white border border-gray-200 text-[11px] font-bold text-gray-700"
                 >
-                  Pesanan Saya
+                  Pesanan
+                </Link>
+                <Link
+                  href="/account#membership"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="py-2 text-center rounded-xl bg-white border border-amber-200 text-[11px] font-bold text-amber-700"
+                >
+                  VIP Member
                 </Link>
                 <Link
                   href="/account"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="py-2 text-center rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-700"
+                  className="py-2 text-center rounded-xl bg-white border border-gray-200 text-[11px] font-bold text-gray-700"
                 >
-                  Profil & Saldo
+                  Profil/Saldo
                 </Link>
               </div>
             </div>

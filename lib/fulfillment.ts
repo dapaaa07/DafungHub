@@ -48,8 +48,19 @@ export async function processOrderPayment(
   options?: { allowRetryQueued?: boolean }
 ): Promise<FulfillmentResult> {
   // 1. Fetch Order and Buyer details
-  const orderRes = await query<Order & { telegram_id: string | null; product_name: string; product_price: number }>(
-    `SELECT o.*, u.telegram_id, p.name as product_name, p.price as product_price
+  const orderRes = await query<
+    Order & {
+      telegram_id: string | null;
+      username: string | null;
+      user_name: string | null;
+      user_email: string | null;
+      user_phone: string | null;
+      product_name: string;
+      product_price: number;
+    }
+  >(
+    `SELECT o.*, u.telegram_id, u.username, u.name as user_name, u.email as user_email, u.phone as user_phone,
+            p.name as product_name, p.price as product_price
      FROM orders o
      JOIN users u ON o.user_id = u.id
      JOIN products p ON o.product_id = p.id
@@ -89,6 +100,10 @@ export async function processOrderPayment(
   // 2. Mark order as PAID & lock transaction ID in invoice_data if provided
   const invData = (order.invoice_data as Record<string, unknown>) || {};
   const isBalancePayment = invData.payment_method === 'balance' || invData.gateway === 'balance';
+  const buyerDisplayId = order.telegram_id || (order.user_id ? `WEB-${order.user_id.replace(/-/g, '').slice(0, 8).toUpperCase()}` : 'WEB-BUYER');
+  const buyerUsername = order.username || (invData.customer_username as string) || (order.user_email ? order.user_email.split('@')[0] : null);
+  const buyerName = order.user_name || (invData.customer_name as string) || (invData.buyer_name as string) || (order.user_email ? order.user_email.split('@')[0] : null);
+  const buyerDisplay = buyerUsername ? `@${buyerUsername} (ID: ${buyerDisplayId})` : (buyerName ? `${buyerName} (ID: ${buyerDisplayId})` : `ID: ${buyerDisplayId}`);
   const rawTxId =
     transactionMeta?.transactionId ??
     transactionMeta?.transaction_id ??
@@ -138,9 +153,9 @@ export async function processOrderPayment(
     // Send real-time push notification to Admin Mobile App
     try {
       const { sendAdminPushNotification } = await import('./push-notifications');
-      const customerDisplay = invData.customer_username
-        ? `@${invData.customer_username}`
-        : (invData.customer_first_name as string) || 'Pelanggan';
+      const customerDisplay = buyerUsername
+        ? `@${buyerUsername}`
+        : (buyerName || buyerDisplayId);
 
       sendAdminPushNotification({
         orderCode: order.order_code,
@@ -226,7 +241,6 @@ export async function processOrderPayment(
     }
 
     // Notify Owner
-    const buyerDisplay = order.telegram_id || (invData.buyer_name as string) || (invData.buyer_email as string) || (invData.buyer_phone as string) || 'Website Buyer';
     const ownerMembershipAlert =
       `💎 <b>PEMBELIAN MEMBERSHIP VIP BARU</b>\n` +
       `━━━━━━━━━━━━━━━━━━━\n` +
@@ -305,12 +319,11 @@ export async function processOrderPayment(
     }
 
     // Notify Owner
-    const depositBuyerDisplay = order.telegram_id || (invData.buyer_name as string) || (invData.buyer_email as string) || (invData.buyer_phone as string) || 'Website Buyer';
     const ownerDepositAlert =
       `💰 <b>DEPOSIT USER BERHASIL MASUK</b>\n` +
       `━━━━━━━━━━━━━━━━━━━\n` +
       `• <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>\n` +
-      `• <b>Pembeli:</b> <code>${escapeHtml(depositBuyerDisplay)}</code>\n` +
+      `• <b>Pembeli:</b> <code>${escapeHtml(buyerDisplay)}</code>\n` +
       `• <b>Nominal Deposit:</b> <b>Rp ${depositAmount.toLocaleString('id-ID')}</b>\n` +
       (cashback > 0 ? `• <b>Cashback Voucher:</b> +Rp ${cashback.toLocaleString('id-ID')} (${escapeHtml(String(invData.voucher_code))})\n` : '') +
       `━━━━━━━━━━━━━━━━━━━`;
@@ -443,13 +456,12 @@ export async function processOrderPayment(
         }
 
         // Notify Owner
-        const buyerOwnerDisplay = buyerChatId || (invData.buyer_name as string) || (invData.buyer_email as string) || (invData.buyer_phone as string) || 'Website Buyer';
         const ownerAlert =
           `✅ <b>ORDER SELESAI OTOMATIS (H2H INSTAN)</b>\n` +
           `━━━━━━━━━━━━━━━━━━━\n` +
           `• <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code>\n` +
           `• <b>Produk:</b> ${escapeHtml(order.product_name)}\n` +
-          `• <b>Pembeli:</b> <code>${escapeHtml(buyerOwnerDisplay)}</code>\n` +
+          `• <b>Pembeli:</b> <code>${escapeHtml(buyerDisplay)}</code>\n` +
           paymentMethodLineOwner +
           `• <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString('id-ID')}\n` +
           `• <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString('id-ID')}\n` +
@@ -523,13 +535,12 @@ export async function processOrderPayment(
   const vipPriorityBadge = memberInfo?.isVip ? ' ⭐ <b>[VIP MEMBER - PRIORITAS]</b>' : '';
 
   // Send Actionable Alert to Owner
-  const queueBuyerDisplay = buyerChatId || (invData.buyer_name as string) || (invData.buyer_email as string) || (invData.buyer_phone as string) || 'Website Buyer';
   const ownerQueueAlert =
     `🔔 <b>PESANAN BARU MASUK (MODE ANTREAN)</b>\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
     `• <b>Kode Order:</b> <code>${escapeHtml(order.order_code)}</code> <i>(Sentuh untuk salin)</i>\n` +
     `• <b>Produk:</b> ${escapeHtml(order.product_name)}\n` +
-    `• <b>Pembeli:</b> <code>${escapeHtml(queueBuyerDisplay)}</code>${vipPriorityBadge}\n` +
+    `• <b>Pembeli:</b> <code>${escapeHtml(buyerDisplay)}</code>${vipPriorityBadge}\n` +
     paymentMethodLineOwner +
     `• <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString('id-ID')}\n` +
     `• <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString('id-ID')}\n` +

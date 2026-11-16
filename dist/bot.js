@@ -19308,7 +19308,8 @@ function escapeHtml2(str) {
 }
 async function processOrderPayment(orderCode, botInstance, transactionMeta, options) {
   const orderRes = await query(
-    `SELECT o.*, u.telegram_id, p.name as product_name, p.price as product_price
+    `SELECT o.*, u.telegram_id, u.username, u.name as user_name, u.email as user_email, u.phone as user_phone,
+            p.name as product_name, p.price as product_price
      FROM orders o
      JOIN users u ON o.user_id = u.id
      JOIN products p ON o.product_id = p.id
@@ -19342,6 +19343,10 @@ async function processOrderPayment(orderCode, botInstance, transactionMeta, opti
   }
   const invData = order.invoice_data || {};
   const isBalancePayment = invData.payment_method === "balance" || invData.gateway === "balance";
+  const buyerDisplayId = order.telegram_id || (order.user_id ? `WEB-${order.user_id.replace(/-/g, "").slice(0, 8).toUpperCase()}` : "WEB-BUYER");
+  const buyerUsername = order.username || invData.customer_username || (order.user_email ? order.user_email.split("@")[0] : null);
+  const buyerName = order.user_name || invData.customer_name || invData.buyer_name || (order.user_email ? order.user_email.split("@")[0] : null);
+  const buyerDisplay = buyerUsername ? `@${buyerUsername} (ID: ${buyerDisplayId})` : buyerName ? `${buyerName} (ID: ${buyerDisplayId})` : `ID: ${buyerDisplayId}`;
   const rawTxId = transactionMeta?.transactionId ?? transactionMeta?.transaction_id ?? transactionMeta?.id;
   const txId = rawTxId !== void 0 && rawTxId !== null ? String(rawTxId).trim() : "";
   if (txId) {
@@ -19381,7 +19386,7 @@ async function processOrderPayment(orderCode, botInstance, transactionMeta, opti
     });
     try {
       const { sendAdminPushNotification: sendAdminPushNotification2 } = await Promise.resolve().then(() => (init_push_notifications(), push_notifications_exports));
-      const customerDisplay = invData.customer_username ? `@${invData.customer_username}` : invData.customer_first_name || "Pelanggan";
+      const customerDisplay = buyerUsername ? `@${buyerUsername}` : buyerName || buyerDisplayId;
       sendAdminPushNotification2({
         orderCode: order.order_code,
         productName: order.product_name || "Produk Dafung Hub",
@@ -19450,7 +19455,6 @@ async function processOrderPayment(orderCode, botInstance, transactionMeta, opti
         }
       );
     }
-    const buyerDisplay = order.telegram_id || invData.buyer_name || invData.buyer_email || invData.buyer_phone || "Website Buyer";
     const ownerMembershipAlert = `\u{1F48E} <b>PEMBELIAN MEMBERSHIP VIP BARU</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
@@ -19518,11 +19522,10 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
         }
       );
     }
-    const depositBuyerDisplay = order.telegram_id || invData.buyer_name || invData.buyer_email || invData.buyer_phone || "Website Buyer";
     const ownerDepositAlert = `\u{1F4B0} <b>DEPOSIT USER BERHASIL MASUK</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
-\u2022 <b>Pembeli:</b> <code>${escapeHtml2(depositBuyerDisplay)}</code>
+\u2022 <b>Pembeli:</b> <code>${escapeHtml2(buyerDisplay)}</code>
 \u2022 <b>Nominal Deposit:</b> <b>Rp ${depositAmount.toLocaleString("id-ID")}</b>
 ` + (cashback > 0 ? `\u2022 <b>Cashback Voucher:</b> +Rp ${cashback.toLocaleString("id-ID")} (${escapeHtml2(String(invData.voucher_code))})
 ` : "") + `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`;
@@ -19617,12 +19620,11 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
             }
           );
         }
-        const buyerOwnerDisplay = buyerChatId || invData.buyer_name || invData.buyer_email || invData.buyer_phone || "Website Buyer";
         const ownerAlert = `\u2705 <b>ORDER SELESAI OTOMATIS (H2H INSTAN)</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code>
 \u2022 <b>Produk:</b> ${escapeHtml2(order.product_name)}
-\u2022 <b>Pembeli:</b> <code>${escapeHtml2(buyerOwnerDisplay)}</code>
+\u2022 <b>Pembeli:</b> <code>${escapeHtml2(buyerDisplay)}</code>
 ` + paymentMethodLineOwner + `\u2022 <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
 \u2022 <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString("id-ID")}
 \u2022 <b>Untung Bersih:</b> <b>+Rp ${netProfit.toLocaleString("id-ID")}</b>
@@ -19681,12 +19683,11 @@ Saldo telah berhasil masuk ke akun DaFung Hub Anda. Silakan cek menu <b>\u{1F464
   }
   const memberInfo = await getUserMembership2(order.user_id).catch(() => null);
   const vipPriorityBadge = memberInfo?.isVip ? " \u2B50 <b>[VIP MEMBER - PRIORITAS]</b>" : "";
-  const queueBuyerDisplay = buyerChatId || invData.buyer_name || invData.buyer_email || invData.buyer_phone || "Website Buyer";
   const ownerQueueAlert = `\u{1F514} <b>PESANAN BARU MASUK (MODE ANTREAN)</b>
 \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 \u2022 <b>Kode Order:</b> <code>${escapeHtml2(order.order_code)}</code> <i>(Sentuh untuk salin)</i>
 \u2022 <b>Produk:</b> ${escapeHtml2(order.product_name)}
-\u2022 <b>Pembeli:</b> <code>${escapeHtml2(queueBuyerDisplay)}</code>${vipPriorityBadge}
+\u2022 <b>Pembeli:</b> <code>${escapeHtml2(buyerDisplay)}</code>${vipPriorityBadge}
 ` + paymentMethodLineOwner + `\u2022 <b>Uang Masuk:</b> Rp ${sellingPrice.toLocaleString("id-ID")}
 \u2022 <b>Modal Supplier:</b> Rp ${modalPrice.toLocaleString("id-ID")}
 \u2022 <b>Estimasi Untung:</b> <b>+Rp ${netProfit.toLocaleString("id-ID")}</b>
@@ -54308,7 +54309,7 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
                (o.fulfillment_status = 'delivered') as is_delivered,
                o.delivered_at, o.created_at, o.credential_encrypted as encrypted_credential, o.invoice_data,
                p.id as product_id, p.name as product_name, p.price,
-               u.telegram_id, u.username, u.first_name, u.membership_tier
+               u.id as user_id, u.telegram_id, u.username, u.name as user_name, u.email as user_email, u.first_name, u.membership_tier
         FROM orders o
         JOIN products p ON o.product_id = p.id
         LEFT JOIN users u ON o.user_id = u.id
@@ -54317,26 +54318,32 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
         LIMIT $${valIdx++} OFFSET $${valIdx++}
       `;
       const ordersRes = await query(ordersSql, [...values, limit, offset]);
-      const formatted = ordersRes.rows.map((row) => ({
-        id: row.id,
-        orderCode: row.order_code,
-        productId: row.product_id,
-        productName: row.product_name,
-        price: Number(row.price),
-        paymentStatus: row.payment_status,
-        fulfillmentStatus: row.fulfillment_status,
-        isDelivered: row.is_delivered,
-        deliveredAt: row.delivered_at,
-        createdAt: row.created_at,
-        hasEncryptedCredential: Boolean(row.encrypted_credential),
-        customer: {
-          telegramId: row.telegram_id,
-          username: row.username,
-          firstName: row.first_name,
-          isVip: row.membership_tier === "vip"
-        },
-        invoiceData: typeof row.invoice_data === "string" ? JSON.parse(row.invoice_data || "{}") : row.invoice_data || {}
-      }));
+      const formatted = ordersRes.rows.map((row) => {
+        const displayId = row.telegram_id || (row.user_id ? `WEB-${row.user_id.replace(/-/g, "").slice(0, 8).toUpperCase()}` : "WEB-BUYER");
+        const username = row.username || (row.user_email ? row.user_email.split("@")[0] : null);
+        return {
+          id: row.id,
+          orderCode: row.order_code,
+          productId: row.product_id,
+          productName: row.product_name,
+          price: Number(row.price),
+          paymentStatus: row.payment_status,
+          fulfillmentStatus: row.fulfillment_status,
+          isDelivered: row.is_delivered,
+          deliveredAt: row.delivered_at,
+          createdAt: row.created_at,
+          hasEncryptedCredential: Boolean(row.encrypted_credential),
+          customer: {
+            telegramId: displayId,
+            telegram_id: displayId,
+            displayId,
+            username,
+            firstName: row.first_name || row.user_name || username || "Pelanggan",
+            isVip: row.membership_tier === "vip"
+          },
+          invoiceData: typeof row.invoice_data === "string" ? JSON.parse(row.invoice_data || "{}") : row.invoice_data || {}
+        };
+      });
       sendJson(res, 200, {
         success: true,
         orders: formatted,
@@ -54604,7 +54611,7 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
       );
       const totalCount = parseInt(countRes.rows[0]?.total || "0", 10);
       const usersSql = `
-        SELECT u.id, u.telegram_id, u.role, u.balance, u.username, u.first_name,
+        SELECT u.id, u.telegram_id, u.role, u.balance, u.username, u.name, u.email, u.first_name,
                u.membership_tier, u.membership_expires_at, u.created_at,
                COUNT(o.id) as total_orders,
                COALESCE(SUM(CASE WHEN o.payment_status = 'paid' THEN p.price ELSE 0 END), 0) as total_spent
@@ -54623,15 +54630,18 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
           row.membership_tier === "vip" && (!row.membership_expires_at || new Date(row.membership_expires_at) > /* @__PURE__ */ new Date())
         );
         const tier = isVip ? "vip" : "free";
+        const displayId = row.telegram_id || `WEB-${row.id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+        const username = row.username || (row.email ? row.email.split("@")[0] : null);
         return {
           id: row.id,
-          telegramId: row.telegram_id,
-          telegram_id: row.telegram_id,
+          telegramId: displayId,
+          telegram_id: displayId,
+          displayId,
           role: row.role,
           balance: Number(row.balance || 0),
-          username: row.username,
-          firstName: row.first_name,
-          first_name: row.first_name,
+          username,
+          firstName: row.first_name || row.name || username || "Pelanggan",
+          first_name: row.first_name || row.name || username || "Pelanggan",
           membershipTier: tier,
           membership_tier: tier,
           membershipExpiresAt: row.membership_expires_at,
@@ -54666,9 +54676,11 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
     const id = decodeURIComponent(userDetailMatch[1]);
     try {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      const isWebId = id.toUpperCase().startsWith("WEB-");
+      const webHex = isWebId ? id.substring(4).toLowerCase() : "";
       const userRes = await query(
-        isUuid ? `SELECT * FROM users WHERE id = $1 LIMIT 1` : `SELECT * FROM users WHERE telegram_id = $1 LIMIT 1`,
-        [id]
+        isUuid ? `SELECT * FROM users WHERE id = $1 LIMIT 1` : isWebId ? `SELECT * FROM users WHERE replace(id::text, '-', '') ILIKE $1 || '%' OR telegram_id = $2 LIMIT 1` : `SELECT * FROM users WHERE telegram_id = $1 LIMIT 1`,
+        isWebId ? [webHex, id] : [id]
       );
       if (userRes.rows.length === 0) {
         sendJson(res, 404, { success: false, error: "User tidak ditemukan." });
@@ -54689,17 +54701,20 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
         user.membership_tier === "vip" && (!user.membership_expires_at || new Date(user.membership_expires_at) > /* @__PURE__ */ new Date())
       );
       const tier = isVip ? "vip" : "free";
+      const displayId = user.telegram_id || `WEB-${user.id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+      const username = user.username || (user.email ? user.email.split("@")[0] : null);
       sendJson(res, 200, {
         success: true,
         user: {
           ...user,
           id: user.id,
-          telegramId: user.telegram_id,
-          telegram_id: user.telegram_id,
+          telegramId: displayId,
+          telegram_id: displayId,
+          displayId,
           balance: Number(user.balance || 0),
-          username: user.username,
-          firstName: user.first_name,
-          first_name: user.first_name,
+          username,
+          firstName: user.first_name || user.name || username || "Pelanggan",
+          first_name: user.first_name || user.name || username || "Pelanggan",
           membershipTier: tier,
           membership_tier: tier,
           membershipExpiresAt: user.membership_expires_at,
@@ -54731,7 +54746,7 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
         `SELECT o.order_code, o.payment_status, o.created_at,
                 (o.invoice_data->>'payable_amount') as payable_amount,
                 (o.invoice_data->>'shopeepay_tx_id') as shopeepay_tx_id,
-                p.price, p.name as product_name, u.telegram_id, u.username
+                p.price, p.name as product_name, u.id as user_id, u.telegram_id, u.username, u.name as user_name, u.email as user_email
          FROM orders o
          JOIN products p ON o.product_id = p.id
          LEFT JOIN users u ON o.user_id = u.id
@@ -54775,12 +54790,18 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
           time: rawTime || (/* @__PURE__ */ new Date()).toISOString(),
           issuer: String(tx.issuer || tx.payment_method || "ShopeePay"),
           isMatched: Boolean(matchedOrder),
-          order: matchedOrder ? {
-            orderCode: matchedOrder.order_code,
-            productName: matchedOrder.product_name,
-            customer: matchedOrder.username ? `@${matchedOrder.username}` : `ID: ${matchedOrder.telegram_id}`,
-            telegramId: matchedOrder.telegram_id
-          } : null
+          order: matchedOrder ? (() => {
+            const displayId = matchedOrder.telegram_id || (matchedOrder.user_id ? `WEB-${matchedOrder.user_id.replace(/-/g, "").slice(0, 8).toUpperCase()}` : "WEB-BUYER");
+            const username = matchedOrder.username || (matchedOrder.user_email ? matchedOrder.user_email.split("@")[0] : null);
+            const custName = username ? `@${username}` : matchedOrder.user_name || `ID: ${displayId}`;
+            return {
+              orderCode: matchedOrder.order_code,
+              productName: matchedOrder.product_name,
+              customer: custName,
+              telegramId: displayId,
+              telegram_id: displayId
+            };
+          })() : null
         };
       });
       const totalAll = reconciledTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
@@ -54849,12 +54870,16 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
                   COALESCE(p.price, (o.invoice_data->>'amount')::int, (o.invoice_data->>'payable_amount')::int, 0) as price,
                   o.fulfillment_status,
                   o.created_at,
+                  u.id as user_id,
                   u.telegram_id,
                   u.username,
+                  u.name as user_name,
+                  u.email as user_email,
                   u.first_name,
                   u.membership_tier,
                   (o.invoice_data->>'customer_username') as inv_username,
-                  (o.invoice_data->>'customer_first_name') as inv_first_name
+                  (o.invoice_data->>'customer_first_name') as inv_first_name,
+                  (o.invoice_data->>'customer_id') as inv_customer_id
            FROM orders o
            LEFT JOIN products p ON o.product_id = p.id
            LEFT JOIN users u ON o.user_id = u.id
@@ -54868,8 +54893,9 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
            WHERE payment_status = 'paid' AND fulfillment_status IN ('pending', 'processing')`
         );
         const formatted = newPaidOrdersRes.rows.map((row) => {
-          const finalUsername = row.username || row.inv_username || null;
-          const finalFirstName = row.first_name || row.inv_first_name || null;
+          const displayId = row.telegram_id || row.inv_customer_id || (row.user_id ? `WEB-${row.user_id.replace(/-/g, "").slice(0, 8).toUpperCase()}` : "Pembeli");
+          const finalUsername = row.username || row.inv_username || (row.user_email ? row.user_email.split("@")[0] : null);
+          const finalFirstName = row.first_name || row.inv_first_name || row.user_name || (finalUsername ? `@${finalUsername}` : "Pelanggan");
           const finalPrice = Number(row.price || 0);
           return {
             id: row.id,
@@ -54880,7 +54906,9 @@ async function handleAdminHttpRequest(req, res, bodyStr) {
             fulfillmentStatus: row.fulfillment_status,
             createdAt: row.created_at,
             customer: {
-              telegramId: row.telegram_id || "Pembeli",
+              telegramId: displayId,
+              telegram_id: displayId,
+              displayId,
               username: finalUsername,
               firstName: finalFirstName,
               isVip: row.membership_tier === "vip"

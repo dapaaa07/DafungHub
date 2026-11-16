@@ -20,6 +20,8 @@ export interface CustomerSessionPayload {
 
 export interface CustomerProfile {
   id: string;
+  display_id: string;
+  username: string | null;
   name: string | null;
   email: string | null;
   phone: string | null;
@@ -147,12 +149,61 @@ export function verifyCustomerToken(token: string): CustomerSessionPayload | nul
 }
 
 /**
+ * Format clean customer display ID for web users and telegram users
+ */
+export function getCustomerDisplayId(user: { id: string; telegram_id?: string | null }): string {
+  if (user.telegram_id && user.telegram_id.trim() && user.telegram_id !== 'Guest') {
+    return user.telegram_id;
+  }
+  const cleanId = (user.id || '').replace(/-/g, '').substring(0, 8).toUpperCase();
+  return cleanId ? `WEB-${cleanId}` : 'WEB-BUYER';
+}
+
+/**
+ * Generate a clean, unique username from email prefix or identifier
+ */
+export async function generateUniqueUsername(
+  emailOrIdentifier: string,
+  excludeUserId?: string
+): Promise<string> {
+  let base = (emailOrIdentifier || '').split('@')[0].toLowerCase().trim();
+  base = base.replace(/[^a-z0-9_]/g, '');
+  if (!base || base.length < 3) {
+    base = `user_${Math.random().toString(36).substring(2, 7)}`;
+  }
+  base = base.substring(0, 24);
+
+  let candidate = base;
+  let counter = 1;
+  while (true) {
+    const checkSql = excludeUserId
+      ? 'SELECT id FROM public.users WHERE LOWER(username) = $1 AND id <> $2 LIMIT 1'
+      : 'SELECT id FROM public.users WHERE LOWER(username) = $1 LIMIT 1';
+    const params = excludeUserId ? [candidate, excludeUserId] : [candidate];
+    const res = await query(checkSql, params);
+    if (res.rows.length === 0) {
+      return candidate;
+    }
+    candidate = `${base.substring(0, 20)}${counter}`;
+    counter++;
+    if (counter > 20) {
+      return `${base.substring(0, 16)}_${Date.now().toString().slice(-4)}`;
+    }
+  }
+}
+
+/**
  * Map raw User row to safe CustomerProfile
  */
 export function formatCustomerProfile(user: User): CustomerProfile {
+  const displayId = getCustomerDisplayId(user);
+  const username = user.username || (user.email ? user.email.split('@')[0] : null);
+
   return {
     id: user.id,
-    name: user.name || user.first_name || user.username || (user.email ? user.email.split('@')[0] : 'Pelanggan'),
+    display_id: displayId,
+    username: username || null,
+    name: user.name || user.first_name || (username ? `@${username}` : 'Pelanggan'),
     email: user.email || null,
     phone: user.phone || null,
     telegram_id: user.telegram_id || null,
@@ -203,11 +254,14 @@ export async function registerCustomer(params: {
       throw new Error('Email ini sudah terdaftar. Silakan login atau gunakan email lain.');
     }
 
+    const username = await generateUniqueUsername(parsed.value);
+    const displayName = cleanName || username;
+
     const inserted = await query<User>(
-      `INSERT INTO public.users (email, name, password_hash, role)
-       VALUES ($1, $2, $3, 'buyer')
+      `INSERT INTO public.users (email, name, username, password_hash, role)
+       VALUES ($1, $2, $3, $4, 'buyer')
        RETURNING *`,
-      [parsed.value, cleanName, passwordHash]
+      [parsed.value, displayName, username, passwordHash]
     );
     return inserted.rows[0];
   } else {
@@ -219,11 +273,14 @@ export async function registerCustomer(params: {
       throw new Error('Nomor HP ini sudah terdaftar. Silakan login atau gunakan nomor lain.');
     }
 
+    const username = await generateUniqueUsername(cleanName || `user_${parsed.value.slice(-6)}`);
+    const displayName = cleanName || username;
+
     const inserted = await query<User>(
-      `INSERT INTO public.users (phone, name, password_hash, role)
-       VALUES ($1, $2, $3, 'buyer')
+      `INSERT INTO public.users (phone, name, username, password_hash, role)
+       VALUES ($1, $2, $3, $4, 'buyer')
        RETURNING *`,
-      [parsed.value, cleanName, passwordHash]
+      [parsed.value, displayName, username, passwordHash]
     );
     return inserted.rows[0];
   }
@@ -290,12 +347,28 @@ export async function findOrCreateGoogleCustomer(params: {
   );
   if (byGoogle.rows.length > 0) {
     const user = byGoogle.rows[0];
-    // Update avatar or name if newer
+    let needsUpdate = false;
+    let newUsername = user.username;
+
+    if (!newUsername) {
+      newUsername = await generateUniqueUsername(cleanEmail, user.id);
+      needsUpdate = true;
+    }
+
     if (avatarUrl && avatarUrl !== user.avatar_url) {
+      needsUpdate = true;
+    }
+
+    if (needsUpdate) {
       await query(
-        'UPDATE public.users SET avatar_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        [avatarUrl, user.id]
+        `UPDATE public.users
+         SET avatar_url = COALESCE($1, avatar_url),
+             username = COALESCE(username, $2),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3`,
+        [avatarUrl || null, newUsername, user.id]
       ).catch(() => {});
+      user.username = newUsername;
     }
     return user;
   }
@@ -307,25 +380,31 @@ export async function findOrCreateGoogleCustomer(params: {
   );
   if (byEmail.rows.length > 0) {
     const user = byEmail.rows[0];
+    const username = user.username || (await generateUniqueUsername(cleanEmail, user.id));
+
     const updated = await query<User>(
       `UPDATE public.users
        SET google_id = $1,
            avatar_url = COALESCE(avatar_url, $2),
            name = COALESCE(name, $3),
+           username = COALESCE(username, $4),
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4
+       WHERE id = $5
        RETURNING *`,
-      [googleId, avatarUrl || null, cleanName, user.id]
+      [googleId, avatarUrl || null, cleanName, username, user.id]
     );
     return updated.rows[0];
   }
 
   // 3. Create fresh customer account
+  const username = await generateUniqueUsername(cleanEmail);
+  const displayName = cleanName || username;
+
   const inserted = await query<User>(
-    `INSERT INTO public.users (google_id, email, name, avatar_url, role)
-     VALUES ($1, $2, $3, $4, 'buyer')
+    `INSERT INTO public.users (google_id, email, name, username, avatar_url, role)
+     VALUES ($1, $2, $3, $4, $5, 'buyer')
      RETURNING *`,
-    [googleId, cleanEmail, cleanName, avatarUrl || null]
+    [googleId, cleanEmail, displayName, username, avatarUrl || null]
   );
 
   return inserted.rows[0];
