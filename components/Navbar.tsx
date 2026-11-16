@@ -33,7 +33,7 @@ export default function Navbar() {
       setIsScrolled(window.scrollY > 20);
 
       // Dynamic active section detection
-      const sections = ['katalog', 'keunggulan', 'cara-order', 'garansi', 'faq'];
+      const sections = ['keunggulan', 'katalog', 'cara-order', 'garansi', 'faq'];
       const scrollPos = window.scrollY + 120;
       for (const sectionId of sections) {
         const el = document.getElementById(sectionId);
@@ -84,16 +84,6 @@ export default function Navbar() {
           {/* Desktop Nav Links */}
           <nav className="hidden lg:flex items-center gap-5 xl:gap-8 text-xs xl:text-sm font-semibold whitespace-nowrap">
             <Link
-              href="/#katalog"
-              className={`whitespace-nowrap py-1.5 transition-colors relative ${
-                activeSection === 'katalog'
-                  ? 'text-[#121212] font-extrabold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#FFDE00]'
-                  : 'text-gray-600 hover:text-[#121212]'
-              }`}
-            >
-              Katalog Produk
-            </Link>
-            <Link
               href="/#keunggulan"
               className={`whitespace-nowrap py-1.5 transition-colors relative ${
                 activeSection === 'keunggulan'
@@ -102,6 +92,16 @@ export default function Navbar() {
               }`}
             >
               Keunggulan
+            </Link>
+            <Link
+              href="/#katalog"
+              className={`whitespace-nowrap py-1.5 transition-colors relative ${
+                activeSection === 'katalog'
+                  ? 'text-[#121212] font-extrabold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#FFDE00]'
+                  : 'text-gray-600 hover:text-[#121212]'
+              }`}
+            >
+              Katalog Produk
             </Link>
             <Link
               href="/#cara-order"
@@ -402,18 +402,18 @@ export default function Navbar() {
 
           <nav className="flex flex-col space-y-2 text-base font-semibold text-gray-800">
             <Link
-              href="/#katalog"
-              onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2 rounded-lg hover:bg-gray-100"
-            >
-              Katalog Produk
-            </Link>
-            <Link
               href="/#keunggulan"
               onClick={() => setMobileMenuOpen(false)}
               className="px-3 py-2 rounded-lg hover:bg-gray-100"
             >
               Keunggulan
+            </Link>
+            <Link
+              href="/#katalog"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2 rounded-lg hover:bg-gray-100"
+            >
+              Katalog Produk
             </Link>
             <Link
               href="/#cara-order"
