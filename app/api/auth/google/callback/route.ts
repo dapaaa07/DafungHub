@@ -110,8 +110,9 @@ export async function GET(req: NextRequest) {
     return response;
   } catch (err: any) {
     console.error('[Google OAuth Callback Exception]:', err);
+    const detail = err?.message || 'Terjadi kesalahan sistem saat memproses login Google.';
     return NextResponse.redirect(
-      `${baseUrl}${returnTo}?auth_error=${encodeURIComponent('Terjadi kesalahan saat memproses login Google.')}`
+      `${baseUrl}${returnTo}?auth_error=${encodeURIComponent(`Gagal login Google: ${detail}`)}`
     );
   }
 }

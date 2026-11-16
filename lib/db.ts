@@ -68,7 +68,13 @@ declare global {
 }
 
 function createPool(): Pool {
-  const connectionString = process.env.DATABASE_URL;
+  let connectionString = process.env.DATABASE_URL;
+  if (connectionString && connectionString.includes('pooler.supabase.com:5432')) {
+    // Automatically switch to Supabase transaction pooler on port 6543 to support high concurrency
+    // and avoid "EMAXCONNSESSION: max clients reached in session mode - pool_size: 15"
+    connectionString = connectionString.replace('pooler.supabase.com:5432', 'pooler.supabase.com:6543');
+  }
+
   const isRemote =
     connectionString?.includes('supabase.co') ||
     connectionString?.includes('pooler.supabase.com') ||
@@ -76,8 +82,8 @@ function createPool(): Pool {
 
   return new Pool({
     connectionString,
-    max: 10,
-    idleTimeoutMillis: 30000,
+    max: 5,
+    idleTimeoutMillis: 15000,
     connectionTimeoutMillis: 10000,
     ssl: isRemote ? { rejectUnauthorized: false } : undefined,
   });

@@ -5382,12 +5382,15 @@ __export2(db_exports, {
   testConnection: () => testConnection
 });
 function createPool() {
-  const connectionString = process.env.DATABASE_URL;
+  let connectionString = process.env.DATABASE_URL;
+  if (connectionString && connectionString.includes("pooler.supabase.com:5432")) {
+    connectionString = connectionString.replace("pooler.supabase.com:5432", "pooler.supabase.com:6543");
+  }
   const isRemote = connectionString?.includes("supabase.co") || connectionString?.includes("pooler.supabase.com") || connectionString?.includes("sslmode=require");
   return new Pool({
     connectionString,
-    max: 10,
-    idleTimeoutMillis: 3e4,
+    max: 5,
+    idleTimeoutMillis: 15e3,
     connectionTimeoutMillis: 1e4,
     ssl: isRemote ? { rejectUnauthorized: false } : void 0
   });

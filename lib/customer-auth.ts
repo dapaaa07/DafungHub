@@ -393,7 +393,7 @@ export async function findOrCreateGoogleCustomer(params: {
        RETURNING *`,
       [googleId, avatarUrl || null, cleanName, username, user.id]
     );
-    return updated.rows[0];
+    return updated.rows[0] || user;
   }
 
   // 3. Create fresh customer account
@@ -406,6 +406,10 @@ export async function findOrCreateGoogleCustomer(params: {
      RETURNING *`,
     [googleId, cleanEmail, displayName, username, avatarUrl || null]
   );
+
+  if (!inserted.rows[0]) {
+    throw new Error('Gagal menyimpan data pengguna Google ke database.');
+  }
 
   return inserted.rows[0];
 }
