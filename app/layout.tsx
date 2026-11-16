@@ -38,6 +38,7 @@ export const metadata: Metadata = {
 
 import { CustomerAuthProvider } from '@/components/CustomerAuthContext';
 import { BotStatusProvider } from '@/components/BotStatusContext';
+import Navbar from '@/components/Navbar';
 import AuthModal from '@/components/AuthModal';
 import TopUpModal from '@/components/TopUpModal';
 import FloatingWhatsApp from '@/components/FloatingWhatsApp';
@@ -60,7 +61,8 @@ export default function RootLayout({
       <body className="min-h-screen bg-[#F8F9FA] text-[#121212] antialiased flex flex-col relative">
         <BotStatusProvider>
           <CustomerAuthProvider>
-            {children}
+            <Navbar />
+            <div className="flex-1 flex flex-col">{children}</div>
             <AuthModal />
             <TopUpModal />
             <FloatingWhatsApp />

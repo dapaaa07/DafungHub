@@ -17,7 +17,7 @@ export default function Navbar() {
   const [activeSection, setActiveSection] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { botStatus } = useBotStatus();
-  const { customer, openAuthModal, openTopUpModal, logout } = useCustomerAuth();
+  const { customer, isLoading, openAuthModal, openTopUpModal, logout } = useCustomerAuth();
   const isOnline = botStatus === 'online';
 
   useEffect(() => {
@@ -284,6 +284,8 @@ export default function Navbar() {
                   </div>
                 )}
               </div>
+            ) : isLoading ? (
+              <div className="w-28 h-9 rounded-xl bg-gray-100 animate-pulse shrink-0" />
             ) : (
               <button
                 type="button"
@@ -298,7 +300,7 @@ export default function Navbar() {
 
           {/* Mobile Menu Button */}
           <div className="flex sm:hidden items-center gap-2">
-            {!customer && (
+            {!customer && !isLoading && (
               <button
                 type="button"
                 onClick={() => openAuthModal('login')}

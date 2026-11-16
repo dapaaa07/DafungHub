@@ -18,7 +18,6 @@ import {
   X,
 } from 'lucide-react';
 import { formatRupiah } from '@/lib/pricing';
-import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useCustomerAuth } from '@/components/CustomerAuthContext';
 
@@ -75,8 +74,6 @@ export default function CustomerOrdersPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col">
-      <Navbar />
-
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8 sm:py-12">
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>

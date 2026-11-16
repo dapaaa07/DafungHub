@@ -1,5 +1,4 @@
 import { connection } from 'next/server';
-import Navbar from '@/components/Navbar';
 import HeroSection from '@/components/HeroSection';
 import ValueProps from '@/components/ValueProps';
 import ProductGrid from '@/components/ProductGrid';
@@ -20,10 +19,7 @@ export default async function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-[#F8F9FA] text-[#121212]">
-      {/* Top Sticky Navbar */}
-      <Navbar />
-
-        <main className="flex-1">
+      <main className="flex-1">
           {/* Hero Section */}
           <HeroSection />
 

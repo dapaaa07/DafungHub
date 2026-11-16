@@ -23,13 +23,41 @@ interface CustomerAuthContextType {
 
 const CustomerAuthContext = createContext<CustomerAuthContextType | undefined>(undefined);
 
+const AUTH_CACHE_KEY = 'dafung_customer_profile';
+
+function getCachedCustomer(): CustomerProfile | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(AUTH_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function CustomerAuthProvider({ children }: { children: React.ReactNode }) {
-  const [customer, setCustomer] = useState<CustomerProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [customer, setCustomer] = useState<CustomerProfile | null>(getCachedCustomer);
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    return !Boolean(getCachedCustomer());
+  });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
   const [isTopUpModalOpen, setIsTopUpModalOpen] = useState(false);
   const [initialTopUpAmount, setInitialTopUpAmount] = useState<number | undefined>(undefined);
+
+  const setCustomerState = useCallback((profile: CustomerProfile | null) => {
+    setCustomer(profile);
+    if (typeof window !== 'undefined') {
+      try {
+        if (profile) {
+          localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(profile));
+        } else {
+          localStorage.removeItem(AUTH_CACHE_KEY);
+        }
+      } catch {}
+    }
+  }, []);
 
   const refreshCustomer = useCallback(async () => {
     try {
@@ -40,17 +68,17 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
         const data = await res.json();
         const profile = data.customer || data.user;
         if (profile) {
-          setCustomer(profile);
+          setCustomerState(profile);
           return;
         }
       }
-      setCustomer(null);
+      setCustomerState(null);
     } catch {
-      setCustomer(null);
+      // Keep existing customer state on transient network failures
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [setCustomerState]);
 
   useEffect(() => {
     refreshCustomer();
@@ -100,7 +128,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
       }
       const profile = data.customer || data.user;
       if (profile) {
-        setCustomer(profile);
+        setCustomerState(profile);
       }
       setIsAuthModalOpen(false);
       return { success: true };
@@ -122,7 +150,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
       }
       const profile = data.customer || data.user;
       if (profile) {
-        setCustomer(profile);
+        setCustomerState(profile);
       }
       setIsAuthModalOpen(false);
       return { success: true };
@@ -137,7 +165,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
     } catch (err) {
       console.warn('Logout network error:', err);
     } finally {
-      setCustomer(null);
+      setCustomerState(null);
     }
   };
 

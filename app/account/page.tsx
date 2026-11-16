@@ -27,7 +27,6 @@ import {
   Flame,
 } from 'lucide-react';
 import { formatRupiah, CS_WHATSAPP_INTL, TELEGRAM_BOT_USERNAME } from '@/lib/pricing';
-import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useCustomerAuth } from '@/components/CustomerAuthContext';
 
@@ -195,7 +194,6 @@ export default function AccountPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex flex-col">
-        <Navbar />
         <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-16 flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-[#FFDE00]" />
         </main>
@@ -207,7 +205,6 @@ export default function AccountPage() {
   if (!customer) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex flex-col">
-        <Navbar />
         <main className="flex-1 max-w-lg w-full mx-auto px-4 py-16 text-center space-y-4">
           <div className="w-14 h-14 rounded-2xl bg-yellow-100 text-[#121212] flex items-center justify-center mx-auto">
             <UserIcon className="w-7 h-7 text-yellow-800" />
@@ -235,8 +232,6 @@ export default function AccountPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col">
-      <Navbar />
-
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-8 sm:py-12 space-y-8">
         {/* Success Alert Banner */}
         {upgradeSuccess && (

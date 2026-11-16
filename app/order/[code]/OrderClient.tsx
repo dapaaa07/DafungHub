@@ -22,7 +22,6 @@ import {
   Paperclip,
 } from 'lucide-react';
 import { formatRupiah, CS_WHATSAPP_INTL } from '@/lib/pricing';
-import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 interface OrderDetail {
@@ -130,8 +129,6 @@ export default function OrderClient({ code }: { code: string }) {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col">
-      <Navbar />
-
       <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-8 sm:py-12">
         <div className="mb-6">
           <Link
