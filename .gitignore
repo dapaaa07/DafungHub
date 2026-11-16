@@ -57,3 +57,4 @@ dafung-web/
 *.rar
 sda2greedy/
 .agents/
+.cache/

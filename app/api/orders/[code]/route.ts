@@ -90,13 +90,80 @@ export async function GET(
     }
 
     // Decrypt credentials if delivered
-    let credentials: string | null = null;
+    let rawCredentials: string | null = null;
+    let cleanCredentials: string | null = null;
+    let credentialsNote: string | null = null;
+
     if (order.fulfillment_status === 'delivered' && order.credential_encrypted) {
       try {
-        credentials = decrypt(order.credential_encrypted);
+        rawCredentials = decrypt(order.credential_encrypted);
+        cleanCredentials = rawCredentials;
+        if (cleanCredentials) {
+          const fileTagMatch = cleanCredentials.match(/^\[(?:FILE|MEDIA):[^\]]+\]\s*/i);
+          if (fileTagMatch) {
+            const rest = cleanCredentials.slice(fileTagMatch[0].length).trim();
+            credentialsNote = rest.length > 0 ? rest : null;
+          } else {
+            credentialsNote = cleanCredentials;
+          }
+        }
       } catch (decErr) {
         console.error('[Order Poll] Credential decryption error:', decErr);
-        credentials = '⚠️ Gagal mendekripsi kredensial. Silakan hubungi Customer Support.';
+        cleanCredentials = '⚠️ Gagal mendekripsi kredensial. Silakan hubungi Customer Support.';
+      }
+    }
+
+    // Resolve delivered media if present
+    let deliveredMedia: {
+      type: string;
+      fileName: string;
+      mimeType: string;
+      fileUrl: string;
+      downloadUrl: string;
+      fileSize: number | null;
+      isPhoto: boolean;
+      isText: boolean;
+      textContent: string | null;
+    } | null = null;
+
+    const rawMedia = invData.delivered_media as
+      | {
+          type?: string;
+          fileId?: string;
+          fileName?: string;
+          mimeType?: string;
+        }
+      | undefined;
+
+    if (order.fulfillment_status === 'delivered' && rawMedia?.fileId) {
+      try {
+        const { getDeliveredTelegramMedia } = await import('@/lib/telegram-media');
+        const mediaResult = await getDeliveredTelegramMedia(
+          rawMedia.fileId,
+          rawMedia.fileName,
+          rawMedia.mimeType
+        );
+
+        deliveredMedia = {
+          type: rawMedia.type || 'document',
+          fileName: mediaResult?.fileName || rawMedia.fileName || 'lampiran',
+          mimeType: mediaResult?.mimeType || rawMedia.mimeType || 'application/octet-stream',
+          fileUrl: `/api/orders/${order.order_code}/media`,
+          downloadUrl: `/api/orders/${order.order_code}/media?download=1`,
+          fileSize: mediaResult?.fileSize || null,
+          isPhoto: mediaResult?.isPhoto ?? Boolean(rawMedia.type === 'photo' || /\.(jpe?g|png|webp|gif)$/i.test(rawMedia.fileName || '')),
+          isText: mediaResult?.isText ?? Boolean(/\.(txt|json|csv|log)$/i.test(rawMedia.fileName || '')),
+          textContent: mediaResult?.textContent || null,
+        };
+
+        // If credentials only had [FILE: ...] and we have text content from file, display the file's text content!
+        if (deliveredMedia.isText && deliveredMedia.textContent) {
+          cleanCredentials = deliveredMedia.textContent;
+        } else if (credentialsNote) {
+          cleanCredentials = credentialsNote;
+        }
+      } catch (mediaErr) {
+        console.warn('[Order Media] Error resolving delivered media:', mediaErr);
       }
     }
 
@@ -122,7 +189,9 @@ export async function GET(
         uniqueCode: invData.unique_code || 0,
         createdAt: order.created_at,
         deliveredAt: order.delivered_at,
-        credentials,
+        credentials: cleanCredentials,
+        credentialsNote,
+        deliveredMedia,
         isDelivered: order.fulfillment_status === 'delivered',
         isPaid: order.payment_status === 'paid',
         isExpired: order.payment_status === 'expired',

@@ -15,6 +15,11 @@ import {
   Sparkles,
   MessageCircle,
   Wallet,
+  Download,
+  FileText,
+  Image as ImageIcon,
+  Eye,
+  Paperclip,
 } from 'lucide-react';
 import { formatRupiah, CS_WHATSAPP_INTL } from '@/lib/pricing';
 import Navbar from '@/components/Navbar';
@@ -36,6 +41,18 @@ interface OrderDetail {
   createdAt: string;
   deliveredAt: string | null;
   credentials: string | null;
+  credentialsNote?: string | null;
+  deliveredMedia?: {
+    type: string;
+    fileName: string;
+    mimeType: string;
+    fileUrl: string;
+    downloadUrl: string;
+    fileSize: number | null;
+    isPhoto: boolean;
+    isText: boolean;
+    textContent: string | null;
+  } | null;
   isDelivered: boolean;
   isPaid: boolean;
   isExpired: boolean;
@@ -285,36 +302,145 @@ export default function OrderClient({ code }: { code: string }) {
                         </Link>
                       </div>
                     </div>
-                  ) : order.credentials ? (
-                    <div className="p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-300 space-y-3">
-                      <div className="flex items-center justify-between">
+                  ) : (order.deliveredMedia || order.credentials) ? (
+                    <div className="p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-300 space-y-4">
+                      {/* Header with Title and Actions */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
                         <div className="flex items-center gap-2 text-emerald-900 font-extrabold text-xs sm:text-sm">
-                          <Sparkles className="w-4 h-4 text-emerald-600" />
-                          <span>Kredensial Akun Digital Anda:</span>
-                        </div>
-                        <button
-                          onClick={() => handleCopy(order.credentials!, 'key')}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs shadow-sm transition-all"
-                        >
-                          {copiedKey ? (
-                            <>
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Tersalin!</span>
-                            </>
+                          {order.deliveredMedia ? (
+                            <Paperclip className="w-4 h-4 text-emerald-600" />
                           ) : (
-                            <>
-                              <Copy className="w-3.5 h-3.5" />
-                              <span>Salin Akun</span>
-                            </>
+                            <Sparkles className="w-4 h-4 text-emerald-600" />
                           )}
-                        </button>
+                          <span>
+                            {order.deliveredMedia
+                              ? order.deliveredMedia.isPhoto
+                                ? 'Media Gambar Kredensial Akun:'
+                                : 'File Lampiran & Kredensial Akun:'
+                              : 'Kredensial Akun Digital Anda:'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {order.deliveredMedia && (
+                            <a
+                              href={order.deliveredMedia.downloadUrl}
+                              download={order.deliveredMedia.fileName}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-100 border border-emerald-300 active:scale-95 text-emerald-800 font-bold text-xs shadow-sm transition-all"
+                            >
+                              <Download className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>Unduh File</span>
+                            </a>
+                          )}
+
+                          {order.credentials && (
+                            <button
+                              onClick={() => handleCopy(order.credentials!, 'key')}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs shadow-sm transition-all"
+                            >
+                              {copiedKey ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Tersalin!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5" />
+                                  <span>Salin Akun</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="p-3.5 bg-white rounded-xl border border-emerald-200">
-                        <pre className="font-mono text-xs text-gray-800 whitespace-pre-wrap break-all leading-relaxed">
-                          {order.credentials}
-                        </pre>
-                      </div>
+                      {/* MEDIA ATTACHMENT DISPLAY */}
+                      {order.deliveredMedia && (
+                        <div className="space-y-3">
+                          {/* If Image: Render Image Preview */}
+                          {order.deliveredMedia.isPhoto ? (
+                            <div className="rounded-2xl border-2 border-emerald-200 bg-white p-3 space-y-3 shadow-xs">
+                              <div className="relative group max-h-[420px] rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center border border-gray-100">
+                                <img
+                                  src={order.deliveredMedia.fileUrl}
+                                  alt={order.deliveredMedia.fileName}
+                                  className="max-h-[380px] w-auto object-contain rounded-lg"
+                                />
+                              </div>
+                              <div className="flex items-center justify-between text-xs text-gray-600 pt-1">
+                                <span className="font-semibold truncate max-w-[200px] sm:max-w-xs text-gray-800 flex items-center gap-1.5">
+                                  <ImageIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  {order.deliveredMedia.fileName}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <a
+                                    href={order.deliveredMedia.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-800 font-bold hover:underline"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                    <span>Buka Penuh</span>
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            /* If Document / File */
+                            <div className="p-3.5 bg-white rounded-xl border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                                  <FileText className="w-5 h-5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="font-extrabold text-xs sm:text-sm text-gray-900 block truncate">
+                                    {order.deliveredMedia.fileName}
+                                  </span>
+                                  <span className="text-[11px] text-gray-500 font-medium">
+                                    Lampiran Berkas Akun Digital
+                                    {order.deliveredMedia.fileSize ? ` • ${(order.deliveredMedia.fileSize / 1024).toFixed(1)} KB` : ''}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                                <a
+                                  href={order.deliveredMedia.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold transition-colors"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Buka</span>
+                                </a>
+                                <a
+                                  href={order.deliveredMedia.downloadUrl}
+                                  download={order.deliveredMedia.fileName}
+                                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Unduh File</span>
+                                </a>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* TEXT CREDENTIALS / FILE CONTENT */}
+                      {order.credentials && (
+                        <div className="space-y-1.5">
+                          {order.deliveredMedia && (
+                            <span className="text-[11px] font-bold text-emerald-900 block">
+                              {order.deliveredMedia.isText ? 'Isi Teks Berkas Kredensial:' : 'Keterangan Tambahan:'}
+                            </span>
+                          )}
+                          <div className="p-3.5 bg-white rounded-xl border border-emerald-200">
+                            <pre className="font-mono text-xs text-gray-800 whitespace-pre-wrap break-all leading-relaxed">
+                              {order.credentials}
+                            </pre>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="flex items-center gap-2 text-[11px] text-emerald-800">
                         <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
