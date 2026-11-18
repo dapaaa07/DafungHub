@@ -1,6 +1,6 @@
-# DaFung Hub - cPanel Apache & Node.js Passenger Configuration
+# DaFung Hub - cPanel LiteSpeed Reverse Proxy & Error Handling Configuration
 
-# Disable LiteSpeed Cache completely so Next.js pages are never stale
+# Disable LiteSpeed Cache so dynamic Next.js pages are never stale
 <IfModule LiteSpeed>
   CacheLookup off
   CacheDisable public /
@@ -25,17 +25,15 @@ ErrorDocument 502 /public/errors/502.html
 ErrorDocument 503 /public/errors/503.html
 ErrorDocument 504 /public/errors/504.html
 
-<IfModule mod_rewrite.c>
-  RewriteEngine On
+RewriteEngine On
 
-  # Force HTTPS
-  RewriteCond %{HTTPS} off
-  RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# Serve custom static error pages directly from disk (never proxy to Node.js)
+RewriteCond %{REQUEST_URI} ^/public/errors/[0-9]{3}\.html$ [OR]
+RewriteCond %{REQUEST_URI} ^/public/503\.html$
+RewriteRule ^ - [L]
 
-  # Allow static files & custom error pages directly
-  RewriteCond %{REQUEST_URI} ^/_next/static/(.*)$ [OR]
-  RewriteCond %{REQUEST_URI} ^/public/errors/[0-9]{3}\.html$ [OR]
-  RewriteCond %{REQUEST_URI} ^/public/503\.html$ [OR]
-  RewriteCond %{REQUEST_FILENAME} -f
-  RewriteRule ^ - [L]
-</IfModule>
+# Reverse proxy root & Next.js routes to local PM2 server (port 3088)
+RewriteRule ^$ http://127.0.0.1:3088/ [P,L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ http://127.0.0.1:3088/$1 [P,L]
