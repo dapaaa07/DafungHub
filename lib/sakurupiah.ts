@@ -9,8 +9,8 @@ if (!process.env.SAKURUPIAH_API_KEY && !process.env.SAKURUPIAH_API_ID) {
   }
 }
 
-export const SAKURUPIAH_API_ID = process.env.SAKURUPIAH_API_ID || 'SANBOX-31838670';
-export const SAKURUPIAH_API_KEY = process.env.SAKURUPIAH_API_KEY || 'SANBOX-u3N76fgWjJnhehCQ5q0IQoF8VDEv6nWJ';
+export const SAKURUPIAH_API_ID = process.env.SAKURUPIAH_API_ID || '';
+export const SAKURUPIAH_API_KEY = process.env.SAKURUPIAH_API_KEY || '';
 
 /**
  * Determine base URL:
@@ -99,10 +99,12 @@ export function verifySakurupiahCallbackSignature(
   incomingSignature: string,
   apiKey: string = SAKURUPIAH_API_KEY
 ): boolean {
-  if (!incomingSignature || !rawJsonBody) return false;
+  if (!apiKey || !incomingSignature || !rawJsonBody) return false;
   try {
     const computed = crypto.createHmac('sha256', apiKey).update(rawJsonBody).digest('hex');
-    return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(incomingSignature));
+    const a = Buffer.from(computed, 'utf8');
+    const b = Buffer.from(incomingSignature.trim(), 'utf8');
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
   } catch {
     return false;
   }

@@ -1,20 +1,19 @@
 'use client';
 
+import { memo } from 'react';
 import Image from 'next/image';
 import { Check, Send, ShieldCheck, Zap } from 'lucide-react';
 import { EnrichedProduct } from '@/lib/types';
 import { formatRupiah, TELEGRAM_BOT_USERNAME } from '@/lib/pricing';
-import { useBotStatus } from './BotStatusContext';
 
 interface ProductCardProps {
   product: EnrichedProduct;
+  isOnline: boolean;
   onSelect: (product: EnrichedProduct) => void;
 }
 
-export default function ProductCard({ product, onSelect }: ProductCardProps) {
+const ProductCard = memo(function ProductCard({ product, isOnline, onSelect }: ProductCardProps) {
   const isAvailable = product.availability === 'in_stock';
-  const { botStatus } = useBotStatus();
-  const isOnline = botStatus === 'online';
   const telegramBuyUrl = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=buy_${product.id}`;
 
   return (
@@ -31,6 +30,8 @@ export default function ProductCard({ product, onSelect }: ProductCardProps) {
                   alt={product.platformName}
                   width={40}
                   height={40}
+                  loading="lazy"
+                  decoding="async"
                   className="object-contain max-h-9 w-auto"
                 />
               ) : (
@@ -145,4 +146,6 @@ export default function ProductCard({ product, onSelect }: ProductCardProps) {
       </div>
     </div>
   );
-}
+});
+
+export default ProductCard;

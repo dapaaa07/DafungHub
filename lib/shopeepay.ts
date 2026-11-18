@@ -680,16 +680,21 @@ export async function processShopeePayWebhookPayload(
   }
 
   const webhookSecret = process.env.SHOPEEPAY_WEBHOOK_SECRET;
-  if (webhookSecret) {
-    if (
-      !signatureHeader ||
-      !verifyShopeePayWebhookSignature(rawBody, data, signatureHeader, webhookSecret)
-    ) {
-      return {
-        httpStatus: 401,
-        body: { success: false, message: 'Invalid webhook signature' },
-      };
-    }
+  if (!webhookSecret) {
+    console.error('[ShopeePay Webhook] SHOPEEPAY_WEBHOOK_SECRET is not configured. Rejecting webhook.');
+    return {
+      httpStatus: 503,
+      body: { success: false, message: 'Webhook verification secret not configured' },
+    };
+  }
+  if (
+    !signatureHeader ||
+    !verifyShopeePayWebhookSignature(rawBody, data, signatureHeader, webhookSecret)
+  ) {
+    return {
+      httpStatus: 401,
+      body: { success: false, message: 'Invalid webhook signature' },
+    };
   }
 
   const eventName = String(data.event || '').trim().toLowerCase();

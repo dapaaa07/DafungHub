@@ -1,5 +1,8 @@
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestBaseUrl } from '@/lib/customer-auth';
+
+const OAUTH_STATE_COOKIE = 'dafung_oauth_state';
 
 export async function GET(req: NextRequest) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -16,15 +19,19 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const returnTo = searchParams.get('returnTo') || '/';
+  const rawReturnTo = searchParams.get('returnTo') || '/';
+  // Prevent protocol-relative open redirects like //evil.com
+  const returnTo =
+    rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//') ? rawReturnTo : '/';
 
   // Construct OAuth callback redirect URI
   const baseUrl = getRequestBaseUrl(req);
   const redirectUri =
     process.env.GOOGLE_REDIRECT_URI || `${baseUrl}/api/auth/google/callback`;
 
-  // Encode state with returnTo
-  const state = Buffer.from(JSON.stringify({ returnTo })).toString('base64url');
+  // Generate cryptographic CSRF nonce bound to HttpOnly cookie
+  const nonce = crypto.randomBytes(32).toString('base64url');
+  const state = Buffer.from(JSON.stringify({ returnTo, nonce })).toString('base64url');
 
   const scope = encodeURIComponent('openid email profile');
   const googleAuthUrl =
@@ -36,5 +43,16 @@ export async function GET(req: NextRequest) {
     `prompt=select_account&` +
     `state=${state}`;
 
-  return NextResponse.redirect(googleAuthUrl);
+  const response = NextResponse.redirect(googleAuthUrl);
+  response.cookies.set({
+    name: OAUTH_STATE_COOKIE,
+    value: nonce,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 600,
+  });
+
+  return response;
 }

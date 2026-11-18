@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 export type BotStatus = 'online' | 'maintenance';
 
@@ -14,10 +14,6 @@ const BotStatusContext = createContext<BotStatusContextValue>({
   refreshStatus: async () => {},
 });
 
-function getStatusEndpoint(): string {
-  return '/api/bot-status';
-}
-
 export function BotStatusProvider({
   initialStatus = 'online',
   children,
@@ -26,15 +22,21 @@ export function BotStatusProvider({
   children: React.ReactNode;
 }) {
   const [botStatus, setBotStatus] = useState<BotStatus>(initialStatus);
+  const lastFetchedRef = useRef<number>(0);
 
-  const fetchLatestStatus = async () => {
+  const fetchLatestStatus = async (force = false) => {
+    if (!force && typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+      return;
+    }
+    const now = Date.now();
+    if (!force && now - lastFetchedRef.current < 15_000) {
+      return;
+    }
+    lastFetchedRef.current = now;
+
     try {
-      const endpoint = getStatusEndpoint();
-      const res = await fetch(endpoint, {
+      const res = await fetch('/api/bot-status', {
         cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-        },
       });
       if (res.ok) {
         const data = await res.json();
@@ -42,41 +44,35 @@ export function BotStatusProvider({
           setBotStatus(data.status);
         }
       }
-    } catch (err) {
+    } catch {
       // Ignore background fetch error
     }
   };
 
   useEffect(() => {
-    // 1. Fetch immediately on client mount
-    fetchLatestStatus();
+    fetchLatestStatus(true);
 
-    // 2. Polling interval every 10 seconds
-    const interval = setInterval(fetchLatestStatus, 10000);
-
-    // 3. Refresh immediately when window/tab is focused
-    const handleFocus = () => {
-      fetchLatestStatus();
-    };
+    // Poll every 60 seconds only while tab is visible
+    const interval = setInterval(() => {
+      fetchLatestStatus(false);
+    }, 60_000);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        fetchLatestStatus();
+        fetchLatestStatus(false);
       }
     };
 
-    window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
   return (
-    <BotStatusContext.Provider value={{ botStatus, refreshStatus: fetchLatestStatus }}>
+    <BotStatusContext.Provider value={{ botStatus, refreshStatus: () => fetchLatestStatus(true) }}>
       {children}
     </BotStatusContext.Provider>
   );

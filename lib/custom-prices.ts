@@ -2,7 +2,21 @@ import { query } from './db';
 
 let cachedCustomPrices: Map<string, number> | null = null;
 let customPricesExpiry = 0;
-const PRICES_CACHE_TTL_MS = 5000;
+let productPricesTableEnsured = false;
+const PRICES_CACHE_TTL_MS = 60_000;
+
+async function ensureProductPricesTable(): Promise<void> {
+  if (productPricesTableEnsured) return;
+  await query(`
+    CREATE TABLE IF NOT EXISTS product_prices (
+      product_id VARCHAR(100) PRIMARY KEY,
+      product_name VARCHAR(255),
+      custom_price INTEGER NOT NULL CHECK (custom_price >= 0),
+      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `).catch(() => {});
+  productPricesTableEnsured = true;
+}
 
 /**
  * Fetch custom price overrides from database (with in-memory TTL caching)
@@ -15,15 +29,7 @@ export async function getCustomPrices(): Promise<Map<string, number>> {
 
   const priceMap = new Map<string, number>();
   try {
-    // Ensure table exists safely without error
-    await query(`
-      CREATE TABLE IF NOT EXISTS product_prices (
-        product_id VARCHAR(100) PRIMARY KEY,
-        product_name VARCHAR(255),
-        custom_price INTEGER NOT NULL CHECK (custom_price >= 0),
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `).catch(() => {});
+    await ensureProductPricesTable();
 
     const res = await query<{ product_id: string; custom_price: number }>(
       'SELECT product_id, custom_price FROM product_prices'
@@ -56,16 +62,10 @@ export async function setCustomPrice(
   }
   cachedCustomPrices.set(cleanId, cleanPrice);
   customPricesExpiry = Date.now() + PRICES_CACHE_TTL_MS;
+  import('./supplier').then((m) => m.clearSupplierCatalogCache()).catch(() => {});
 
   try {
-    await query(`
-      CREATE TABLE IF NOT EXISTS product_prices (
-        product_id VARCHAR(100) PRIMARY KEY,
-        product_name VARCHAR(255),
-        custom_price INTEGER NOT NULL CHECK (custom_price >= 0),
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `).catch(() => {});
+    await ensureProductPricesTable();
 
     await query(
       `INSERT INTO product_prices (product_id, product_name, custom_price, updated_at)
@@ -97,6 +97,7 @@ export async function deleteCustomPrice(productId: string): Promise<void> {
     cachedCustomPrices = null;
     customPricesExpiry = 0;
   }
+  import('./supplier').then((m) => m.clearSupplierCatalogCache()).catch(() => {});
 
   try {
     await query('DELETE FROM product_prices WHERE product_id = $1 OR product_name = $1', [cleanId]);

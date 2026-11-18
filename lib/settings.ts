@@ -4,7 +4,7 @@ export type BotStatus = 'online' | 'maintenance';
 
 let cachedStatus: BotStatus | null = null;
 let cacheExpiry = 0;
-const CACHE_TTL_MS = 5000; // 5 seconds cache for serverless efficiency
+const CACHE_TTL_MS = 30_000; // 30 seconds cache (invalidated immediately on setBotStatus)
 
 /**
  * Get current bot operational status (online vs maintenance)

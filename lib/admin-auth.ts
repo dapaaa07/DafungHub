@@ -1,6 +1,7 @@
+import crypto from 'crypto';
 import { NextResponse } from 'next/server';
 
-if (!process.env.ADMIN_API_KEY) {
+if (!process.env.ADMIN_API_KEY && !process.env.ADMIN_SECRET_KEY) {
   try {
     process.loadEnvFile?.();
   } catch {
@@ -8,33 +9,47 @@ if (!process.env.ADMIN_API_KEY) {
   }
 }
 
-// Configurable admin secret key with fallback to supplier API key
 export const ADMIN_SECRET_KEY =
   process.env.ADMIN_API_KEY ||
   process.env.ADMIN_SECRET_KEY ||
-  process.env.SUPPLIER_API_KEY ||
-  'dafung-admin-2026';
+  '';
 
-export const ADMIN_TELEGRAM_ID = '7133868769';
-export const ADMIN_DEFAULT_PIN = process.env.ADMIN_PIN || '713386';
+export const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID || '7133868769';
+
+function safeEqual(a: string, b: string): boolean {
+  const hashA = crypto.createHash('sha256').update(a).digest();
+  const hashB = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
+}
+
+function getConfiguredAdminKeys(): string[] {
+  const keys: string[] = [];
+  const primary = process.env.ADMIN_API_KEY || process.env.ADMIN_SECRET_KEY;
+  if (primary && primary.trim().length > 0) {
+    keys.push(primary.trim());
+  }
+  const pin = process.env.ADMIN_PIN;
+  if (pin && pin.trim().length > 0) {
+    keys.push(pin.trim());
+  }
+  return keys;
+}
 
 export function verifyAdminKey(key?: string | null): boolean {
   if (!key) return false;
   const clean = key.trim();
+  if (!clean) return false;
 
-  // Accept Owner Telegram ID, PINs, or configured secret keys
-  if (
-    clean === ADMIN_TELEGRAM_ID ||
-    clean === '7133868769' ||
-    clean === '713386' ||
-    clean === '123456' ||
-    clean === ADMIN_DEFAULT_PIN ||
-    clean === ADMIN_SECRET_KEY ||
-    (process.env.SUPPLIER_API_KEY && clean === process.env.SUPPLIER_API_KEY) ||
-    (process.env.SHOPEEPAY_API_KEY && clean === process.env.SHOPEEPAY_API_KEY) ||
-    clean === 'dafung-admin-2026'
-  ) {
-    return true;
+  const configuredKeys = getConfiguredAdminKeys();
+  if (configuredKeys.length === 0) {
+    console.error('[Admin Auth] ADMIN_API_KEY is not configured in environment. Failing closed.');
+    return false;
+  }
+
+  for (const validKey of configuredKeys) {
+    if (safeEqual(clean, validKey)) {
+      return true;
+    }
   }
 
   return false;
@@ -49,11 +64,6 @@ export function verifyAdminRequest(req: Request): boolean {
     const token = authHeader.substring(7);
     if (verifyAdminKey(token)) return true;
   }
-
-  // Also check query param ?key=
-  const url = new URL(req.url);
-  const queryKey = url.searchParams.get('key');
-  if (queryKey && verifyAdminKey(queryKey)) return true;
 
   return false;
 }

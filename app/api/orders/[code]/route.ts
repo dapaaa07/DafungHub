@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { decrypt } from '@/lib/encrypt';
+import { getCustomerFromRequest } from '@/lib/customer-auth';
+import { verifyAdminRequest } from '@/lib/admin-auth';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
+    const isAdmin = verifyAdminRequest(req);
+    const customer = isAdmin ? null : await getCustomerFromRequest(req);
+
+    if (!isAdmin && !customer) {
+      return NextResponse.json(
+        { success: false, error: 'Silakan masuk ke akun Anda untuk melihat detail pesanan.' },
+        { status: 401, headers: { 'Cache-Control': 'private, no-store, max-age=0' } }
+      );
+    }
+
     const { code } = await params;
     const orderCode = code?.trim();
 
@@ -43,6 +55,13 @@ export async function GET(
     }
 
     let order = orderRes.rows[0];
+
+    if (!isAdmin && customer && order.user_id !== customer.id) {
+      return NextResponse.json(
+        { success: false, error: 'Anda tidak memiliki izin untuk mengakses pesanan ini.' },
+        { status: 403, headers: { 'Cache-Control': 'private, no-store, max-age=0' } }
+      );
+    }
     const invData =
       typeof order.invoice_data === 'string'
         ? JSON.parse(order.invoice_data || '{}')
@@ -196,7 +215,9 @@ export async function GET(
         isPaid: order.payment_status === 'paid',
         isExpired: order.payment_status === 'expired',
       },
-    });
+    },
+    { headers: { 'Cache-Control': 'private, no-store, max-age=0' } }
+    );
   } catch (error) {
     console.error('[/api/orders/[code]] Error:', error);
     return NextResponse.json(

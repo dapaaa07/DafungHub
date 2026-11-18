@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { query, getClient, Product, User } from './db';
 import { calculateCheckoutPrice, CheckoutPaymentMethod } from './membership';
 import { validateVoucherForTransaction, Voucher } from './voucher';
@@ -7,7 +8,7 @@ import { generateUniqueCheckoutAmount } from './unique-code';
 
 export function generateOrderCode(): string {
   const timestamp = Math.floor(Date.now() / 1000);
-  const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
+  const randomSuffix = crypto.randomBytes(4).toString('hex').toUpperCase();
   return `ORD-${timestamp}-${randomSuffix}`;
 }
 
@@ -87,7 +88,7 @@ export async function resolveWebProduct(productId: string): Promise<Product | nu
   if (!product && (trimmedId.startsWith('deposit_') || trimmedId.startsWith('dep_'))) {
     try {
       const amount = parseInt(trimmedId.replace(/^(deposit_|dep_)/, ''), 10);
-      if (amount && !isNaN(amount) && amount >= 1000) {
+      if (amount && !isNaN(amount) && amount >= 1000 && amount <= 5_000_000) {
         const prodName = `Deposit Saldo Rp ${amount.toLocaleString('id-ID')}`;
         const existingByName = await query<Product>(
           'SELECT * FROM products WHERE name = $1 LIMIT 1',

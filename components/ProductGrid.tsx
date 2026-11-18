@@ -1,15 +1,18 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { EnrichedProduct, ProductCategory } from '@/lib/types';
 import CategoryFilter from './CategoryFilter';
 import ProductCard from './ProductCard';
 import OrderModal from './OrderModal';
-import { Sparkles, PackageSearch } from 'lucide-react';
+import { useBotStatus } from './BotStatusContext';
+import { ChevronDown, PackageSearch } from 'lucide-react';
 
 interface ProductGridProps {
   initialProducts: EnrichedProduct[];
 }
+
+const PAGE_SIZE = 20;
 
 export default function ProductGrid({ initialProducts }: ProductGridProps) {
   const [products, setProducts] = useState<EnrichedProduct[]>(initialProducts);
@@ -17,39 +20,44 @@ export default function ProductGrid({ initialProducts }: ProductGridProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('popular');
   const [stockOnly, setStockOnly] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [activeModalProduct, setActiveModalProduct] = useState<EnrichedProduct | null>(null);
+  const { botStatus } = useBotStatus();
+  const isOnline = botStatus === 'online';
 
-  // Auto-sync live prices & catalogue from /api/products in real-time
+  // Gentle background refresh every 2 minutes only when the tab is visible
   useEffect(() => {
     let isMounted = true;
     const fetchLiveProducts = async () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
       try {
-        const isStaticHost =
-          typeof window !== 'undefined' &&
-          (window.location.hostname === 'store.dafung.web.id' ||
-           window.location.protocol === 'file:' ||
-           window.location.hostname.includes('github.io'));
-        const endpoint = isStaticHost
-          ? 'https://dafung-hub.vercel.app/api/products'
-          : '/api/products';
-
-        const res = await fetch(endpoint, { cache: 'no-store' });
+        const res = await fetch('/api/products', { cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
         if (isMounted && data.success && Array.isArray(data.products) && data.products.length > 0) {
           setProducts(data.products);
         }
-      } catch (err) {
-        console.debug('Live products auto-sync failed, retaining initial:', err);
+      } catch {
+        // Retain current catalog silently on transient errors
       }
     };
 
-    fetchLiveProducts();
-    const interval = setInterval(fetchLiveProducts, 15000);
+    const interval = setInterval(fetchLiveProducts, 120_000);
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
+  }, []);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [selectedCategory, searchQuery, sortBy, stockOnly]);
+
+  const handleSelectProduct = useCallback((p: EnrichedProduct) => {
+    setActiveModalProduct(p);
   }, []);
 
   // Compute category counts
@@ -79,17 +87,14 @@ export default function ProductGrid({ initialProducts }: ProductGridProps) {
   const filteredProducts = useMemo(() => {
     let list = [...products];
 
-    // Filter by Category
     if (selectedCategory !== 'all') {
       list = list.filter((p) => p.category === selectedCategory);
     }
 
-    // Filter by Stock
     if (stockOnly) {
       list = list.filter((p) => p.availability === 'in_stock');
     }
 
-    // Filter by Search Query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter(
@@ -100,7 +105,6 @@ export default function ProductGrid({ initialProducts }: ProductGridProps) {
       );
     }
 
-    // Sort Products
     if (sortBy === 'price_asc') {
       list.sort((a, b) => a.sellingPrice - b.sellingPrice);
     } else if (sortBy === 'price_desc') {
@@ -108,7 +112,6 @@ export default function ProductGrid({ initialProducts }: ProductGridProps) {
     } else if (sortBy === 'name_asc') {
       list.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortBy === 'popular') {
-      // Prioritize popular items first, then in_stock, then name
       list.sort((a, b) => {
         if (a.isPopular && !b.isPopular) return -1;
         if (!a.isPopular && b.isPopular) return 1;
@@ -120,6 +123,12 @@ export default function ProductGrid({ initialProducts }: ProductGridProps) {
 
     return list;
   }, [products, selectedCategory, searchQuery, sortBy, stockOnly]);
+
+  const visibleProducts = useMemo(
+    () => filteredProducts.slice(0, visibleCount),
+    [filteredProducts, visibleCount]
+  );
+  const remainingCount = filteredProducts.length - visibleProducts.length;
 
   return (
     <section id="katalog" className="py-16 sm:py-24 bg-[#F8F9FA]">
@@ -150,13 +159,13 @@ export default function ProductGrid({ initialProducts }: ProductGridProps) {
         {/* Results Counter */}
         <div className="flex items-center justify-between text-xs text-gray-500 font-medium px-1">
           <span>
-            Menampilkan <strong className="text-black">{filteredProducts.length}</strong> dari{' '}
-            {products.length} produk
+            Menampilkan <strong className="text-black">{visibleProducts.length}</strong> dari{' '}
+            <strong className="text-black">{filteredProducts.length}</strong> produk
           </span>
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="text-yellow-700 hover:underline font-semibold"
+              className="text-yellow-700 hover:underline font-semibold cursor-pointer"
             >
               Reset Pencarian
             </button>
@@ -164,16 +173,43 @@ export default function ProductGrid({ initialProducts }: ProductGridProps) {
         </div>
 
         {/* Products Grid */}
-        {filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map((prod) => (
-              <ProductCard
-                key={prod.id}
-                product={prod}
-                onSelect={(p) => setActiveModalProduct(p)}
-              />
-            ))}
-          </div>
+        {visibleProducts.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {visibleProducts.map((prod) => (
+                <ProductCard
+                  key={prod.id}
+                  product={prod}
+                  isOnline={isOnline}
+                  onSelect={handleSelectProduct}
+                />
+              ))}
+            </div>
+
+            {remainingCount > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#121212] hover:bg-[#252525] text-white text-xs sm:text-sm font-bold shadow-sm transition-all cursor-pointer"
+                >
+                  <ChevronDown className="w-4 h-4 text-[#FFDE00]" />
+                  <span>
+                    Muat {Math.min(PAGE_SIZE, remainingCount)} Produk Lainnya ({remainingCount} tersisa)
+                  </span>
+                </button>
+                {remainingCount > PAGE_SIZE && (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount(filteredProducts.length)}
+                    className="w-full sm:w-auto inline-flex items-center justify-center px-5 py-3 rounded-xl bg-white hover:bg-gray-100 text-[#121212] border border-gray-200 text-xs sm:text-sm font-bold transition-all cursor-pointer"
+                  >
+                    Tampilkan Semua ({filteredProducts.length})
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         ) : (
           /* Empty State */
           <div className="bg-white rounded-3xl border border-gray-200 p-12 text-center max-w-md mx-auto space-y-4 shadow-sm">
@@ -192,18 +228,20 @@ export default function ProductGrid({ initialProducts }: ProductGridProps) {
                 setSelectedCategory('all');
                 setStockOnly(false);
               }}
-              className="px-5 py-2.5 rounded-xl bg-[#121212] text-white font-bold text-xs hover:bg-[#252525] transition-all"
+              className="px-5 py-2.5 rounded-xl bg-[#121212] text-white font-bold text-xs hover:bg-[#252525] transition-all cursor-pointer"
             >
               Tampilkan Semua Produk
             </button>
           </div>
         )}
 
-        {/* Order Modal Component */}
-        <OrderModal
-          product={activeModalProduct}
-          onClose={() => setActiveModalProduct(null)}
-        />
+        {/* Mount Order Modal only when opened */}
+        {activeModalProduct && (
+          <OrderModal
+            product={activeModalProduct}
+            onClose={() => setActiveModalProduct(null)}
+          />
+        )}
       </div>
     </section>
   );

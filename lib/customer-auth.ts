@@ -129,7 +129,9 @@ export function verifyCustomerToken(token: string): CustomerSessionPayload | nul
       .update(`${header}.${body}`)
       .digest('base64url');
 
-    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
+    const sigBuf = Buffer.from(signature, 'utf8');
+    const expectedBuf = Buffer.from(expectedSig, 'utf8');
+    if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
       return null;
     }
 
@@ -138,7 +140,7 @@ export function verifyCustomerToken(token: string): CustomerSessionPayload | nul
     );
 
     const now = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < now) {
+    if (typeof payload.exp !== 'number' || payload.exp <= now) {
       return null;
     }
 
@@ -385,6 +387,7 @@ export async function findOrCreateGoogleCustomer(params: {
     const updated = await query<User>(
       `UPDATE public.users
        SET google_id = $1,
+           password_hash = CASE WHEN google_id IS NULL THEN NULL ELSE password_hash END,
            avatar_url = COALESCE(avatar_url, $2),
            name = COALESCE(name, $3),
            username = COALESCE(username, $4),
@@ -506,14 +509,9 @@ export function getRequestBaseUrl(req?: Request | { headers: Headers }): string 
   }
 
   if (req) {
-    const forwardedHost = req.headers.get('x-forwarded-host');
-    const host = forwardedHost || req.headers.get('host');
-    const proto =
-      req.headers.get('x-forwarded-proto') ||
-      (host?.includes('localhost') ? 'http' : 'https');
-
-    if (host && !host.startsWith('0.0.0.0')) {
-      return `${proto}://${host}`;
+    const host = req.headers.get('host');
+    if (host && (host.startsWith('localhost:') || host === 'localhost' || host.startsWith('127.0.0.1'))) {
+      return `http://${host}`;
     }
   }
 

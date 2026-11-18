@@ -1,12 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getDeliveredTelegramMedia } from '@/lib/telegram-media';
+import { getCustomerFromRequest } from '@/lib/customer-auth';
+import { verifyAdminRequest } from '@/lib/admin-auth';
+
+const SAFE_INLINE_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+  'text/plain',
+]);
+
+function sanitizeHeaderFileName(name: string): string {
+  return name.replace(/["\\\r\n]/g, '_').trim() || 'attachment';
+}
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
+    const isAdmin = verifyAdminRequest(req);
+    const customer = isAdmin ? null : await getCustomerFromRequest(req);
+
+    if (!isAdmin && !customer) {
+      return new NextResponse('Autentikasi diperlukan untuk mengakses lampiran pesanan', {
+        status: 401,
+        headers: { 'Cache-Control': 'private, no-store, max-age=0' },
+      });
+    }
+
     const { code } = await params;
     const orderCode = code?.trim();
 
@@ -16,11 +42,12 @@ export async function GET(
 
     const orderRes = await query<{
       id: string;
+      user_id: string;
       order_code: string;
       fulfillment_status: string;
       invoice_data: unknown;
     }>(
-      `SELECT id, order_code, fulfillment_status, invoice_data
+      `SELECT id, user_id, order_code, fulfillment_status, invoice_data
        FROM orders
        WHERE order_code = $1 LIMIT 1`,
       [orderCode]
@@ -31,6 +58,14 @@ export async function GET(
     }
 
     const order = orderRes.rows[0];
+
+    if (!isAdmin && customer && order.user_id !== customer.id) {
+      return new NextResponse('Anda tidak memiliki izin mengakses lampiran pesanan ini', {
+        status: 403,
+        headers: { 'Cache-Control': 'private, no-store, max-age=0' },
+      });
+    }
+
     if (order.fulfillment_status !== 'delivered') {
       return new NextResponse('Pesanan belum berstatus delivered', { status: 403 });
     }
@@ -67,16 +102,22 @@ export async function GET(
 
     const url = new URL(req.url);
     const isDownload = url.searchParams.get('download') === '1';
-    const dispositionType = isDownload ? 'attachment' : 'inline';
-    const safeFileName = encodeURIComponent(mediaResult.fileName);
+    const normalizedMime = (mediaResult.mimeType || 'application/octet-stream').toLowerCase().split(';')[0].trim();
+    // Never render SVG/HTML/active formats inline to prevent same-origin XSS
+    const allowInline = !isDownload && SAFE_INLINE_MIME_TYPES.has(normalizedMime);
+    const dispositionType = allowInline ? 'inline' : 'attachment';
+    const cleanFileName = sanitizeHeaderFileName(mediaResult.fileName);
+    const encodedFileName = encodeURIComponent(cleanFileName);
 
     return new NextResponse(new Uint8Array(mediaResult.buffer), {
       status: 200,
       headers: {
         'Content-Type': mediaResult.mimeType,
         'Content-Length': mediaResult.fileSize.toString(),
-        'Content-Disposition': `${dispositionType}; filename="${mediaResult.fileName}"; filename*=UTF-8''${safeFileName}`,
-        'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+        'Content-Disposition': `${dispositionType}; filename="${cleanFileName}"; filename*=UTF-8''${encodedFileName}`,
+        'Cache-Control': 'private, no-store, max-age=0',
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'; sandbox",
       },
     });
   } catch (error) {

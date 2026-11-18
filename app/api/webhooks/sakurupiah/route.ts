@@ -23,9 +23,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate signature
-    if (signature && !verifySakurupiahCallbackSignature(rawBody, signature)) {
-      console.error('[Sakurupiah Webhook] Invalid signature rejected');
+    // Validate signature (fail closed when missing or invalid)
+    if (!signature || !verifySakurupiahCallbackSignature(rawBody, signature)) {
+      console.error('[Sakurupiah Webhook] Missing or invalid signature rejected');
       return NextResponse.json(
         { success: false, message: 'Invalid signature' },
         { status: 401 }

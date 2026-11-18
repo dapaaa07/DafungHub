@@ -10,10 +10,14 @@ if (!url) {
 const webhookUrl = `${url.replace(/\/$/, '')}/api/webhooks/telegram`;
 
 async function main() {
+  const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
   console.log(`Setting Telegram webhook to: ${webhookUrl}`);
-  await bot.api.setWebhook({ url: webhookUrl });
+  await bot.api.setWebhook({
+    url: webhookUrl,
+    ...(secretToken ? { secret_token: secretToken } : {}),
+  });
   const info = await bot.api.getWebhookInfo();
-  console.log('✅ Webhook successfully set!');
+  console.log(`Webhook successfully set! (secret_token: ${secretToken ? 'enabled' : 'NOT SET'})`);
   console.log('Webhook Info:', info);
 }
 

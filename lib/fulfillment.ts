@@ -110,26 +110,53 @@ export async function processOrderPayment(
     transactionMeta?.id;
   const txId = rawTxId !== undefined && rawTxId !== null ? String(rawTxId).trim() : '';
 
-  if (txId) {
-    const txFieldPath = isBalancePayment ? '{balance_tx_id}' : '{shopeepay_tx_id}';
-    await query(
-      `UPDATE orders
-       SET payment_status = 'paid',
-           invoice_data = jsonb_set(
-             COALESCE(invoice_data::jsonb, '{}'::jsonb),
-             $1::text[],
-             to_jsonb($2::text)
-           )
-       WHERE id = $3`,
-      [txFieldPath, txId, order.id]
-    ).catch(() => {
-      return query(`UPDATE orders SET payment_status = 'paid' WHERE id = $1`, [order.id]);
-    });
-  } else if (!wasPreviouslyPaid) {
-    await query(
-      `UPDATE orders SET payment_status = 'paid' WHERE id = $1`,
-      [order.id]
-    );
+  if (!wasPreviouslyPaid) {
+    let claimed = false;
+    if (txId) {
+      const txFieldPath = isBalancePayment ? '{balance_tx_id}' : '{shopeepay_tx_id}';
+      const claimRes = await query<{ id: string }>(
+        `UPDATE orders
+         SET payment_status = 'paid',
+             fulfillment_status = CASE WHEN fulfillment_status = 'pending' THEN 'processing' ELSE fulfillment_status END,
+             invoice_data = jsonb_set(
+               COALESCE(invoice_data::jsonb, '{}'::jsonb),
+               $1::text[],
+               to_jsonb($2::text)
+             )
+         WHERE id = $3 AND payment_status = 'unpaid'
+         RETURNING id`,
+        [txFieldPath, txId, order.id]
+      ).catch(async () => {
+        return query<{ id: string }>(
+          `UPDATE orders
+           SET payment_status = 'paid',
+               fulfillment_status = CASE WHEN fulfillment_status = 'pending' THEN 'processing' ELSE fulfillment_status END
+           WHERE id = $1 AND payment_status = 'unpaid'
+           RETURNING id`,
+          [order.id]
+        );
+      });
+      claimed = claimRes.rows.length > 0;
+    } else {
+      const claimRes = await query<{ id: string }>(
+        `UPDATE orders
+         SET payment_status = 'paid',
+             fulfillment_status = CASE WHEN fulfillment_status = 'pending' THEN 'processing' ELSE fulfillment_status END
+         WHERE id = $1 AND payment_status = 'unpaid'
+         RETURNING id`,
+        [order.id]
+      );
+      claimed = claimRes.rows.length > 0;
+    }
+
+    if (!claimed) {
+      return {
+        success: true,
+        mode: 'already_processed',
+        message: `Order "${orderCode}" payment was already claimed by another concurrent request.`,
+        orderCode,
+      };
+    }
   }
 
   // 2a. Record voucher usage & broadcast immediately upon initial payment confirmation

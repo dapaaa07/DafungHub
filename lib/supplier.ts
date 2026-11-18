@@ -60,6 +60,7 @@ async function supplierRequest<T>(endpoint: string, options: RequestInit = {}): 
   const response = await fetch(url, {
     ...options,
     headers,
+    signal: options.signal ?? AbortSignal.timeout(6000),
   });
 
   if (!response.ok) {
@@ -682,7 +683,22 @@ export function enrichManualProduct(product: Product): EnrichedProduct {
   };
 }
 
-export async function getAllEnrichedProducts(includeTest: boolean = false): Promise<EnrichedProduct[]> {
+const CATALOG_FRESH_TTL_MS = 60_000;
+const CATALOG_STALE_TTL_MS = 5 * 60_000;
+
+interface CatalogCacheEntry {
+  data: EnrichedProduct[];
+  fetchedAt: number;
+}
+
+const catalogCache = new Map<string, CatalogCacheEntry>();
+const inflightCatalogFetches = new Map<string, Promise<EnrichedProduct[]>>();
+
+export function clearSupplierCatalogCache(): void {
+  catalogCache.clear();
+}
+
+async function fetchEnrichedProductsFresh(includeTest: boolean): Promise<EnrichedProduct[]> {
   try {
     const [rawProducts, customPrices, manualDbResult] = await Promise.all([
       getSupplierProducts(includeTest, false).catch(() => FALLBACK_PRODUCTS),
@@ -704,5 +720,40 @@ export async function getAllEnrichedProducts(includeTest: boolean = false): Prom
     return FALLBACK_PRODUCTS.filter((p) => includeTest || !isTestProduct(p)).map((p) => enrichProduct(p));
   }
 }
+
+export async function getAllEnrichedProducts(includeTest: boolean = false): Promise<EnrichedProduct[]> {
+  const key = includeTest ? 'with_test' : 'public';
+  const now = Date.now();
+  const cached = catalogCache.get(key);
+
+  if (cached && now - cached.fetchedAt < CATALOG_FRESH_TTL_MS) {
+    return cached.data;
+  }
+
+  const refresh = () => {
+    let inflight = inflightCatalogFetches.get(key);
+    if (!inflight) {
+      inflight = fetchEnrichedProductsFresh(includeTest)
+        .then((data) => {
+          catalogCache.set(key, { data, fetchedAt: Date.now() });
+          return data;
+        })
+        .finally(() => {
+          inflightCatalogFetches.delete(key);
+        });
+      inflightCatalogFetches.set(key, inflight);
+    }
+    return inflight;
+  };
+
+  // Stale-while-revalidate: serve cached data instantly while refreshing in background
+  if (cached && now - cached.fetchedAt < CATALOG_STALE_TTL_MS) {
+    refresh().catch(() => {});
+    return cached.data;
+  }
+
+  return await refresh();
+}
+
 
 

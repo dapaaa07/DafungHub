@@ -765,10 +765,13 @@ export async function handleAdminHttpRequest(
       const displayId = user.telegram_id || `WEB-${user.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
       const username = user.username || (user.email ? (user.email as string).split('@')[0] : null);
 
+      const { password_hash: _passwordHash, ...safeUser } = user;
+      void _passwordHash;
+
       sendJson(res, 200, {
         success: true,
         user: {
-          ...user,
+          ...safeUser,
           id: user.id,
           telegramId: displayId,
           telegram_id: displayId,

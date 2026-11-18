@@ -22,6 +22,17 @@ const nextConfig: NextConfig = {
     workerThreads: false,
   },
   async headers() {
+    const noStoreHeaders = [
+      {
+        key: 'Cache-Control',
+        value: 'private, no-cache, no-store, max-age=0, must-revalidate',
+      },
+      {
+        key: 'X-LiteSpeed-Cache-Control',
+        value: 'no-cache, no-store',
+      },
+    ];
+
     return [
       {
         source: '/:path*',
@@ -30,34 +41,31 @@ const nextConfig: NextConfig = {
             key: 'X-LiteSpeed-Cache-Control',
             value: 'no-cache',
           },
-        ],
-      },
-      {
-        source: '/account/:path*',
-        headers: [
           {
-            key: 'Cache-Control',
-            value: 'private, no-cache, no-store, max-age=0, must-revalidate',
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
           },
           {
-            key: 'X-LiteSpeed-Cache-Control',
-            value: 'no-cache, no-store',
-          },
-        ],
-      },
-      {
-        source: '/orders/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'private, no-cache, no-store, max-age=0, must-revalidate',
+            key: 'X-Frame-Options',
+            value: 'DENY',
           },
           {
-            key: 'X-LiteSpeed-Cache-Control',
-            value: 'no-cache, no-store',
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()',
           },
         ],
       },
+      { source: '/account/:path*', headers: noStoreHeaders },
+      { source: '/orders/:path*', headers: noStoreHeaders },
+      { source: '/order/:path*', headers: noStoreHeaders },
+      { source: '/api/orders/:path*', headers: noStoreHeaders },
+      { source: '/api/auth/:path*', headers: noStoreHeaders },
+      { source: '/api/user/:path*', headers: noStoreHeaders },
+      { source: '/api/admin/:path*', headers: noStoreHeaders },
     ];
   },
   turbopack: {

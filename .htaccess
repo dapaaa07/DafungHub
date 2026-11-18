@@ -1,4 +1,7 @@
-# DaFung Hub - cPanel LiteSpeed Reverse Proxy & Error Handling Configuration
+# DaFung Hub - cPanel LiteSpeed Reverse Proxy, Security & Error Handling Configuration
+
+# Disable directory listing
+Options -Indexes
 
 # Disable LiteSpeed Cache so dynamic Next.js pages are never stale
 <IfModule LiteSpeed>
@@ -9,6 +12,9 @@
 
 <IfModule mod_headers.c>
   Header always set X-LiteSpeed-Cache-Control "no-cache, no-store"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
 
 # Custom static error pages (served directly by LiteSpeed even when Node.js/PM2 is offline)
@@ -32,8 +38,17 @@ RewriteCond %{REQUEST_URI} ^/public/errors/[0-9]{3}\.html$ [OR]
 RewriteCond %{REQUEST_URI} ^/public/503\.html$
 RewriteRule ^ - [L]
 
-# Reverse proxy root & Next.js routes to local PM2 server (port 3088)
+# Allow cPanel AutoSSL / ACME challenge verification
+RewriteCond %{REQUEST_URI} ^/\.well-known/
+RewriteRule ^ - [L]
+
+# SECURITY: Explicitly deny direct web access to dotfiles (.env, .git, .cache, .htaccess),
+# server source directories, configs, backups, and credentials on disk
+RewriteRule (^|/)\. - [F,L]
+RewriteRule ^(app|bot|components|lib|migrations|node_modules|scripts|tests|dist|dafung-web|dafung-hub-admin)(/|$) - [F,L]
+RewriteRule ^(server\.js|ecosystem\.config\.cjs|next\.config\.ts|package(-lock)?\.json|tsconfig\.json|README.*\.md)$ - [F,L]
+RewriteRule \.(env|bak|sql|log|zip|tar|gz|ts|tsx|cjs|mjs|pem|key)$ - [F,L]
+
+# Reverse proxy all application routes cleanly to local PM2 Next.js server (port 3088)
 RewriteRule ^$ http://127.0.0.1:3088/ [P,L]
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.*)$ http://127.0.0.1:3088/$1 [P,L]
