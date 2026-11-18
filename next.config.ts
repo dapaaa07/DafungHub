@@ -62,6 +62,7 @@ const nextConfig: NextConfig = {
       { source: '/account/:path*', headers: noStoreHeaders },
       { source: '/orders/:path*', headers: noStoreHeaders },
       { source: '/order/:path*', headers: noStoreHeaders },
+      { source: '/monitor/:path*', headers: noStoreHeaders },
       { source: '/api/orders/:path*', headers: noStoreHeaders },
       { source: '/api/auth/:path*', headers: noStoreHeaders },
       { source: '/api/user/:path*', headers: noStoreHeaders },

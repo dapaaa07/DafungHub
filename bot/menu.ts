@@ -3028,6 +3028,22 @@ export function registerMenuHandlers(botInstance: ExtendedBot): void {
       // OWNER / ADMIN CALLBACKS
       if (data === 'admin_panel') {
         await sendAdminPanel(ctx, botInstance);
+      } else if (data === 'admin_refresh_server') {
+        if (isAdmin(ctx.from?.id)) {
+          const { getServerHealth, formatTelegramHealthReport } = await import('../lib/server-health');
+          const health = await getServerHealth();
+          const report = formatTelegramHealthReport(health);
+          await sendSafeMessage(ctx, botInstance, report, {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '🔄 Refresh Resource', callback_data: 'admin_refresh_server' }],
+                [{ text: '⚙️ Panel Admin', callback_data: 'admin_panel' }],
+              ],
+            },
+          });
+        }
+        return;
       } else if (data === 'admin_set_maintenance') {
         if (isAdmin(ctx.from?.id)) {
           await setBotStatus('maintenance');

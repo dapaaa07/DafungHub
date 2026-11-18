@@ -647,6 +647,39 @@ export function registerHandlers(botInstance: ExtendedBot): void {
     await sendAdminPanel(ctx, botInstance);
   });
 
+  // Owner Server Resource Monitor (/server or /resource)
+  botInstance.command(['server', 'resource'], async (ctx: Context) => {
+    const { isAdmin } = await import('../lib/pricing');
+    if (!isAdmin(ctx.from?.id)) {
+      await sendSafeMessage(
+        ctx,
+        botInstance,
+        '⛔ <b>Akses Ditolak:</b> Perintah ini khusus untuk Owner / Admin DaFung Hub.',
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [[{ text: '🔙 Menu Utama', callback_data: 'menu_main' }]],
+          },
+        }
+      );
+      return;
+    }
+
+    const { getServerHealth, formatTelegramHealthReport } = await import('../lib/server-health');
+    const health = await getServerHealth();
+    const report = formatTelegramHealthReport(health);
+
+    await sendSafeMessage(ctx, botInstance, report, {
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔄 Refresh Resource', callback_data: 'admin_refresh_server' }],
+          [{ text: '⚙️ Panel Admin', callback_data: 'admin_panel' }],
+        ],
+      },
+    });
+  });
+
   const handleKirimCommand = async (ctx: Context) => {
     const { isAdmin } = await import('../lib/pricing');
     if (ctx.from?.id && !isAdmin(ctx.from?.id)) {
