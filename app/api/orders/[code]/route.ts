@@ -62,20 +62,21 @@ export async function GET(
         { status: 403, headers: { 'Cache-Control': 'private, no-store, max-age=0' } }
       );
     }
-    const invData =
+    let invData =
       typeof order.invoice_data === 'string'
         ? JSON.parse(order.invoice_data || '{}')
         : ((order.invoice_data || {}) as Record<string, unknown>);
 
     // If order is still unpaid, check ShopeePay payment status on the fly
+    // Works for both token-based gateway payments and static_conversion QRIS orders (matched by unique amount + timestamp)
     if (order.payment_status === 'unpaid') {
       const orderGateway = String(invData.gateway || process.env.PAYMENT_GATEWAY || 'shopeepay').toLowerCase();
-      if (orderGateway === 'shopeepay' && invData.token) {
+      if (orderGateway === 'shopeepay') {
         try {
           const { checkShopeePayPayment } = await import('@/lib/shopeepay');
-          const checkAmount = Number(invData.payable_amount || order.product_price);
+          const checkAmount = Number(invData.payable_amount || invData.amount || order.product_price);
           const checkResult = await checkShopeePayPayment({
-            token: String(invData.token),
+            token: invData.token ? String(invData.token) : undefined,
             orderCode: order.order_code,
             amount: checkAmount,
             orderCreatedAt: order.created_at,
@@ -90,7 +91,7 @@ export async function GET(
 
             await processOrderPayment(order.order_code, bot, txMeta);
 
-            // Re-fetch fresh order status
+            // Re-fetch fresh order status and updated invoice_data (e.g. delivered_media)
             const freshRes = await query<typeof order>(
               `SELECT o.*, p.name as product_name, p.price as product_price, p.description as product_description
                FROM orders o
@@ -100,6 +101,10 @@ export async function GET(
             );
             if (freshRes.rows.length > 0) {
               order = freshRes.rows[0];
+              invData =
+                typeof order.invoice_data === 'string'
+                  ? JSON.parse(order.invoice_data || '{}')
+                  : ((order.invoice_data || {}) as Record<string, unknown>);
             }
           }
         } catch (checkErr) {
