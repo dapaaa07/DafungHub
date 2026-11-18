@@ -1,6 +1,8 @@
 // server.js - cPanel Node.js / Phusion Passenger Entrypoint
 const { createServer } = require('http');
 const { parse } = require('url');
+const fs = require('fs');
+const path = require('path');
 const next = require('next');
 
 // Auto-load .env for standalone execution
@@ -13,6 +15,13 @@ try {
 const dev = false;
 const hostname = process.env.HOSTNAME || '127.0.0.1';
 const port = parseInt(process.env.PORT, 10) || 3000;
+
+let fallbackErrorHtml = null;
+try {
+  fallbackErrorHtml = fs.readFileSync(path.join(__dirname, 'public', '503.html'), 'utf8');
+} catch {
+  // Fallback to plain text if file is missing
+}
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -27,7 +36,15 @@ app
       } catch (err) {
         console.error('[cPanel Server Error]:', req.url, err);
         res.statusCode = 500;
-        res.end('Internal Server Error');
+        if (req.url && req.url.startsWith('/api/')) {
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ success: false, error: 'Terjadi kesalahan sementara pada server.' }));
+        } else if (fallbackErrorHtml) {
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          res.end(fallbackErrorHtml);
+        } else {
+          res.end('Internal Server Error');
+        }
       }
     })
       .once('error', (err) => {

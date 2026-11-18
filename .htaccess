@@ -11,6 +11,12 @@
   Header always set X-LiteSpeed-Cache-Control "no-cache, no-store"
 </IfModule>
 
+# Custom static error pages (served directly by LiteSpeed even when Node.js/PM2 is offline)
+ErrorDocument 500 /public/503.html
+ErrorDocument 502 /public/503.html
+ErrorDocument 503 /public/503.html
+ErrorDocument 504 /public/503.html
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
@@ -18,8 +24,9 @@
   RewriteCond %{HTTPS} off
   RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-  # Allow static files directly
+  # Allow static files & custom error page directly
   RewriteCond %{REQUEST_URI} ^/_next/static/(.*)$ [OR]
+  RewriteCond %{REQUEST_URI} ^/public/503\.html$ [OR]
   RewriteCond %{REQUEST_FILENAME} -f
   RewriteRule ^ - [L]
 </IfModule>
