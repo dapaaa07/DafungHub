@@ -16,12 +16,16 @@ const dev = false;
 const hostname = process.env.HOSTNAME || '127.0.0.1';
 const port = parseInt(process.env.PORT, 10) || 3000;
 
-let fallbackErrorHtml = null;
-try {
-  fallbackErrorHtml = fs.readFileSync(path.join(__dirname, 'public', '503.html'), 'utf8');
-} catch {
-  // Fallback to plain text if file is missing
+function loadErrorHtml(code) {
+  try {
+    return fs.readFileSync(path.join(__dirname, 'public', 'errors', `${code}.html`), 'utf8');
+  } catch {
+    return null;
+  }
 }
+
+const fallback500Html = loadErrorHtml(500) || loadErrorHtml(503);
+const fallback400Html = loadErrorHtml(400);
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -31,7 +35,22 @@ app
   .then(() => {
     createServer(async (req, res) => {
       try {
-        const parsedUrl = parse(req.url, true);
+        let parsedUrl;
+        try {
+          parsedUrl = parse(req.url || '/', true);
+        } catch {
+          res.statusCode = 400;
+          if (req.url && req.url.startsWith('/api/')) {
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify({ success: false, error: 'Format URL permintaan tidak valid.' }));
+          } else if (fallback400Html) {
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.end(fallback400Html);
+          } else {
+            res.end('Bad Request');
+          }
+          return;
+        }
         await handle(req, res, parsedUrl);
       } catch (err) {
         console.error('[cPanel Server Error]:', req.url, err);
@@ -39,9 +58,9 @@ app
         if (req.url && req.url.startsWith('/api/')) {
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.end(JSON.stringify({ success: false, error: 'Terjadi kesalahan sementara pada server.' }));
-        } else if (fallbackErrorHtml) {
+        } else if (fallback500Html) {
           res.setHeader('Content-Type', 'text/html; charset=utf-8');
-          res.end(fallbackErrorHtml);
+          res.end(fallback500Html);
         } else {
           res.end('Internal Server Error');
         }

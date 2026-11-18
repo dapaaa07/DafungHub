@@ -12,10 +12,18 @@
 </IfModule>
 
 # Custom static error pages (served directly by LiteSpeed even when Node.js/PM2 is offline)
-ErrorDocument 500 /public/503.html
-ErrorDocument 502 /public/503.html
-ErrorDocument 503 /public/503.html
-ErrorDocument 504 /public/503.html
+ErrorDocument 400 /public/errors/400.html
+ErrorDocument 401 /public/errors/401.html
+ErrorDocument 402 /public/errors/402.html
+ErrorDocument 403 /public/errors/403.html
+ErrorDocument 404 /public/errors/404.html
+ErrorDocument 405 /public/errors/405.html
+ErrorDocument 408 /public/errors/408.html
+ErrorDocument 429 /public/errors/429.html
+ErrorDocument 500 /public/errors/500.html
+ErrorDocument 502 /public/errors/502.html
+ErrorDocument 503 /public/errors/503.html
+ErrorDocument 504 /public/errors/504.html
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
@@ -24,8 +32,9 @@ ErrorDocument 504 /public/503.html
   RewriteCond %{HTTPS} off
   RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-  # Allow static files & custom error page directly
+  # Allow static files & custom error pages directly
   RewriteCond %{REQUEST_URI} ^/_next/static/(.*)$ [OR]
+  RewriteCond %{REQUEST_URI} ^/public/errors/[0-9]{3}\.html$ [OR]
   RewriteCond %{REQUEST_URI} ^/public/503\.html$ [OR]
   RewriteCond %{REQUEST_FILENAME} -f
   RewriteRule ^ - [L]

@@ -4,14 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>Pemulihan Layanan — Dafung Hub</title>
+  <title>503 Service Unavailable — Dafung Hub</title>
   <style>
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg: #F8F9FA;
       --surface: #FFFFFF;
@@ -20,10 +15,7 @@
       --border: #E5E7EB;
       --yellow: #FFDE00;
       --yellow-hover: #FFE838;
-      --cyan: #3AA8E8;
-      --wa: #25D366;
     }
-
     body {
       min-height: 100vh;
       background-color: var(--bg);
@@ -36,10 +28,9 @@
       justify-content: center;
       padding: 24px 16px;
     }
-
     .card {
       width: 100%;
-      max-width: 520px;
+      max-width: 540px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 24px;
@@ -47,19 +38,17 @@
       padding: 36px 28px;
       text-align: center;
     }
-
     .brand {
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 24px;
+      margin-bottom: 22px;
       font-weight: 800;
       font-size: 18px;
       letter-spacing: -0.02em;
       color: var(--ink);
       text-decoration: none;
     }
-
     .brand-mark {
       width: 34px;
       height: 34px;
@@ -72,60 +61,57 @@
       font-weight: 900;
       font-size: 16px;
     }
-
     .badge {
       display: inline-flex;
       align-items: center;
       gap: 8px;
       padding: 6px 14px;
       border-radius: 999px;
-      background: rgba(255, 222, 0, 0.25);
-      border: 1px solid var(--yellow);
-      color: var(--ink);
+      background: #FFFBEB;
+      border: 1px solid #FDE68A;
+      color: #92400E;
       font-size: 11px;
       font-weight: 800;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
-
-    .pulse-dot {
-      width: 8px;
-      height: 8px;
+    .dot {
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
-      background: var(--ink);
-      animation: pulse 1.6s ease-in-out infinite;
+      background: #D97706;
+      flex-shrink: 0;
     }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.35; transform: scale(0.82); }
+    .code {
+      font-size: 64px;
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      color: var(--ink);
+      margin-bottom: 12px;
     }
-
     h1 {
-      font-size: 24px;
-      line-height: 1.25;
+      font-size: 22px;
+      line-height: 1.3;
       font-weight: 800;
       letter-spacing: -0.02em;
       margin-bottom: 10px;
       color: var(--ink);
     }
-
     .desc {
       font-size: 14px;
       line-height: 1.6;
       color: var(--muted);
-      max-width: 410px;
+      max-width: 420px;
       margin: 0 auto 24px;
     }
-
     .actions {
       display: flex;
       flex-direction: column;
       gap: 10px;
-      margin-bottom: 24px;
+      margin-bottom: 10px;
     }
-
     .btn {
       display: inline-flex;
       align-items: center;
@@ -141,31 +127,23 @@
       cursor: pointer;
       transition: transform 0.15s ease, background-color 0.15s ease;
     }
-
-    .btn:active {
-      transform: scale(0.98);
-    }
-
-    .btn-primary {
-      background: var(--ink);
-      color: #FFFFFF;
-    }
-
-    .btn-primary:hover {
-      background: #252525;
-    }
-
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--ink); color: #FFFFFF; }
+    .btn-primary:hover { background: #252525; }
+    .btn-secondary { background: #F3F4F6; color: var(--ink); }
+    .btn-secondary:hover { background: #E5E7EB; }
+    .btn-yellow { background: var(--yellow); color: var(--ink); font-weight: 800; }
+    .btn-yellow:hover { background: var(--yellow-hover); }
     .retry-note {
       font-size: 12px;
       color: var(--muted);
-      margin-top: 4px;
+      margin-top: 8px;
     }
-
     .divider {
+      margin-top: 22px;
       border-top: 1px solid #F3F4F6;
       padding-top: 20px;
     }
-
     .alt-title {
       font-size: 11px;
       font-weight: 800;
@@ -174,47 +152,21 @@
       color: #9CA3AF;
       margin-bottom: 12px;
     }
-
     .alt-grid {
       display: grid;
       grid-template-columns: 1fr;
       gap: 10px;
     }
-
     @media (min-width: 480px) {
-      .card {
-        padding: 42px 36px;
-      }
-      .alt-grid {
-        grid-template-columns: 1fr 1fr;
-      }
+      .card { padding: 42px 36px; }
+      .actions { flex-direction: row; }
+      .alt-grid { grid-template-columns: 1fr 1fr; }
     }
-
-    .btn-tg {
-      background: #F0F9FF;
-      border: 1px solid #BAE6FD;
-      color: #0C4A6E;
-    }
-
-    .btn-tg:hover {
-      background: #E0F2FE;
-    }
-
-    .btn-wa {
-      background: #ECFDF5;
-      border: 1px solid #A7F3D0;
-      color: #064E3B;
-    }
-
-    .btn-wa:hover {
-      background: #D1FAE5;
-    }
-
-    .footer-note {
-      margin-top: 20px;
-      font-size: 11px;
-      color: #9CA3AF;
-    }
+    .btn-tg { background: #F0F9FF; border: 1px solid #BAE6FD; color: #0C4A6E; }
+    .btn-tg:hover { background: #E0F2FE; }
+    .btn-wa { background: #ECFDF5; border: 1px solid #A7F3D0; color: #064E3B; }
+    .btn-wa:hover { background: #D1FAE5; }
+    .footer-note { margin-top: 20px; font-size: 11px; color: #9CA3AF; }
   </style>
 </head>
 <body>
@@ -226,29 +178,31 @@
 
     <div>
       <span class="badge">
-        <span class="pulse-dot" aria-hidden="true"></span>
-        <span>503 — Pemulihan Layanan</span>
+        <span class="dot" aria-hidden="true"></span>
+        <span>Error 503 — Pemulihan Layanan</span>
       </span>
     </div>
 
+    <p class="code">503</p>
     <h1>Website sedang dalam pemulihan singkat</h1>
-    <p class="desc">
-      Server sedang memuat ulang layanan secara otomatis agar performa tetap optimal. Halaman ini akan mencoba tersambung kembali secara otomatis.
-    </p>
+    <p class="desc">Server sedang memuat ulang layanan secara otomatis agar performa tetap optimal. Halaman ini akan mencoba tersambung kembali.</p>
 
     <div class="actions">
-      <button type="button" id="retryBtn" class="btn btn-primary" onclick="window.location.reload()">
+      
+      <button type="button" class="btn btn-primary" onclick="window.location.reload()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFDE00" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
           <path d="M3 3v5h5" />
         </svg>
         <span>Muat Ulang Sekarang</span>
       </button>
-      <p class="retry-note" id="countdownText">Mencoba ulang otomatis dalam 15 detik...</p>
+      <a href="/" class="btn btn-secondary">Kembali ke Beranda</a>
+    
     </div>
+    <p class="retry-note" id="countdownText">Mencoba ulang otomatis dalam 15 detik...</p>
 
     <div class="divider">
-      <p class="alt-title">Order &amp; Bantuan Tetap Aktif</p>
+      <p class="alt-title">Jalur Bantuan &amp; Order Resmi</p>
       <div class="alt-grid">
         <a href="https://t.me/dafung_hub_bot" target="_blank" rel="noopener noreferrer" class="btn btn-tg">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3AA8E8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -257,7 +211,7 @@
           </svg>
           <span>Bot Telegram</span>
         </a>
-        <a href="https://wa.me/6281294950241?text=Halo%20CS%20Dafung%20Hub%2C%20website%20sedang%20menampilkan%20503%20Service%20Unavailable." target="_blank" rel="noopener noreferrer" class="btn btn-wa">
+        <a href="https://wa.me/6281294950241?text=Halo%20CS%20Dafung%20Hub%2C%20saya%20mengalami%20Error%20503%20(Service%20Unavailable)%20saat%20mengakses%20website." target="_blank" rel="noopener noreferrer" class="btn btn-wa">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#25D366" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
           </svg>
@@ -268,7 +222,7 @@
   </main>
 
   <p class="footer-note">store.dafung.web.id &bull; Layanan Digital Premium</p>
-
+  
   <script>
     (function () {
       var seconds = 15;
