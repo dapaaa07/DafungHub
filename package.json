@@ -5,9 +5,10 @@
   "main": "server.js",
   "scripts": {
     "dev": "next dev",
-    "build": "npm run build:bot && next build",
+    "build": "npm run build:bot && NODE_OPTIONS='--max-old-space-size=768' UV_THREADPOOL_SIZE=2 next build",
     "build:bot": "esbuild scripts/run-bot.ts --bundle --platform=node --target=node18 --outfile=dist/bot.js --external:pg-native --external:node-telegram-bot-api || true",
-    "start": "node server.js",
+    "start": "NODE_OPTIONS='--max-old-space-size=384' UV_THREADPOOL_SIZE=2 node server.js",
+    "deploy:lowmem": "(pm2 stop dafung-hub 2>/dev/null || true) && npm run build && pm2 startOrRestart ecosystem.config.cjs --update-env && pm2 save",
     "start:bot": "node dist/bot.js",
     "start:dev": "tsx scripts/run-bot.ts",
     "lint": "eslint",

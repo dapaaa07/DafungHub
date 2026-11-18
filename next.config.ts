@@ -5,6 +5,16 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Low-RAM optimizations for 1.5GB cPanel shared hosting:
+  // 1. Disable runtime image resizing (sharp allocates 100-250MB native RAM)
+  // 2. Disable Node gzip (Cloudflare & LiteSpeed already handle Brotli/Gzip)
+  // 3. Cap Next.js internal in-memory cache to 10MB (default is 50MB)
+  images: {
+    unoptimized: true,
+  },
+  compress: false,
+  productionBrowserSourceMaps: false,
+  cacheMaxMemorySize: 10 * 1024 * 1024,
   cacheComponents: true,
   partialPrefetching: true,
   experimental: {
