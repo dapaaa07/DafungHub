@@ -11,8 +11,9 @@ module.exports = {
       node_args: '--max-old-space-size=384',
       max_memory_restart: '450M',
       min_uptime: '10s',
-      max_restarts: 10,
-      restart_delay: 3000,
+      max_restarts: 50,
+      restart_delay: 2000,
+      exp_backoff_restart_delay: 500,
       env: {
         NODE_ENV: 'production',
         HOSTNAME: '127.0.0.1',

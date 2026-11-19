@@ -80,13 +80,20 @@ function createPool(): Pool {
     connectionString?.includes('pooler.supabase.com') ||
     connectionString?.includes('sslmode=require');
 
-  return new Pool({
+  const poolInstance = new Pool({
     connectionString,
     max: 5,
     idleTimeoutMillis: 15000,
     connectionTimeoutMillis: 10000,
     ssl: isRemote ? { rejectUnauthorized: false } : undefined,
   });
+
+  // CRITICAL: Handle idle client errors so Node.js process does not crash when remote DB closes idle socket
+  poolInstance.on('error', (err) => {
+    console.error('[PostgreSQL Pool] Idle client connection error (handled):', err.message);
+  });
+
+  return poolInstance;
 }
 
 export const pool = globalThis.postgresPoolGlobal ?? createPool();

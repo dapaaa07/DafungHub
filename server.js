@@ -12,6 +12,15 @@ try {
   // Ignore
 }
 
+// Global guards against unhandled crashes
+process.on('uncaughtException', (err) => {
+  console.error('[DaFung Server Uncaught Exception]:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[DaFung Server Unhandled Rejection]:', reason);
+});
+
 const dev = false;
 const hostname = process.env.HOSTNAME || '127.0.0.1';
 const port = parseInt(process.env.PORT, 10) || 3000;
